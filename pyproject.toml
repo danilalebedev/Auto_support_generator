@@ -1,0 +1,19 @@
+[project]
+name = "si-generator"
+version = "0.1.0"
+description = "Generate organic chemistry Supporting Information DOCX files from tabular compound data."
+requires-python = ">=3.10"
+dependencies = [
+    "olefile",
+    "python-docx",
+    "pywin32; platform_system == 'Windows'",
+    "rdkit",
+]
+
+[project.scripts]
+si-generator = "si_generator.cli:main"
+si-generator-gui = "si_generator.gui:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

@@ -1,0 +1,77 @@
+document:
+  base_style: Normal
+
+compound:
+  title:
+    paragraph_style:
+    bold: true
+    italic: false
+  number:
+    bold: true
+    italic: false
+  structure:
+    top_offset_pt: 12
+    wrap: square
+    distance_right_pt: 8
+  summary:
+    paragraph_style:
+    line_spacing: 1.5
+
+nmr:
+  paragraph_style:
+  label:
+    bold: true
+    italic: false
+  conditions:
+    bold: false
+    italic: false
+  body:
+    bold: false
+    italic: false
+
+chem_formatting:
+  formulas:
+    subscripts: true
+  isotope_numbers:
+    superscript: true
+  coupling_constants:
+    order_superscript: false
+    j_italic: true
+    coupling_partner_subscript: false
+  ranges:
+    en_dash: false
+
+hrms:
+  paragraph_style:
+  label:
+    bold: true
+    italic: false
+  formula:
+    subscripts: true
+    charge_superscript: true
+  adduct:
+    superscript_charge: false
+
+ir:
+  paragraph_style:
+  label:
+    bold: true
+    italic: false
+  unit:
+    superscript_minus_one: true
+
+appendix:
+  title:
+    paragraph_style:
+    bold: true
+    italic: false
+  spectrum_title:
+    paragraph_style:
+    bold: true
+    italic: false
+  structure:
+    top_offset_pt: 0
+    wrap: in_front
+  image:
+    width: page
+    align: center
