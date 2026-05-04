@@ -21,7 +21,6 @@ def fill_nmr_from_mnova(
     output_dir = Path(output_dir).resolve()
     output_root = Path(output_root).resolve() if output_root else output_dir.parent
     logs_root = output_root / "logs"
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     tasks: list[MnovaTask] = []
     image_root = logs_root / "spectrum_images"
@@ -42,6 +41,7 @@ def fill_nmr_from_mnova(
     if not tasks:
         return
 
+    output_dir.mkdir(parents=True, exist_ok=True)
     print(f"[Mnova] extracting {len(tasks)} spectra in one MestReNova session", flush=True)
     reports = extract_reports_batch(tasks, output_dir)
 

@@ -1,23 +1,134 @@
 # Auto Support Generator
 
-Auto Support Generator assembles organic chemistry Supporting Information (SI)
-documents from a compound table and NMR spectra. The program can copy ChemDraw
-OLE structures from a Word table, process spectra through MestReNova, generate
-NMR descriptions and spectrum images, calculate HRMS values, and build a final
-`.docx` file in a journal-like format.
+Auto Support Generator - программа для автоматической сборки Supporting
+Information (SI) в органической химии.
 
-The project is currently Windows-oriented because ChemDraw, Word OLE objects,
-and MestReNova automation are used through desktop applications.
+Идея простая: пользователь заполняет таблицу по веществам, добавляет архив со
+спектрами ЯМР, выбирает настройки оформления, а программа собирает готовый
+`docx` support information. Программа также сохраняет обработанные спектры,
+картинки спектров и `.mnova` файлы для каждого соединения.
 
-## What The Program Produces
+## Для чего нужна программа
 
-For one run, choose an output file such as:
+Обычно SI собирают вручную: копируют структуры из ChemDraw, пишут названия,
+переносят ЯМР, вставляют HRMS, форматируют спектры и картинки. Это долго и
+легко ошибиться.
+
+Auto Support Generator делает это автоматически:
+
+- переносит структуры как настоящие OLE-объекты ChemDraw/ChemSketch;
+- генерирует блоки описания соединений в одном стиле;
+- обрабатывает 1H и 13C NMR через MestReNova;
+- вставляет описания ЯМР в текст SI;
+- экспортирует картинки спектров;
+- сохраняет обработанные `.mnova` файлы;
+- считает расчетный HRMS по формуле;
+- проверяет, совпадают ли экспериментальные данные с формулой вещества.
+
+## Что нужно установить
+
+Полный workflow сейчас рассчитан на Windows, потому что используются Word,
+ChemDraw OLE и MestReNova.
+
+Обязательные программы:
+
+| Программа | Для чего нужна | Проверенная версия |
+| --- | --- | --- |
+| Windows | запуск Word/ChemDraw/MestReNova automation | Windows 10/11 |
+| Microsoft Word desktop | создание итогового `.docx` и вставка OLE-структур | Microsoft 365 / Word 2019+ |
+| ChemDraw / ChemOffice | хранение и перенос структур как OLE-объектов | ChemDraw 22.2.0.3300 |
+| MestReNova | обработка ЯМР, peak picking, экспорт PNG и `.mnova` | MestReNova 14.2.0-26256 |
+| Python | запуск программы | Python 3.10+ |
+
+Важно: ChemDraw и MestReNova должны быть установлены как обычные desktop
+программы. Для генерации только из CSV без структур и без спектров можно
+запустить часть функций без ChemDraw/MestReNova, но основной сценарий требует
+обе программы.
+
+По умолчанию MestReNova ожидается здесь:
+
+```text
+C:\Program Files\Mestrelab Research S.L\MestReNova\MestReNova.exe
+```
+
+## Как скачать программу с GitHub
+
+Если вы не знакомы с GitHub:
+
+1. Откройте страницу проекта:
+
+```text
+https://github.com/danilalebedev/Auto_support_generator
+```
+
+2. Нажмите зеленую кнопку `Code`.
+3. Выберите `Download ZIP`.
+4. Распакуйте архив, например на рабочий стол.
+5. Откройте распакованную папку `Auto_support_generator`.
+
+После распаковки в папке должны быть файлы:
+
+```text
+Install dependencies.bat
+SI Generator GUI.bat
+README.md
+pyproject.toml
+src/
+scripts/
+examples/
+```
+
+## Как установить Python-зависимости
+
+Самый простой способ:
+
+1. Откройте папку проекта.
+2. Дважды кликните `Install dependencies.bat`.
+3. Дождитесь окончания установки.
+
+Если удобнее через PowerShell:
+
+```powershell
+cd C:\Users\user\Desktop\Auto_support_generator
+py -m pip install --upgrade pip
+py -m pip install -e .
+```
+
+## Как запустить GUI
+
+После установки зависимостей дважды кликните:
+
+```text
+SI Generator GUI.bat
+```
+
+В окне программы:
+
+1. В `Table type` выберите тип таблицы:
+   - `Word table with ChemDraw objects` - основной вариант, если в таблице есть
+     структуры ChemDraw/ChemSketch;
+   - `CSV table` - простой вариант без OLE-структур.
+2. В `Compound table` выберите таблицу с веществами.
+3. В `Spectra zip` выберите zip-архив со спектрами.
+4. В `Template .docx` можно выбрать Word-шаблон оформления. Это необязательно.
+5. В `Style config .yml` можно выбрать файл настроек оформления. Это
+   необязательно.
+6. В `Output .docx` выберите, куда сохранить готовый support.
+7. Оставьте `Check support` включенным, если хотите проверять ЯМР и HRMS.
+8. Нажмите `Generate SI`.
+
+В нижнем окне будет лог выполнения. После завершения нажмите `Open output
+folder`, чтобы открыть папку с результатами.
+
+## Что получается на выходе
+
+Если выбран output:
 
 ```text
 output/support_information.docx
 ```
 
-The generator creates this folder structure:
+то рядом создается структура:
 
 ```text
 output/
@@ -36,117 +147,87 @@ output/
       2a_1H.txt
       2a_13C.txt
   logs/
-    mnova_batch/
-    spectrum_images/
-    _spectra_zip/
 ```
 
-`support_information.docx` is the final SI file.
+Главные файлы для пользователя:
 
-`processed_spectra.zip` is the user-facing archive with one folder per
-compound. Each compound folder contains the generated spectrum PNG files and
-one processed `.mnova` file containing both 1H and 13C spectra in the same state
-used to export the PNG images.
+- `support_information.docx` - готовый SI;
+- `processed_spectra.zip` - архив с обработанными спектрами, PNG-картинками и
+  `.mnova` файлами;
+- `processed_spectra/` - то же самое, но в виде обычных папок.
 
-`logs/` contains temporary and diagnostic files. It can be kept for debugging or
-deleted after the result is checked.
+`logs/` - служебные файлы. Они нужны для отладки, но обычно пользователю их
+трогать не нужно.
 
-## Quick Start With The GUI
+## Примеры
 
-The easiest way to use the project is the graphical interface.
-
-1. Install the Python dependencies.
-2. Open the project folder.
-3. Double-click:
+В папке `examples/` есть пример CSV-входа:
 
 ```text
-SI Generator GUI.bat
+examples/sample_compounds.csv
 ```
 
-In the GUI:
-
-1. Select the table type:
-   - `Word table with ChemDraw objects` for `.docx` tables where the first
-     column contains ChemDraw/ChemSketch OLE structures.
-   - `CSV table` for a plain CSV workflow.
-2. Choose the compound table.
-3. Choose the spectra `.zip` file.
-4. Optionally choose a Word template `.docx`.
-5. Optionally choose `style_config.yml`.
-6. Choose the output `.docx` path.
-7. Leave `Check support` enabled if you want NMR/HRMS warnings in the final
-   document.
-8. Click `Generate SI`.
-
-The log window shows MestReNova processing status and the path to the generated
-files.
-
-## Installation
-
-Recommended setup on Windows:
+После установки зависимостей можно сгенерировать пример support без спектров:
 
 ```powershell
-cd C:\Users\user\Desktop\Auto_support_generator
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e .
+py -m si_generator ^
+  --input examples\sample_compounds.csv ^
+  --style-config style_config.example.yml ^
+  --no-check-support ^
+  --output examples\generated_support_example.docx
 ```
 
-External desktop software used by the full workflow:
+Файл `examples/generated_support_example.docx` - пример результата. Он показывает
+формат описания соединений, HRMS, IR и ручные ЯМР-описания. В реальном workflow
+ЯМР-описания и картинки спектров можно генерировать автоматически из
+MestReNova/Bruker spectra zip. В этой демонстрационной команде проверка
+отключена, чтобы пример выглядел как чистовой документ без диагностических
+пометок.
 
-- Microsoft Word
-- ChemDraw or another compatible OLE structure editor in the input document
-- MestReNova installed at:
+## Формат Word-таблицы
 
-```text
-C:\Program Files\Mestrelab Research S.L\MestReNova\MestReNova.exe
-```
+Основной вариант ввода - Word-файл с таблицей.
 
-## Input Word Table
+Первая строка таблицы - заголовки. Каждая следующая строка - одно соединение.
+В первой колонке должен быть номер соединения и OLE-структура ChemDraw или
+ChemSketch. Программа копирует эту структуру в итоговый SI как настоящий OLE
+объект.
 
-For the main workflow, prepare a Word document with a table. The first row is a
-header row. Each next row describes one compound.
+Полезные колонки:
 
-The first column should contain the compound number and the ChemDraw/ChemSketch
-OLE structure object. The generator uses this object as the real structure in
-the final SI.
-
-Common columns:
-
-| Column | Meaning |
+| Колонка | Что писать |
 | --- | --- |
-| `number` | Compound number, for example `2a` |
-| `name` | Compound name. If empty, the program can try to extract it from the structure |
-| `preparation` | Synthetic procedure text |
-| `yield` | Yield, for example `492 mg (31%)` |
-| `color` | Color, for example `white` |
-| `state` | State, for example `solid` or `oil` |
-| `melting_point` | Melting point without `mp`, for example `81-82 °C` |
-| `rf` | TLC/Rf text |
-| `formula` | Neutral molecular formula |
-| `hrms_adduct` | Adduct, for example `[M+H]+` |
-| `hrms_found` | Experimental HRMS value |
-| `h1_nmr` | Optional manually written 1H NMR description |
-| `c13_nmr` | Optional manually written 13C NMR description |
-| `extra_nmr` | Optional extra NMR lines, for example 19F NMR |
-| `ir` | Optional IR line |
+| `number` | номер соединения, например `2a` |
+| `name` | название вещества |
+| `preparation` | текст получения вещества |
+| `yield` | выход, например `492 mg (31%)` |
+| `color` | цвет, например `white` |
+| `state` | состояние, например `solid` или `oil` |
+| `melting_point` | температура плавления без `mp`, например `81-82 °C` |
+| `rf` | TLC/Rf строка |
+| `formula` | нейтральная молекулярная формула |
+| `hrms_adduct` | аддукт, например `[M+H]+` |
+| `hrms_found` | экспериментальный HRMS |
+| `h1_nmr` | ручное описание 1H NMR, если нет spectra zip |
+| `c13_nmr` | ручное описание 13C NMR, если нет spectra zip |
+| `extra_nmr` | дополнительные спектры, например 19F NMR |
+| `ir` | IR строка |
 
-If spectra are supplied, the generator fills `h1_nmr` and `c13_nmr`
-automatically from MestReNova.
+Если подключен zip со спектрами, `h1_nmr` и `c13_nmr` можно не заполнять:
+программа попробует получить их из MestReNova.
 
-## Spectra Zip Format
+## Формат spectra zip
 
-The spectra archive should contain one folder per compound number:
+Архив со спектрами должен содержать папки с номерами соединений:
 
 ```text
 spectra.zip
   2a/
-    2a_1H/
+    any_name_1H/
       fid
       acqus
       ...
-    2a_13C/
+    any_name_13C/
       fid
       acqus
       ...
@@ -154,161 +235,140 @@ spectra.zip
     ...
 ```
 
-The exact experiment folder names are flexible. The program searches for Bruker
-`fid` files and reads `acqus`/`acqu` to detect `1H` or `13C`.
+Названия внутренних папок могут отличаться. Программа ищет Bruker `fid` файлы и
+читает `acqus`/`acqu`, чтобы понять, где 1H, а где 13C.
 
-For every compound, the expected result is:
+## Как обрабатываются спектры
 
-```text
-processed_spectra/
-  2a/
-    2a_1H.png
-    2a_13C.png
-    2a.mnova
-```
+MestReNova запускается автоматически.
 
-## MestReNova Processing
+Сейчас программа делает следующее:
 
-The generator opens all spectra in one MestReNova session for better speed.
+- открывает все спектры в одной сессии MestReNova;
+- калибрует 1H по растворителю:
+  - CDCl3: 7.26 ppm;
+  - DMSO-d6: 2.50 ppm;
+- калибрует 13C по растворителю:
+  - CDCl3: 77.16 ppm;
+  - DMSO-d6: 39.52 ppm;
+- для 13C делает baseline correction перед финальным peak picking;
+- для 1H экспортирует картинку в диапазоне от -1 до 12 ppm;
+- для 13C экспортирует картинку в диапазоне от -10 до 210 ppm;
+- для 1H оставляет интегралы снизу и убирает лишнюю верхнюю integral curve;
+- для 13C оставляет только peak picking без интегралов и мультиплетов;
+- сохраняет один `.mnova` файл на соединение, где лежат обработанные 1H и 13C.
 
-Current processing behavior:
+## Как работает проверка экспериментальных данных
 
-- 1H spectra are referenced to the solvent peak:
-  - CDCl3: 7.26 ppm
-  - DMSO-d6: 2.50 ppm
-- 13C spectra are referenced to the solvent peak:
-  - CDCl3: 77.16 ppm
-  - DMSO-d6: 39.52 ppm
-- 13C spectra receive baseline correction before final peak picking.
-- 1H images show the -1 to 12 ppm range.
-- 13C images show the -10 to 210 ppm range.
-- 1H images keep integral labels below the spectrum but hide the upper integral
-  curve and multiplet labels.
-- 13C images show peak picking only.
+Проверка включается чекбоксом `Check support`.
 
-## Support Check
+Она нужна, чтобы быстро заметить типичные ошибки:
 
-The GUI option `Check support` controls validation warnings.
+- в 1H NMR потеряли или добавили лишний интеграл;
+- в 13C NMR не все атомы углерода попали в описание;
+- HRMS не совпадает с расчетной массой.
 
-When enabled, the generator checks:
+Что именно проверяется:
 
-- whether the number of protons in the 1H NMR description matches the molecular
-  formula;
-- whether the number of carbons in the 13C NMR description matches the molecular
-  formula;
-- whether experimental HRMS matches the calculated value within tolerance.
+1. Формула вещества разбирается на количество H и C.
+2. В 1H NMR программа ищет интегралы вида `1H`, `2H`, `3H` и суммирует их.
+3. В 13C NMR программа считает количество сигналов или назначений углерода.
+4. Для HRMS программа считает массу по `formula` и `hrms_adduct`, например
+   `[M+H]+`, и сравнивает с `hrms_found`.
+5. Если есть расхождение, в итоговом SI добавляется красная пометка
+   `Support check`.
 
-Warnings are added to the final `.docx` as red `Support check` notes. Disable
-the option if you want a clean document without these warnings.
+Важно: проверка не заменяет ручную проверку химика. Это быстрый автоматический
+контроль, который помогает найти подозрительные места.
 
-## Formatting Templates
+## Настройка оформления
 
-Formatting has two layers.
+Есть два уровня оформления.
 
-### Word Template
+### Word template
 
-Use `--template-docx` or the GUI `Template .docx` field to provide margins, page
-setup, default fonts, and named Word styles.
+В GUI можно выбрать `Template .docx`.
 
-The generator clears the body of the template and inserts the generated SI into
-that document, preserving styles and page settings.
+Из него берутся:
+
+- поля страницы;
+- размер страницы;
+- стандартный шрифт;
+- Word-стили.
+
+Тело шаблона очищается, а внутрь вставляется новый SI.
 
 ### style_config.yml
 
-Use `style_config.yml` for semantic formatting rules: which parts are bold,
-italic, superscript, subscript, and how far structures are shifted.
+Файл `style_config.yml` управляет смысловым форматированием:
 
-Start from:
+- какие элементы жирные;
+- какие элементы курсивные;
+- делать ли `1H`, `13C` верхними индексами;
+- делать ли цифры в формулах нижними индексами;
+- делать ли `J` в константах курсивным;
+- насколько опустить структуру под названием.
+
+Начните с примера:
 
 ```text
 style_config.example.yml
 ```
 
-Important options:
+Пример важной настройки:
 
 ```yaml
-compound:
-  title:
-    bold: true
-    italic: false
-  structure:
-    top_offset_pt: 12
-
-nmr:
-  label:
-    bold: true
-  body:
-    bold: false
-
 chem_formatting:
-  isotope_numbers:
-    superscript: true
-  formulas:
-    subscripts: true
   coupling_constants:
     j_italic: true
-    order_superscript: false
-    coupling_partner_subscript: false
-
-hrms:
-  label:
-    bold: true
-  formula:
-    subscripts: true
 ```
 
-For example, set `chem_formatting.coupling_constants.j_italic: true` to make
-the `J` symbol in coupling constants italic.
+Она делает символ `J` в константах спин-спинового взаимодействия курсивным.
 
-## Command Line Usage
+## CLI для продвинутых пользователей
 
-Word table workflow:
+Основной Word workflow:
 
 ```powershell
-$env:PYTHONPATH = "src"
-python -m si_generator `
-  --word-input C:\path\to\input.docx `
-  --spectra-zip C:\path\to\spectra.zip `
-  --style-config style_config.example.yml `
+py -m si_generator ^
+  --word-input C:\path\to\input.docx ^
+  --spectra-zip C:\path\to\spectra.zip ^
+  --style-config style_config.example.yml ^
   --output output\support_information.docx
 ```
 
 CSV workflow:
 
 ```powershell
-$env:PYTHONPATH = "src"
-python -m si_generator `
-  --input data\compounds.csv `
+py -m si_generator ^
+  --input examples\sample_compounds.csv ^
   --output output\support_information.docx
 ```
 
-Disable support checking:
+Отключить проверку:
 
 ```powershell
-python -m si_generator `
-  --word-input C:\path\to\input.docx `
-  --spectra-zip C:\path\to\spectra.zip `
-  --no-check-support `
+py -m si_generator ^
+  --word-input C:\path\to\input.docx ^
+  --spectra-zip C:\path\to\spectra.zip ^
+  --no-check-support ^
   --output output\support_information.docx
 ```
 
-Launch GUI from command line:
+Запуск GUI из командной строки:
 
 ```powershell
-$env:PYTHONPATH = "src"
-python -m si_generator.gui
+py -m si_generator.gui
 ```
 
-If the package is installed with `pip install -e .`, these commands are also
-available:
+## Что не нужно добавлять в GitHub
 
-```powershell
-si-generator
-si-generator-gui
-```
+Не нужно загружать в репозиторий:
 
-## Repository Notes
+- папку `output/`;
+- временные файлы MestReNova;
+- распакованные спектры;
+- рабочие `.mnova` batch-файлы;
+- `__pycache__/`.
 
-Do not commit generated output folders, temporary MestReNova files, extracted
-spectra, `.mnova` batches, or Python cache files. These are ignored by
-`.gitignore`.
+Эти файлы уже добавлены в `.gitignore`.
