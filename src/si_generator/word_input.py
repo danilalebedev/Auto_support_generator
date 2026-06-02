@@ -474,6 +474,7 @@ def _paste_word_structures_in_package(
                 if item.filename in {"word/document.xml", "word/_rels/document.xml.rels", "[Content_Types].xml"}:
                     continue
                 out_zip.writestr(item, target_zip.read(item.filename))
+            _drop_stale_ignorable_prefixes(document)
             out_zip.writestr("word/document.xml", ET.tostring(document, encoding="utf-8", xml_declaration=True))
             out_zip.writestr("word/_rels/document.xml.rels", ET.tostring(rels, encoding="utf-8", xml_declaration=True))
             out_zip.writestr("[Content_Types].xml", ET.tostring(content_types, encoding="utf-8", xml_declaration=True))
@@ -603,6 +604,12 @@ def _ensure_default_content_type(content_types, extension: str, content_type: st
     default = ET.SubElement(content_types, f"{{{ct_ns}}}Default")
     default.set("Extension", extension)
     default.set("ContentType", content_type)
+
+
+def _drop_stale_ignorable_prefixes(document) -> None:
+    ignorable_attr = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable"
+    if ignorable_attr in document.attrib:
+        document.attrib.pop(ignorable_attr, None)
 
 
 def _apply_structure_layout(shape, width: float, height: float) -> None:
