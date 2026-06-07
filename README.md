@@ -1,5 +1,8 @@
 # Auto Support Generator
 
+Короткая инструкция по установке для пользователей без опыта работы с Python и
+GitHub: [INSTALL_RU.md](INSTALL_RU.md).
+
 Auto Support Generator - программа для автоматической сборки Supporting
 Information (SI) в органической химии.
 
