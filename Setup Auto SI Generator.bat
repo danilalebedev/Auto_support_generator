@@ -8,18 +8,10 @@ echo ============================
 echo.
 
 set "PY_CMD="
-py -3.11 -V >nul 2>nul
-if not errorlevel 1 set "PY_CMD=py -3.11"
-
-if not defined PY_CMD (
-  py -3 -V >nul 2>nul
-  if not errorlevel 1 set "PY_CMD=py -3"
-)
-
-if not defined PY_CMD (
-  python --version >nul 2>nul
-  if not errorlevel 1 set "PY_CMD=python"
-)
+call :try_python "py -3.12"
+if not defined PY_CMD call :try_python "py -3.11"
+if not defined PY_CMD call :try_python "py -3"
+if not defined PY_CMD call :try_python "python"
 
 if not defined PY_CMD (
   echo Python was not found.
@@ -42,7 +34,17 @@ if not defined PY_CMD (
     pause
     exit /b 1
   )
-  set "PY_CMD=py -3.11"
+  call :try_python "py -3.12"
+  if not defined PY_CMD call :try_python "py -3.11"
+  if not defined PY_CMD call :try_python "py -3"
+  if not defined PY_CMD call :try_python "python"
+  if not defined PY_CMD (
+    echo.
+    echo Python was installed but is not visible in this terminal yet.
+    echo Close this window and run "Setup Auto SI Generator.bat" again.
+    pause
+    exit /b 1
+  )
 )
 
 echo Using Python:
@@ -98,3 +100,10 @@ echo Start the program with:
 echo Run Auto SI Generator.bat
 echo.
 pause
+exit /b 0
+
+:try_python
+set "CANDIDATE=%~1"
+%CANDIDATE% -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
+if not errorlevel 1 set "PY_CMD=%CANDIDATE%"
+exit /b 0
