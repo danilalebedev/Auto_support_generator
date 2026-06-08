@@ -41,7 +41,7 @@ ChemDraw OLE и MestReNova.
 | Microsoft Word desktop | создание итогового `.docx` и вставка OLE-структур | Microsoft 365 / Word 2019+ |
 | ChemDraw / ChemOffice | хранение и перенос структур как OLE-объектов | ChemDraw 22.2.0.3300 |
 | MestReNova | обработка ЯМР, peak picking, экспорт PNG и `.mnova` | MestReNova 14.2.0-26256 |
-| Python | запуск программы | Python 3.10+ |
+| Python | запуск программы | Python 3.12 рекомендуется |
 
 Важно: ChemDraw и MestReNova должны быть установлены как обычные desktop
 программы. Для генерации только из CSV без структур и без спектров можно
