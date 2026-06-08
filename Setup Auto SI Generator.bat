@@ -27,16 +27,19 @@ if not defined PY_EXE (
   winget install --id Python.Python.3.12 -e --source winget
   if errorlevel 1 (
     echo.
-    echo Python installation failed. Please install Python manually:
-    echo https://www.python.org/downloads/windows/
-    pause
-    exit /b 1
+    echo winget failed. Trying to reset winget sources and install again...
+    winget source reset --force
+    winget install --id Python.Python.3.12 -e --source winget
   )
   call :find_python
   if not defined PY_EXE (
     echo.
-    echo Python was installed but is not visible in this terminal yet.
-    echo Close this window and run "Setup Auto SI Generator.bat" again.
+    echo Setup still cannot find a supported Python.
+    echo Please install Python 3.12 from:
+    echo https://www.python.org/downloads/windows/
+    echo.
+    echo If Python is already installed, add it to PATH or install the Python launcher.
+    echo Then close this window and run "Setup Auto SI Generator.bat" again.
     pause
     exit /b 1
   )
@@ -119,20 +122,60 @@ exit /b 0
 :find_python
 set "PY_EXE="
 call :probe_py -3.12
+if not defined PY_EXE call :probe_common_paths 312
+if not defined PY_EXE call :probe_registry 3.12
+if not defined PY_EXE call :probe_py -3.13
+if not defined PY_EXE call :probe_common_paths 313
+if not defined PY_EXE call :probe_registry 3.13
 if not defined PY_EXE call :probe_py -3.11
+if not defined PY_EXE call :probe_common_paths 311
+if not defined PY_EXE call :probe_registry 3.11
+if not defined PY_EXE call :probe_py -3.10
+if not defined PY_EXE call :probe_common_paths 310
+if not defined PY_EXE call :probe_registry 3.10
 if not defined PY_EXE call :probe_py -3
 if not defined PY_EXE call :probe_python
 exit /b 0
 
 :probe_py
 del "%PY_PROBE%" >nul 2>nul
-py %~1 -c "import sys; print(sys.executable if sys.version_info >= (3, 10) else '')" > "%PY_PROBE%" 2>nul
+py %~1 -c "import sys; v=sys.version_info; print(sys.executable if (v >= (3, 10) and v < (3, 14)) else '')" > "%PY_PROBE%" 2>nul
 call :read_probe
 exit /b 0
 
 :probe_python
 del "%PY_PROBE%" >nul 2>nul
-python -c "import sys; print(sys.executable if sys.version_info >= (3, 10) else '')" > "%PY_PROBE%" 2>nul
+python -c "import sys; v=sys.version_info; print(sys.executable if (v >= (3, 10) and v < (3, 14)) else '')" > "%PY_PROBE%" 2>nul
+call :read_probe
+exit /b 0
+
+:probe_common_paths
+set "PY_SUFFIX=%~1"
+if defined LOCALAPPDATA call :probe_candidate "%LOCALAPPDATA%\Programs\Python\Python%PY_SUFFIX%\python.exe"
+if defined ProgramFiles call :probe_candidate "%ProgramFiles%\Python%PY_SUFFIX%\python.exe"
+if defined ProgramFiles(x86) call :probe_candidate "%ProgramFiles(x86)%\Python%PY_SUFFIX%-32\python.exe"
+call :probe_candidate "C:\Python%PY_SUFFIX%\python.exe"
+exit /b 0
+
+:probe_registry
+set "PY_VERSION=%~1"
+call :probe_registry_key "HKCU\Software\Python\PythonCore\%PY_VERSION%\InstallPath"
+if not defined PY_EXE call :probe_registry_key "HKLM\Software\Python\PythonCore\%PY_VERSION%\InstallPath"
+if not defined PY_EXE call :probe_registry_key "HKLM\Software\WOW6432Node\Python\PythonCore\%PY_VERSION%\InstallPath"
+exit /b 0
+
+:probe_registry_key
+for /f "tokens=2,*" %%A in ('reg query "%~1" /v ExecutablePath 2^>nul ^| findstr /i "ExecutablePath"') do (
+  if not defined PY_EXE call :probe_candidate "%%B"
+)
+exit /b 0
+
+:probe_candidate
+if defined PY_EXE exit /b 0
+set "CANDIDATE=%~1"
+if not exist "%CANDIDATE%" exit /b 0
+del "%PY_PROBE%" >nul 2>nul
+"%CANDIDATE%" -c "import sys; v=sys.version_info; print(sys.executable if (v >= (3, 10) and v < (3, 14)) else '')" > "%PY_PROBE%" 2>nul
 call :read_probe
 exit /b 0
 
