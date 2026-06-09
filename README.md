@@ -129,6 +129,101 @@ Run Auto SI Generator.bat
 Этот путь требует Python 3.12. Батник пытается найти Python автоматически, даже
 если `python` не добавлен в `PATH`.
 
+## Что программа получает на входе
+
+Минимальный вход для основного workflow состоит из двух файлов:
+
+```text
+compound_table.docx
+spectra.zip
+```
+
+`compound_table.docx` - Word-файл с таблицей соединений. В первой строке таблицы
+должны быть заголовки колонок, каждая следующая строка описывает одно
+соединение. В первой колонке обычно находится номер соединения и структура,
+вставленная как OLE-объект ChemDraw или ChemSketch.
+
+`spectra.zip` - zip-архив со спектрами ЯМР. Внутри архива должны быть папки с
+номерами соединений. Названия папок должны совпадать с номерами в таблице:
+
+```text
+spectra.zip
+  2a/
+    any_name_1H/
+      fid
+      acqus
+      ...
+    any_name_13C/
+      fid
+      acqus
+      ...
+  2b/
+    ...
+```
+
+Дополнительные входные файлы необязательны:
+
+- `Template .docx` - Word-шаблон, из которого берутся поля страницы, шрифты,
+  интервалы и стили;
+- `Style config .yml` - настройки смыслового форматирования, например какие
+  элементы делать жирными или курсивными;
+- CSV-таблица - упрощенный вариант вместо Word-таблицы, если OLE-структуры не
+  нужны.
+
+Если колонка `name` в таблице пустая, программа пытается получить
+номенклатурное название напрямую через ChemDraw. Для этого структура извлекается
+из OLE-объекта как CDX и открывается через `ChemDraw.Application`, поэтому
+системная ассоциация OLE с другими программами не должна мешать.
+
+## Что программа создает на выходе
+
+Главный результат - готовый Word-файл Supporting Information:
+
+```text
+support_information.docx
+```
+
+В него вставляются:
+
+- названия и номера соединений;
+- структуры как OLE-объекты ChemDraw/ChemSketch;
+- физические свойства, Rf, выход, температура плавления;
+- описания 1H и 13C NMR;
+- HRMS с расчетной массой по формуле;
+- IR и дополнительные ЯМР, если они есть;
+- картинки спектров в конце SI.
+
+Рядом с итоговым `.docx` создаются дополнительные папки и архив:
+
+```text
+output/
+  support_information.docx
+  processed_spectra.zip
+  processed_spectra/
+    2a/
+      2a_1H.png
+      2a_13C.png
+      2a.mnova
+  processed_mnova/
+    2a/
+      2a.mnova
+  mnova_reports/
+    2a/
+      2a_1H.txt
+      2a_13C.txt
+  logs/
+```
+
+Для пользователя обычно важны:
+
+- `support_information.docx` - финальный SI;
+- `processed_spectra.zip` - архив с PNG-картинками спектров и обработанными
+  `.mnova` файлами;
+- `processed_spectra/` - те же файлы в обычных папках.
+
+`logs/`, `mnova_reports/` и `processed_mnova/` нужны в основном для проверки и
+отладки.
+
 ## Как пользоваться GUI
 
 В окне программы:
@@ -190,11 +285,50 @@ output/
 
 ## Примеры
 
-В папке `examples/` есть пример CSV-входа:
+В папке `examples/` есть готовые файлы, на которых можно проверить программу.
+
+### Полный Word workflow
+
+```text
+examples/word_workflow/test_input.docx
+examples/word_workflow/test_input.zip
+examples/word_workflow/example_output/support_information.docx
+examples/word_workflow/example_output/processed_spectra.zip
+```
+
+Что это за файлы:
+
+- `test_input.docx` - входная Word-таблица с соединениями `2a-2f`,
+  физическими свойствами, HRMS и OLE-структурами ChemDraw/ChemSketch;
+- `test_input.zip` - входной архив со спектрами для тех же соединений; внутри
+  лежат папки `2a`, `2b`, ..., `2f`, а в них Bruker-эксперименты 1H и 13C;
+- `example_output/support_information.docx` - пример готового SI, который
+  должен получиться после обработки этих входных файлов;
+- `example_output/processed_spectra.zip` - пример архива с обработанными
+  спектрами: PNG-картинки 1H/13C и `.mnova` файл для каждого соединения.
+
+В GUI для этого примера выберите:
+
+- `Table type`: `Word table with ChemDraw objects`;
+- `Compound table`: `examples/word_workflow/test_input.docx`;
+- `Spectra zip`: `examples/word_workflow/test_input.zip`;
+- `Output .docx`: любой удобный путь, например `output/support_information.docx`.
+
+После запуска программа должна создать рядом с выбранным output-файлом готовый
+`support_information.docx`, `processed_spectra.zip` и служебные папки
+`logs/`, `mnova_reports/`, `processed_mnova/`, `processed_spectra/`.
+
+### Простой CSV workflow
 
 ```text
 examples/sample_compounds.csv
+examples/generated_support_example.docx
 ```
+
+Что это за файлы:
+
+- `sample_compounds.csv` - простой вход без Word OLE-структур и без спектров;
+- `generated_support_example.docx` - пример результата для CSV-входа.
 
 После установки зависимостей можно сгенерировать пример support без спектров:
 

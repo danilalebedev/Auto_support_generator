@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import re
+import json
+import subprocess
+import sys
 import time
 import zipfile
 import os
@@ -50,7 +53,8 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
         doc = word.Documents.Open(path, False, False, False)
         table = doc.Tables(1)
         headers = [_cell_text(table.Cell(1, col)) for col in range(1, table.Columns.Count + 1)]
-        compounds: list[Compound] = []
+        missing_name_rows: list[int] = []
+        rows_data = []
 
         for row in range(2, table.Rows.Count + 1):
             values = [_cell_text(table.Cell(row, col)) for col in range(1, table.Columns.Count + 1)]
@@ -61,8 +65,15 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
             name = fields.get("name", "") or (metadata.name if metadata else "")
             if extract_structure_metadata:
                 formula = formula or _formula_from_structure_in_row(doc, table, row)
-                name = name or _name_from_structure_in_row(doc, table, row)
-            name = name or f"Compound {number}"
+            if not name:
+                missing_name_rows.append(row)
+            rows_data.append((row, fields, number, formula, name))
+
+        generated_names = _chemdraw_names_for_rows(path, missing_name_rows)
+        compounds: list[Compound] = []
+
+        for row, fields, number, formula, name in rows_data:
+            name = name or generated_names.get(row, "") or f"Compound {number}"
             compounds.append(
                 Compound(
                     number=number,
@@ -101,7 +112,8 @@ def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Comp
     document = Document(path)
     table = document.tables[0]
     headers = [_clean_docx_cell_text(cell.text) for cell in table.rows[0].cells]
-    compounds: list[Compound] = []
+    rows_data = []
+    missing_name_rows = []
 
     for row_index, row in enumerate(table.rows[1:], start=2):
         values = [_clean_docx_cell_text(cell.text) for cell in row.cells]
@@ -109,7 +121,16 @@ def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Comp
         metadata = structure_metadata.get(row_index)
         number = fields.get("number") or str(row_index - 1)
         formula = fields.get("formula", "") or (metadata.formula if metadata else "")
-        name = fields.get("name", "") or (metadata.name if metadata else "") or f"Compound {number}"
+        name = fields.get("name", "") or (metadata.name if metadata else "")
+        if not name:
+            missing_name_rows.append(row_index)
+        rows_data.append((row_index, fields, metadata, number, formula, name))
+
+    generated_names = _chemdraw_names_for_rows(path, missing_name_rows)
+    compounds: list[Compound] = []
+
+    for row_index, fields, metadata, number, formula, name in rows_data:
+        name = name or generated_names.get(row_index, "") or f"Compound {number}"
         compounds.append(
             Compound(
                 number=number,
@@ -137,6 +158,35 @@ def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Comp
         )
 
     return compounds
+
+
+def _chemdraw_names_for_rows(path: str, rows: list[int], timeout: int = 90) -> dict[int, str]:
+    if not rows:
+        return {}
+    if getattr(sys, "frozen", False):
+        command = [sys.executable, "--si-generator-chemdraw-names", path]
+    else:
+        command = [sys.executable, "-m", "si_generator.chemdraw_names", path]
+    command += ["--rows", ",".join(str(row) for row in rows)]
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+    if completed.returncode != 0 or not completed.stdout.strip():
+        return {}
+    try:
+        raw = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return {}
+    return {int(row): str(name).strip() for row, name in raw.items() if str(name).strip()}
 
 
 def paste_word_structures(
@@ -318,13 +368,8 @@ def _format_generated_name(name: str) -> str:
 
 
 def _name_from_structure_in_row(doc, table, row: int) -> str:
-    structure = _structure_object_in_row(doc, table, row)
-    if structure is None:
-        return ""
-    try:
-        return _get_structure_data(structure, "chemical/x-name").strip()
-    except Exception:
-        return ""
+    names = _chemdraw_names_for_rows(str(Path(doc.FullName).resolve()), [row])
+    return names.get(row, "")
 
 
 def _formula_from_structure_in_row(doc, table, row: int) -> str:

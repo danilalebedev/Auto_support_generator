@@ -40,21 +40,24 @@ def _install_payload(app_dir: Path) -> None:
 
     examples_dir = app_dir / "examples"
     app_dir.mkdir(parents=True, exist_ok=True)
-    examples_dir.mkdir(parents=True, exist_ok=True)
+    if examples_dir.exists():
+        shutil.rmtree(examples_dir)
 
     copies = {
         "AutoSupportGenerator.exe": app_dir / "AutoSupportGenerator.exe",
         "style_config.example.yml": app_dir / "style_config.example.yml",
         "README.md": app_dir / "README.md",
         "INSTALL_RU.md": app_dir / "INSTALL_RU.md",
-        "sample_compounds.csv": examples_dir / "sample_compounds.csv",
-        "generated_support_example.docx": examples_dir / "generated_support_example.docx",
     }
     for source_name, destination in copies.items():
         source = payload / source_name
         if not source.exists():
             raise RuntimeError(f"Installer payload file is missing: {source_name}")
         shutil.copy2(source, destination)
+    examples_source = payload / "examples"
+    if not examples_source.exists():
+        raise RuntimeError("Installer payload examples folder is missing.")
+    shutil.copytree(examples_source, examples_dir)
 
 
 def _create_shortcuts(app_dir: Path) -> None:

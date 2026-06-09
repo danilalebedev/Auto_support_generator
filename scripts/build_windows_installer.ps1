@@ -56,13 +56,16 @@ if (Test-Path -LiteralPath $payloadDir) {
     Remove-Item -LiteralPath $payloadDir -Recurse -Force
 }
 New-Item -ItemType Directory -Path $payloadDir | Out-Null
+$payloadExamplesDir = Join-Path $payloadDir "examples"
+New-Item -ItemType Directory -Path $payloadExamplesDir | Out-Null
 
 Copy-Item -LiteralPath $appExe -Destination (Join-Path $payloadDir "AutoSupportGenerator.exe")
 Copy-Item -LiteralPath (Join-Path $root "style_config.example.yml") -Destination (Join-Path $payloadDir "style_config.example.yml")
 Copy-Item -LiteralPath (Join-Path $root "README.md") -Destination (Join-Path $payloadDir "README.md")
 Copy-Item -LiteralPath (Join-Path $root "INSTALL_RU.md") -Destination (Join-Path $payloadDir "INSTALL_RU.md")
-Copy-Item -LiteralPath (Join-Path $root "examples\sample_compounds.csv") -Destination (Join-Path $payloadDir "sample_compounds.csv")
-Copy-Item -LiteralPath (Join-Path $root "examples\generated_support_example.docx") -Destination (Join-Path $payloadDir "generated_support_example.docx")
+Copy-Item -LiteralPath (Join-Path $root "examples\sample_compounds.csv") -Destination (Join-Path $payloadExamplesDir "sample_compounds.csv")
+Copy-Item -LiteralPath (Join-Path $root "examples\generated_support_example.docx") -Destination (Join-Path $payloadExamplesDir "generated_support_example.docx")
+Copy-Item -LiteralPath (Join-Path $root "examples\word_workflow") -Destination (Join-Path $payloadExamplesDir "word_workflow") -Recurse
 
 Write-Host "Building AutoSupportGeneratorSetup.exe..."
 & $venvPython -m PyInstaller `
