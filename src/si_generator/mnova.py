@@ -3,12 +3,22 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 
 MNOVA_EXE = Path(r"C:\Program Files\Mestrelab Research S.L\MestReNova\MestReNova.exe")
-SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "extract_nmr_report.qs"
+
+
+def _resource_path(relative_path: str) -> Path:
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    if bundle_root:
+        return Path(bundle_root) / relative_path
+    return Path(__file__).resolve().parents[2] / relative_path
+
+
+SCRIPT_PATH = _resource_path("scripts/extract_nmr_report.qs")
 
 
 @dataclass(frozen=True)

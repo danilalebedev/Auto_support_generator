@@ -33,7 +33,7 @@ Auto Support Generator делает это автоматически:
 Полный workflow сейчас рассчитан на Windows, потому что используются Word,
 ChemDraw OLE и MestReNova.
 
-Обязательные программы:
+Обязательные внешние программы:
 
 | Программа | Для чего нужна | Проверенная версия |
 | --- | --- | --- |
@@ -41,12 +41,15 @@ ChemDraw OLE и MestReNova.
 | Microsoft Word desktop | создание итогового `.docx` и вставка OLE-структур | Microsoft 365 / Word 2019+ |
 | ChemDraw / ChemOffice | хранение и перенос структур как OLE-объектов | ChemDraw 22.2.0.3300 |
 | MestReNova | обработка ЯМР, peak picking, экспорт PNG и `.mnova` | MestReNova 14.2.0-26256 |
-| Python | запуск программы | Python 3.12 рекомендуется |
 
 Важно: ChemDraw и MestReNova должны быть установлены как обычные desktop
 программы. Для генерации только из CSV без структур и без спектров можно
 запустить часть функций без ChemDraw/MestReNova, но основной сценарий требует
 обе программы.
+
+Python пользователю готовой версии не нужен: он уже упакован внутрь
+`AutoSupportGenerator.exe`. Python 3.12 нужен только разработчику, если нужно
+собрать программу из исходников.
 
 По умолчанию MestReNova ожидается здесь:
 
@@ -54,7 +57,34 @@ ChemDraw OLE и MestReNova.
 C:\Program Files\Mestrelab Research S.L\MestReNova\MestReNova.exe
 ```
 
-## Как скачать программу с GitHub
+## Как установить готовую версию
+
+Самый простой вариант:
+
+1. Скачайте файл `AutoSupportGeneratorSetup.exe` из GitHub Releases или получите
+   его от разработчика.
+2. Дважды кликните `AutoSupportGeneratorSetup.exe`.
+3. Дождитесь окончания установки.
+4. Запустите программу через ярлык `Auto Support Generator` на рабочем столе или
+   в меню Пуск.
+
+Установщик кладет программу сюда:
+
+```text
+%LOCALAPPDATA%\AutoSupportGenerator
+```
+
+В эту же папку копируются:
+
+- `AutoSupportGenerator.exe` - сама программа;
+- `style_config.example.yml` - пример настроек оформления;
+- `examples/` - примеры входных данных и сгенерированного SI;
+- `README.md` и `INSTALL_RU.md` - инструкции.
+
+Чтобы удалить программу, можно удалить папку
+`%LOCALAPPDATA%\AutoSupportGenerator` и ярлыки `Auto Support Generator`.
+
+## Как скачать исходники с GitHub
 
 Если вы не знакомы с GitHub:
 
@@ -69,11 +99,13 @@ https://github.com/danilalebedev/Auto_support_generator
 4. Распакуйте архив, например на рабочий стол.
 5. Откройте распакованную папку `Auto_support_generator`.
 
-После распаковки в папке должны быть файлы:
+Этот способ нужен только для разработки или пересборки установщика. После
+распаковки в папке должны быть файлы:
 
 ```text
-Install dependencies.bat
-SI Generator GUI.bat
+Setup Auto SI Generator.bat
+Run Auto SI Generator.bat
+Build Auto Support Generator Installer.bat
 README.md
 pyproject.toml
 src/
@@ -81,29 +113,23 @@ scripts/
 examples/
 ```
 
-## Как установить Python-зависимости
+## Как запустить из исходников
 
-Самый простой способ:
+Если готового `AutoSupportGeneratorSetup.exe` нет, программу можно запустить из
+исходников:
 
 1. Откройте папку проекта.
-2. Дважды кликните `Install dependencies.bat`.
-3. Дождитесь окончания установки.
-
-Если удобнее через PowerShell:
-
-```powershell
-cd C:\Users\user\Desktop\Auto_support_generator
-py -m pip install --upgrade pip
-py -m pip install -e .
-```
-
-## Как запустить GUI
-
-После установки зависимостей дважды кликните:
+2. Дважды кликните `Setup Auto SI Generator.bat`.
+3. После успешной установки дважды кликните:
 
 ```text
-SI Generator GUI.bat
+Run Auto SI Generator.bat
 ```
+
+Этот путь требует Python 3.12. Батник пытается найти Python автоматически, даже
+если `python` не добавлен в `PATH`.
+
+## Как пользоваться GUI
 
 В окне программы:
 
@@ -330,7 +356,16 @@ chem_formatting:
 
 ## CLI для продвинутых пользователей
 
-Основной Word workflow:
+Если программа установлена через `AutoSupportGeneratorSetup.exe`, CLI можно
+запускать через установленный exe:
+
+```powershell
+%LOCALAPPDATA%\AutoSupportGenerator\AutoSupportGenerator.exe --input examples\sample_compounds.csv --output output\support_information.docx
+```
+
+Если программа запущена из исходников, используйте `py -m si_generator`.
+
+Основной Word workflow из исходников:
 
 ```powershell
 py -m si_generator ^
@@ -363,6 +398,25 @@ py -m si_generator ^
 ```powershell
 py -m si_generator.gui
 ```
+
+## Как собрать установщик
+
+Сборка установщика нужна разработчику, который хочет получить один файл
+`AutoSupportGeneratorSetup.exe`.
+
+1. Установите Python 3.12.
+2. Запустите `Setup Auto SI Generator.bat`.
+3. Запустите `Build Auto Support Generator Installer.bat`.
+4. Готовые файлы появятся в папке `dist/`:
+
+```text
+dist/AutoSupportGenerator.exe
+dist/AutoSupportGeneratorSetup.exe
+```
+
+Сборка использует PyInstaller: сначала он упаковывает GUI в
+`AutoSupportGenerator.exe`, затем упаковывает установщик
+`AutoSupportGeneratorSetup.exe` с программой, примерами и инструкциями внутри.
 
 ## Что не нужно добавлять в GitHub
 

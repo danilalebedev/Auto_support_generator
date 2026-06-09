@@ -10,6 +10,11 @@ dependencies = [
     "rdkit",
 ]
 
+[project.optional-dependencies]
+build = [
+    "pyinstaller>=6.0",
+]
+
 [project.scripts]
 si-generator = "si_generator.cli:main"
 si-generator-gui = "si_generator.gui:main"

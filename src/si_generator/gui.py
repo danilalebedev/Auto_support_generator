@@ -10,6 +10,9 @@ from tkinter import BooleanVar, StringVar, Tk, filedialog, messagebox
 from tkinter import ttk
 
 
+CLI_FLAG = "--si-generator-cli"
+
+
 class SIGeneratorApp:
     def __init__(self, root: Tk) -> None:
         self.root = root
@@ -139,7 +142,10 @@ class SIGeneratorApp:
         if not output_docx.name.lower().endswith(".docx"):
             raise ValueError("Output file must be a .docx file.")
 
-        command = [sys.executable, "-m", "si_generator"]
+        if getattr(sys, "frozen", False):
+            command = [sys.executable, CLI_FLAG]
+        else:
+            command = [sys.executable, "-m", "si_generator"]
         if self.input_kind.get() == "csv":
             command += ["--input", str(input_path)]
         else:
@@ -167,8 +173,9 @@ class SIGeneratorApp:
 
     def _run_command(self, command: list[str]) -> None:
         env = os.environ.copy()
-        src_path = str(Path(__file__).resolve().parents[1])
-        env["PYTHONPATH"] = src_path + os.pathsep + env.get("PYTHONPATH", "")
+        if not getattr(sys, "frozen", False):
+            src_path = str(Path(__file__).resolve().parents[1])
+            env["PYTHONPATH"] = src_path + os.pathsep + env.get("PYTHONPATH", "")
         try:
             self._process = subprocess.Popen(
                 command,
