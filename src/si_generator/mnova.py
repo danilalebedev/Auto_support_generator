@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import locale
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from .external_tools import find_mnova_executable
+from .external_tools import find_mnova_executable, make_ascii_work_dir
 
 
 def _resource_path(relative_path: str) -> Path:
@@ -57,63 +59,85 @@ def extract_reports_batch(
     tasks_path = output_dir / "mnova_batch_tasks.tsv"
     output_json_path = output_dir / "mnova_batch_reports.json"
     status_path = output_dir / "mnova_batch.status.txt"
+    run_dir = make_ascii_work_dir("mnova")
+    run_tasks_path = run_dir / "mnova_batch_tasks.tsv"
+    run_output_json_path = run_dir / "mnova_batch_reports.json"
+    run_status_path = run_dir / "mnova_batch.status.txt"
+    output_map: dict[tuple[str, str], dict[str, Path]] = {}
 
     for path in [tasks_path, output_json_path, status_path]:
         if path.exists():
             path.unlink()
 
-    lines = []
-    for task in tasks:
-        input_path = _resolve_spectrum_input(task.input_path)
-        image_path = _mnova_arg(task.image_path) if task.image_path else ""
-        mnova_path = _mnova_arg(task.mnova_path) if task.mnova_path else ""
-        if task.image_path:
-            task.image_path.parent.mkdir(parents=True, exist_ok=True)
-        if task.mnova_path:
-            task.mnova_path.parent.mkdir(parents=True, exist_ok=True)
-        lines.append(f"{task.compound}\t{task.nucleus}\t{_mnova_arg(input_path)}\t{image_path}\t{mnova_path}")
-    tasks_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    try:
+        lines = []
+        for index, task in enumerate(tasks, start=1):
+            key = (task.compound, task.nucleus)
+            staged_input = _stage_spectrum_input(_resolve_spectrum_input(task.input_path), run_dir / "inputs", index)
+            staged_image = run_dir / "images" / f"{_safe_token(task.compound)}_{task.nucleus}.png" if task.image_path else None
+            staged_mnova = run_dir / "mnova" / _safe_token(task.compound) / f"{_safe_token(task.compound)}.mnova" if task.mnova_path else None
+            output_map[key] = {}
+            if task.image_path and staged_image:
+                task.image_path.parent.mkdir(parents=True, exist_ok=True)
+                staged_image.parent.mkdir(parents=True, exist_ok=True)
+                output_map[key]["image"] = task.image_path
+            if task.mnova_path and staged_mnova:
+                task.mnova_path.parent.mkdir(parents=True, exist_ok=True)
+                staged_mnova.parent.mkdir(parents=True, exist_ok=True)
+                output_map[key]["mnova"] = task.mnova_path
+            image_path = _mnova_arg(staged_image) if staged_image else ""
+            mnova_path = _mnova_arg(staged_mnova) if staged_mnova else ""
+            lines.append(f"{task.compound}\t{task.nucleus}\t{_mnova_arg(staged_input)}\t{image_path}\t{mnova_path}")
+        run_tasks_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    sf_arg = ",".join(
-        [
-            "extractSpectrumReportsBatch",
-            _mnova_arg(tasks_path),
-            _mnova_arg(output_json_path),
-            _mnova_arg(status_path),
-        ]
-    )
-    executable = find_mnova_executable(mnova_exe)
-    print(f"[Mnova] executable: {executable}", flush=True)
-    command = [str(executable), "-w", str(SCRIPT_PATH), "-sf", sf_arg]
-    subprocess.run(command, cwd=output_dir, check=False, timeout=timeout)
+        sf_arg = ",".join(
+            [
+                "extractSpectrumReportsBatch",
+                _mnova_arg(run_tasks_path),
+                _mnova_arg(run_output_json_path),
+                _mnova_arg(run_status_path),
+            ]
+        )
+        executable = find_mnova_executable(mnova_exe)
+        print(f"[Mnova] executable: {executable}", flush=True)
+        command = [str(executable), "-w", str(SCRIPT_PATH), "-sf", sf_arg]
+        subprocess.run(command, cwd=run_dir, check=False, timeout=timeout)
 
-    status = status_path.read_text(encoding="utf-8", errors="replace") if status_path.exists() else "ERROR: no status file"
-    if "DONE" not in status:
-        raise RuntimeError(status.strip())
-    if not output_json_path.exists():
-        raise RuntimeError(f"Mnova did not create batch report file: {output_json_path}")
+        _copy_if_exists(run_tasks_path, tasks_path)
+        _copy_if_exists(run_output_json_path, output_json_path)
+        _copy_if_exists(run_status_path, status_path)
 
-    raw = json.loads(output_json_path.read_text(encoding="utf-8", errors="replace"))
-    reports: dict[tuple[str, str], dict[str, str]] = {}
-    for item in raw.values():
-        compound = str(item.get("compound", ""))
-        nucleus = str(item.get("nucleus", ""))
-        report = _normalize_report_text(str(item.get("report", "")))
-        peak_report = _normalize_report_text(str(item.get("peakReport", "")))
-        error = str(item.get("error", ""))
-        image = str(item.get("image", ""))
-        reference_offset = str(item.get("referenceOffset", "0"))
-        mnova = str(item.get("mnova", ""))
-        reports[(compound, nucleus)] = {
-            "report": report,
-            "peak_report": peak_report,
-            "image": image,
-            "mnova": mnova,
-            "reference_offset": reference_offset,
-            "error": error,
-        }
+        status = _read_mnova_text(run_status_path) if run_status_path.exists() else "ERROR: no status file"
+        if "DONE" not in status:
+            raise RuntimeError(status.strip())
+        if not run_output_json_path.exists():
+            raise RuntimeError(f"Mnova did not create batch report file: {output_json_path}")
 
-    return reports
+        raw = json.loads(_read_mnova_text(run_output_json_path))
+        reports: dict[tuple[str, str], dict[str, str]] = {}
+        for item in raw.values():
+            compound = str(item.get("compound", ""))
+            nucleus = str(item.get("nucleus", ""))
+            key = (compound, nucleus)
+            destinations = output_map.get(key, {})
+            report = _normalize_report_text(str(item.get("report", "")))
+            peak_report = _normalize_report_text(str(item.get("peakReport", "")))
+            error = str(item.get("error", ""))
+            image = _copy_mnova_output(str(item.get("image", "")), destinations.get("image"))
+            reference_offset = str(item.get("referenceOffset", "0"))
+            mnova = _copy_mnova_output(str(item.get("mnova", "")), destinations.get("mnova"))
+            reports[key] = {
+                "report": report,
+                "peak_report": peak_report,
+                "image": image,
+                "mnova": mnova,
+                "reference_offset": reference_offset,
+                "error": error,
+            }
+
+        return reports
+    finally:
+        shutil.rmtree(run_dir, ignore_errors=True)
 
 
 def _resolve_spectrum_input(path: Path) -> Path:
@@ -123,8 +147,60 @@ def _resolve_spectrum_input(path: Path) -> Path:
     return path
 
 
+def _stage_spectrum_input(input_path: Path, inputs_root: Path, index: int) -> Path:
+    inputs_root.mkdir(parents=True, exist_ok=True)
+    source = input_path.resolve()
+    if source.name.lower() == "fid" and source.parent.exists():
+        target_dir = inputs_root / f"{index:03d}_{_safe_token(source.parent.name)}"
+        shutil.copytree(source.parent, target_dir)
+        return target_dir / "fid"
+    if source.is_dir():
+        target_dir = inputs_root / f"{index:03d}_{_safe_token(source.name)}"
+        shutil.copytree(source, target_dir)
+        return target_dir
+    target = inputs_root / f"{index:03d}_{_safe_token(source.name)}"
+    shutil.copy2(source, target)
+    return target
+
+
+def _copy_mnova_output(source: str, destination: Path | None) -> str:
+    if not source:
+        return ""
+    source_path = Path(source)
+    if destination is None or not source_path.exists():
+        return source
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_path, destination)
+    return str(destination)
+
+
+def _copy_if_exists(source: Path, destination: Path) -> None:
+    if source.exists():
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+
+
+def _read_mnova_text(path: Path) -> str:
+    encodings = ["utf-8-sig", locale.getpreferredencoding(False), "mbcs", "cp1251"]
+    seen: set[str] = set()
+    for encoding in encodings:
+        if not encoding or encoding in seen:
+            continue
+        seen.add(encoding)
+        try:
+            return path.read_text(encoding=encoding)
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
 def _mnova_arg(path: Path) -> str:
     return str(path.resolve()).replace("\\", "/")
+
+
+def _safe_token(value: str) -> str:
+    safe = "".join(char if char.isascii() and (char.isalnum() or char in "._-") else "_" for char in str(value))
+    return safe.strip("._-") or "item"
 
 
 def _normalize_report_text(text: str) -> str:

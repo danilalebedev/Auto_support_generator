@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import uuid
 from pathlib import Path
 
 
@@ -145,3 +146,34 @@ def _unique_paths(paths: list[Path]) -> list[Path]:
         seen.add(key)
         result.append(Path(str(path).strip().strip('"')))
     return result
+
+
+def make_ascii_work_dir(prefix: str) -> Path:
+    """Create a writable ASCII-only temporary directory.
+
+    Some external chemistry tools still mis-handle Unicode paths passed through
+    script files or command-line bridges. Prefer C:\\Users\\Public because it is
+    normally writable for non-admin users and stays ASCII on Windows.
+    """
+    roots = [
+        os.environ.get("AUTO_SUPPORT_TEMP_DIR"),
+        str(Path(os.environ.get("PUBLIC", r"C:\Users\Public")) / "AutoSupportGenerator" / "temp"),
+        r"C:\AutoSupportGeneratorTemp",
+        os.environ.get("TEMP"),
+    ]
+    errors: list[str] = []
+    for raw_root in roots:
+        if not raw_root:
+            continue
+        root = Path(raw_root)
+        if not str(root).isascii():
+            continue
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+            work_dir = root / f"{prefix}_{uuid.uuid4().hex}"
+            work_dir.mkdir(parents=True, exist_ok=False)
+            return work_dir
+        except OSError as exc:
+            errors.append(f"{root}: {exc}")
+    details = "\n".join(f"  - {item}" for item in errors) or "  - no ASCII writable temp root found"
+    raise RuntimeError("Could not create an ASCII-only temporary folder for external tools.\n" + details)

@@ -3,8 +3,8 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import shutil
 import sys
-import tempfile
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -12,6 +12,8 @@ from xml.etree import ElementTree as ET
 import olefile
 import pythoncom
 import win32com.client as win32
+
+from .external_tools import make_ascii_work_dir
 
 
 NS = {
@@ -71,9 +73,10 @@ def _names_from_cdx_with_chemdraw(cdx_by_row: dict[int, bytes]) -> dict[int, str
     app = _dispatch_chemdraw()
     app.Visible = False
     result: dict[int, str] = {}
+    temp_root = make_ascii_work_dir("chemdraw")
     try:
         for row, cdx in cdx_by_row.items():
-            temp_path = _write_temp_cdx(row, cdx)
+            temp_path = _write_temp_cdx(temp_root, row, cdx)
             doc = None
             try:
                 doc = app.Documents.Open(str(temp_path))
@@ -91,6 +94,7 @@ def _names_from_cdx_with_chemdraw(cdx_by_row: dict[int, bytes]) -> dict[int, str
                 temp_path.unlink(missing_ok=True)
         return result
     finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
         try:
             app.Quit()
         except Exception:
@@ -111,8 +115,8 @@ def _dispatch_chemdraw():
     ) from last_error
 
 
-def _write_temp_cdx(row: int, cdx: bytes) -> Path:
-    path = Path(tempfile.gettempdir()) / f"auto_si_chemdraw_name_row_{row}.cdx"
+def _write_temp_cdx(root: Path, row: int, cdx: bytes) -> Path:
+    path = root / f"row_{row}.cdx"
     path.write_bytes(cdx)
     return path
 

@@ -176,6 +176,8 @@ class SIGeneratorApp:
 
     def _run_command(self, command: list[str]) -> None:
         env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+        env["PYTHONUTF8"] = "1"
         if not getattr(sys, "frozen", False):
             src_path = str(Path(__file__).resolve().parents[1])
             env["PYTHONPATH"] = src_path + os.pathsep + env.get("PYTHONPATH", "")

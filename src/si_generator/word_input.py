@@ -166,7 +166,7 @@ def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Comp
     return compounds
 
 
-def _chemdraw_names_for_rows(path: str, rows: list[int], timeout: int = 90) -> dict[int, str]:
+def _chemdraw_names_for_rows(path: str, rows: list[int], timeout: int = 240) -> dict[int, str]:
     if not rows:
         return {}
     if getattr(sys, "frozen", False):
@@ -174,6 +174,9 @@ def _chemdraw_names_for_rows(path: str, rows: list[int], timeout: int = 90) -> d
     else:
         command = [sys.executable, "-m", "si_generator.chemdraw_names", path]
     command += ["--rows", ",".join(str(row) for row in rows)]
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
     try:
         completed = subprocess.run(
             command,
@@ -183,6 +186,7 @@ def _chemdraw_names_for_rows(path: str, rows: list[int], timeout: int = 90) -> d
             encoding="utf-8",
             errors="replace",
             timeout=timeout,
+            env=env,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         print(f"[ChemDraw warning] Could not generate structure names: {exc}", flush=True)
