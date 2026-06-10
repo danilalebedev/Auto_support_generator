@@ -286,15 +286,15 @@ output/
 
 ## Примеры
 
-В папке `examples/` есть готовые файлы, на которых можно проверить программу.
-
-### Полный Word workflow
+В папке `examples/` лежит один полный демонстрационный набор: входные данные,
+архив со спектрами и пример результата. Его можно использовать, чтобы быстро
+проверить GUI и понять, какой формат файлов ожидает программа.
 
 ```text
-examples/word_workflow/test_input.docx
-examples/word_workflow/test_input.zip
-examples/word_workflow/example_output/support_information.docx
-examples/word_workflow/example_output/processed_spectra.zip
+examples/test_input.docx
+examples/test_input.zip
+examples/example_output/support_information.docx
+examples/example_output/processed_spectra.zip
 ```
 
 Что это за файлы:
@@ -311,42 +311,13 @@ examples/word_workflow/example_output/processed_spectra.zip
 В GUI для этого примера выберите:
 
 - `Table type`: `Word table with ChemDraw objects`;
-- `Compound table`: `examples/word_workflow/test_input.docx`;
-- `Spectra zip`: `examples/word_workflow/test_input.zip`;
+- `Compound table`: `examples/test_input.docx`;
+- `Spectra zip`: `examples/test_input.zip`;
 - `Output .docx`: любой удобный путь, например `output/support_information.docx`.
 
 После запуска программа должна создать рядом с выбранным output-файлом готовый
 `support_information.docx`, `processed_spectra.zip` и служебные папки
 `logs/`, `mnova_reports/`, `processed_mnova/`, `processed_spectra/`.
-
-### Простой CSV workflow
-
-```text
-examples/sample_compounds.csv
-examples/generated_support_example.docx
-```
-
-Что это за файлы:
-
-- `sample_compounds.csv` - простой вход без Word OLE-структур и без спектров;
-- `generated_support_example.docx` - пример результата для CSV-входа.
-
-После установки зависимостей можно сгенерировать пример support без спектров:
-
-```powershell
-py -m si_generator ^
-  --input examples\sample_compounds.csv ^
-  --style-config style_config.example.yml ^
-  --no-check-support ^
-  --output examples\generated_support_example.docx
-```
-
-Файл `examples/generated_support_example.docx` - пример результата. Он показывает
-формат описания соединений, HRMS, IR и ручные ЯМР-описания. В реальном workflow
-ЯМР-описания и картинки спектров можно генерировать автоматически из
-MestReNova/Bruker spectra zip. В этой демонстрационной команде проверка
-отключена, чтобы пример выглядел как чистовой документ без диагностических
-пометок.
 
 ## Формат Word-таблицы
 
@@ -495,7 +466,7 @@ chem_formatting:
 запускать через установленный exe:
 
 ```powershell
-%LOCALAPPDATA%\AutoSupportGenerator\AutoSupportGenerator.exe --input examples\sample_compounds.csv --output output\support_information.docx
+%LOCALAPPDATA%\AutoSupportGenerator\AutoSupportGenerator.exe --word-input examples\test_input.docx --spectra-zip examples\test_input.zip --output output\support_information.docx
 ```
 
 Если программа запущена из исходников, используйте `py -m si_generator`.
@@ -514,7 +485,7 @@ CSV workflow:
 
 ```powershell
 py -m si_generator ^
-  --input examples\sample_compounds.csv ^
+  --input C:\path\to\compounds.csv ^
   --output output\support_information.docx
 ```
 
