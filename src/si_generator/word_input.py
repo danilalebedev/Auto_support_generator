@@ -51,6 +51,8 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
 
     try:
         doc = word.Documents.Open(path, False, False, False)
+        if doc.Tables.Count == 0:
+            raise ValueError("Word input must contain at least one table.")
         table = doc.Tables(1)
         headers = [_cell_text(table.Cell(1, col)) for col in range(1, table.Columns.Count + 1)]
         missing_name_rows: list[int] = []
@@ -67,12 +69,12 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
                 formula = formula or _formula_from_structure_in_row(doc, table, row)
             if not name:
                 missing_name_rows.append(row)
-            rows_data.append((row, fields, number, formula, name))
+            rows_data.append((row, fields, number, formula, name, metadata is not None))
 
         generated_names = _chemdraw_names_for_rows(path, missing_name_rows)
         compounds: list[Compound] = []
 
-        for row, fields, number, formula, name in rows_data:
+        for row, fields, number, formula, name, has_structure in rows_data:
             name = name or generated_names.get(row, "") or f"Compound {number}"
             compounds.append(
                 Compound(
@@ -96,7 +98,7 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
                     c13_spectrum_path=fields.get("c13_spectrum_path", ""),
                     extra_nmr=fields.get("extra_nmr", ""),
                     ir=fields.get("ir", ""),
-                    has_word_structure=True,
+                    has_word_structure=has_structure,
                 )
             )
 
@@ -110,7 +112,11 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
 
 def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Compound]:
     document = Document(path)
+    if not document.tables:
+        raise ValueError("Word input must contain at least one table.")
     table = document.tables[0]
+    if not table.rows:
+        raise ValueError("Word input table is empty.")
     headers = [_clean_docx_cell_text(cell.text) for cell in table.rows[0].cells]
     rows_data = []
     missing_name_rows = []
@@ -153,7 +159,7 @@ def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Comp
                 c13_spectrum_path=fields.get("c13_spectrum_path", ""),
                 extra_nmr=fields.get("extra_nmr", ""),
                 ir=fields.get("ir", ""),
-                has_word_structure=True,
+                has_word_structure=metadata is not None,
             )
         )
 
@@ -178,9 +184,13 @@ def _chemdraw_names_for_rows(path: str, rows: list[int], timeout: int = 90) -> d
             errors="replace",
             timeout=timeout,
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"[ChemDraw warning] Could not generate structure names: {exc}", flush=True)
         return {}
     if completed.returncode != 0 or not completed.stdout.strip():
+        message = (completed.stderr or completed.stdout or "").strip()
+        if message:
+            print(f"[ChemDraw warning] Could not generate structure names: {message}", flush=True)
         return {}
     try:
         raw = json.loads(completed.stdout)

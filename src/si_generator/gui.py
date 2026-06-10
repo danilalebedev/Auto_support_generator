@@ -24,6 +24,7 @@ class SIGeneratorApp:
         self.spectra_zip = StringVar()
         self.template_docx = StringVar()
         self.style_config = StringVar()
+        self.mnova_exe = StringVar()
         self.output_docx = StringVar(value=str((Path.cwd() / "output" / "support_information.docx").resolve()))
         self.input_kind = StringVar(value="word")
         self.check_support = BooleanVar(value=True)
@@ -57,7 +58,8 @@ class SIGeneratorApp:
         self._file_row(files, 2, "Spectra zip", self.spectra_zip, lambda: self._browse_file(self.spectra_zip, [("Zip archives", "*.zip"), ("All files", "*.*")]))
         self._file_row(files, 3, "Template .docx", self.template_docx, lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
         self._file_row(files, 4, "Style config .yml", self.style_config, lambda: self._browse_file(self.style_config, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
-        self._file_row(files, 5, "Output .docx", self.output_docx, self._browse_output)
+        self._file_row(files, 5, "MestReNova .exe", self.mnova_exe, lambda: self._browse_file(self.mnova_exe, [("MestReNova", "*.exe"), ("All files", "*.*")]), optional=True)
+        self._file_row(files, 6, "Output .docx", self.output_docx, self._browse_output)
 
         options = ttk.LabelFrame(outer, text="Options", padding=12)
         options.grid(row=2, column=0, sticky="ew", pady=(12, 12))
@@ -156,6 +158,7 @@ class SIGeneratorApp:
             (self.spectra_zip.get(), "--spectra-zip", "Spectra zip"),
             (self.template_docx.get(), "--template-docx", "Template .docx"),
             (self.style_config.get(), "--style-config", "Style config"),
+            (self.mnova_exe.get(), "--mnova-exe", "MestReNova .exe"),
         ]
         for raw_path, flag, label in optional_files:
             raw_path = raw_path.strip().strip('"')

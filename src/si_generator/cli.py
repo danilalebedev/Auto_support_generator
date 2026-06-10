@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 from .chemdraw_ole import insert_chemdraw_placeholders
 from .docx_builder import build_document
+from .input_validation import validate_compound_inputs
 from .input_table import read_compounds
 from .nmr_fill import fill_nmr_from_mnova
 from .nmr_validation import validate_support
@@ -14,6 +16,14 @@ from .word_input import paste_word_structures, read_word_compounds
 
 
 def main(argv: list[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr, flush=True)
+        return 1
+
+
+def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate Supporting Information DOCX from compound CSV data.")
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument("--input", "-i", help="Path to compounds CSV.")
@@ -30,6 +40,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--spectra-zip",
         help="Zip archive with compound-number folders containing NMR spectra.",
+    )
+    parser.add_argument(
+        "--mnova-exe",
+        help="Optional path to MestReNova.exe. If omitted, the program searches PATH, registry, and common install folders.",
     )
     parser.add_argument(
         "--no-extract-nmr",
@@ -70,12 +84,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.spectra_zip:
         spectra_root = prepare_spectra_zip(args.spectra_zip, Path(args.output).parent / "logs" / "_spectra_zip")
         assign_spectra_from_folder(compounds, spectra_root)
+    for warning in validate_compound_inputs(compounds, require_structure=bool(args.word_input)):
+        print(f"[Input warning] {warning}", flush=True)
     if not args.no_extract_nmr:
         fill_nmr_from_mnova(
             compounds,
             input_path.parent,
             Path(args.output).parent / "logs" / "mnova_batch",
             output_root=Path(args.output).parent,
+            mnova_exe=args.mnova_exe,
         )
     if not args.no_check_support:
         validate_support(compounds)

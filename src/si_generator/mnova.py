@@ -7,8 +7,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-
-MNOVA_EXE = Path(r"C:\Program Files\Mestrelab Research S.L\MestReNova\MestReNova.exe")
+from .external_tools import find_mnova_executable
 
 
 def _resource_path(relative_path: str) -> Path:
@@ -51,6 +50,7 @@ def extract_reports_batch(
     tasks: list[MnovaTask],
     output_dir: Path,
     timeout: int = 600,
+    mnova_exe: str | Path | None = None,
 ) -> dict[tuple[str, str], dict[str, str]]:
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -82,7 +82,9 @@ def extract_reports_batch(
             _mnova_arg(status_path),
         ]
     )
-    command = [str(MNOVA_EXE), "-w", str(SCRIPT_PATH), "-sf", sf_arg]
+    executable = find_mnova_executable(mnova_exe)
+    print(f"[Mnova] executable: {executable}", flush=True)
+    command = [str(executable), "-w", str(SCRIPT_PATH), "-sf", sf_arg]
     subprocess.run(command, cwd=output_dir, check=False, timeout=timeout)
 
     status = status_path.read_text(encoding="utf-8", errors="replace") if status_path.exists() else "ERROR: no status file"

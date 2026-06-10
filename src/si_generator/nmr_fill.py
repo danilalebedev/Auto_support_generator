@@ -16,6 +16,7 @@ def fill_nmr_from_mnova(
     base_dir: str | Path,
     output_dir: str | Path,
     output_root: str | Path | None = None,
+    mnova_exe: str | Path | None = None,
 ) -> None:
     base_dir = Path(base_dir).resolve()
     output_dir = Path(output_dir).resolve()
@@ -43,7 +44,7 @@ def fill_nmr_from_mnova(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"[Mnova] extracting {len(tasks)} spectra in one MestReNova session", flush=True)
-    reports = extract_reports_batch(tasks, output_dir)
+    reports = extract_reports_batch(tasks, output_dir, mnova_exe=mnova_exe)
 
     for compound in compounds:
         h1 = reports.get((compound.number, "1H"))

@@ -19,6 +19,8 @@ def read_compounds(path: str | Path) -> list[Compound]:
 
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
+        if not reader.fieldnames:
+            raise ValueError("CSV input has no header row.")
         compounds: list[Compound] = []
         for row_number, raw_row in enumerate(reader, start=2):
             row = {FIELD_ALIASES.get(key, key): (value or "").strip() for key, value in raw_row.items() if key}

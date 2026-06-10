@@ -68,7 +68,7 @@ def _document_relationships(archive: zipfile.ZipFile) -> dict[str, str]:
 
 def _names_from_cdx_with_chemdraw(cdx_by_row: dict[int, bytes]) -> dict[int, str]:
     pythoncom.CoInitialize()
-    app = win32.DispatchEx("ChemDraw.Application")
+    app = _dispatch_chemdraw()
     app.Visible = False
     result: dict[int, str] = {}
     try:
@@ -98,6 +98,19 @@ def _names_from_cdx_with_chemdraw(cdx_by_row: dict[int, bytes]) -> dict[int, str
         pythoncom.CoUninitialize()
 
 
+def _dispatch_chemdraw():
+    last_error: Exception | None = None
+    for prog_id in ["ChemDraw.Application", "ChemDraw.Application.22", "ChemDraw.Application.21", "ChemDraw.Application.20"]:
+        try:
+            return win32.DispatchEx(prog_id)
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(
+        "ChemDraw COM server was not found. Open ChemDraw once, check that it is activated, "
+        "or reinstall ChemDraw/ChemOffice with OLE/COM support enabled."
+    ) from last_error
+
+
 def _write_temp_cdx(row: int, cdx: bytes) -> Path:
     path = Path(tempfile.gettempdir()) / f"auto_si_chemdraw_name_row_{row}.cdx"
     path.write_bytes(cdx)
@@ -111,7 +124,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     rows = [int(item) for item in args.rows.split(",") if item.strip()]
-    result = extract_chemdraw_names_by_row(args.docx, rows=rows)
+    try:
+        result = extract_chemdraw_names_by_row(args.docx, rows=rows)
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     json.dump(result, sys.stdout, ensure_ascii=False)
     return 0
 
