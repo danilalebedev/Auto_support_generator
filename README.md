@@ -61,8 +61,9 @@ C:\Program Files\Mestrelab Research S.L\MestReNova\MestReNova.exe
 
 Самый простой вариант:
 
-1. Скачайте файл `AutoSupportGeneratorSetup.exe` из GitHub Releases или получите
-   его от разработчика.
+1. Скачайте файл `installer/AutoSupportGeneratorSetup.exe` из репозитория.
+   На GitHub откройте папку `installer`, выберите `AutoSupportGeneratorSetup.exe`
+   и нажмите `Download raw file`.
 2. Дважды кликните `AutoSupportGeneratorSetup.exe`.
 3. Дождитесь окончания установки.
 4. Запустите программу через ярлык `Auto Support Generator` на рабочем столе или

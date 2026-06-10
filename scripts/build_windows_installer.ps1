@@ -85,7 +85,13 @@ if (-not (Test-Path -LiteralPath $setupExe)) {
     throw "PyInstaller did not create $setupExe"
 }
 
+$trackedInstallerDir = Join-Path $root "installer"
+$trackedInstallerExe = Join-Path $trackedInstallerDir "AutoSupportGeneratorSetup.exe"
+New-Item -ItemType Directory -Force -Path $trackedInstallerDir | Out-Null
+Copy-Item -LiteralPath $setupExe -Destination $trackedInstallerExe -Force
+
 Write-Host ""
 Write-Host "Build finished:"
 Write-Host "  $appExe"
 Write-Host "  $setupExe"
+Write-Host "  $trackedInstallerExe"
