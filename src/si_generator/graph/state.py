@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Literal, TypedDict
 
 from ..domain.types import SpectrumRenderSpec
+from ..domain.types import JournalProfile
 from ..models import Compound
 from ..render.si_document import SIDocument
 
@@ -20,6 +21,7 @@ class GenerateSIRequest:
     output_path: Path
     template_docx: Path | None = None
     style_config_path: Path | None = None
+    journal_profile: str | Path | None = None
     spectra_zip: Path | None = None
     mnova_exe: Path | None = None
     no_extract_nmr: bool = False
@@ -49,6 +51,7 @@ class GenerateSIState(TypedDict, total=False):
     run_id: str
     request: GenerateSIRequest
     style_config: dict[str, Any]
+    journal_profile: JournalProfile
     input_compounds: list[Compound]
     compounds: dict[str, Compound]
     order: list[str]

@@ -41,6 +41,8 @@ class GenerateWorkflowTests(unittest.TestCase):
             self.assertIsInstance(state["compounds"]["cmp_001"].nmr_spectra, dict)
             self.assertEqual(state["document_model"]["sections"][0]["id"], "compound_descriptions")
             self.assertEqual(state["document_model"]["sections"][0]["blocks"][0]["compound_id"], "cmp_001")
+            self.assertEqual(state["journal_profile"]["id"], "default")
+            self.assertEqual(state["document_model"]["metadata"]["journal_profile"], "default")
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(manifest["order"][:2], ["cmp_001", "cmp_002"])
             self.assertEqual(manifest["compounds"]["cmp_001"]["number"], "2a")

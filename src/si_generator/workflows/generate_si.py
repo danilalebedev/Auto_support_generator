@@ -31,6 +31,7 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
         output_path=Path(args.output),
         template_docx=Path(args.template_docx) if args.template_docx else None,
         style_config_path=Path(args.style_config) if args.style_config else None,
+        journal_profile=args.journal_profile or None,
         spectra_zip=Path(args.spectra_zip) if args.spectra_zip else None,
         mnova_exe=Path(args.mnova_exe) if args.mnova_exe else None,
         no_extract_nmr=bool(args.no_extract_nmr),

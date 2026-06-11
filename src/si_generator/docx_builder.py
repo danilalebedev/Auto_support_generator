@@ -10,6 +10,7 @@ from docx.shared import RGBColor
 from docx.shared import Pt
 
 from .domain.massspec import calculate_hrms
+from .domain.types import JournalProfile
 from .models import Compound
 from .render.document_model import build_si_document_model
 from .render.si_document import DocumentBlock, SIDocument
@@ -21,9 +22,10 @@ def build_document(
     output_path: str | Path,
     style_config: dict[str, Any] | None = None,
     template_path: str | Path | None = None,
+    journal_profile: JournalProfile | None = None,
 ) -> Path:
     return build_document_from_model(
-        build_si_document_model(compounds),
+        build_si_document_model(compounds, journal_profile),
         output_path,
         style_config=style_config,
         template_path=template_path,

@@ -37,6 +37,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional YAML file with semantic formatting rules for titles, NMR, HRMS, IR, and chemical notation.",
     )
     parser.add_argument(
+        "--journal-profile",
+        help="Optional built-in profile name (default, acs, rsc, wiley) or path to a journal profile YAML.",
+    )
+    parser.add_argument(
         "--spectra-zip",
         help="Zip archive with compound-number folders containing NMR spectra.",
     )
