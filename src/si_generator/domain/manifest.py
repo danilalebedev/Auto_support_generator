@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree
 
 from .types import Issue
 
@@ -44,7 +46,10 @@ def check_manifest(
         compounds = {}
 
     issues.extend(_check_compound_entries(order, compounds))
-    issues.extend(_check_support_docx(manifest, base_dir, support_docx))
+    support_docx_path = _support_docx_path(manifest, base_dir, support_docx)
+    issues.extend(_check_support_docx(support_docx_path))
+    if support_docx_path and support_docx_path.exists():
+        issues.extend(_check_docx_bookmarks(manifest, support_docx_path))
     if strict_artifacts:
         issues.extend(_check_artifact_paths(manifest, base_dir))
 
@@ -126,21 +131,77 @@ def _check_compound_entries(order: list[Any], compounds: dict[str, Any]) -> list
     return issues
 
 
-def _check_support_docx(manifest: dict[str, Any], base_dir: Path, support_docx: str | Path | None) -> list[Issue]:
+def _support_docx_path(manifest: dict[str, Any], base_dir: Path, support_docx: str | Path | None) -> Path | None:
     path = Path(support_docx) if support_docx else _manifest_path(manifest, "support_docx")
     if not path:
+        return None
+    return _resolve_manifest_path(path, base_dir)
+
+
+def _check_support_docx(path: Path | None) -> list[Issue]:
+    if not path:
         return [_issue("MANIFEST_MISSING_SUPPORT_DOCX", "error", "support DOCX path is missing from manifest artifacts.")]
-    resolved = _resolve_manifest_path(path, base_dir)
-    if not resolved.exists():
+    if path.exists():
+        return []
+    return [
+        _issue(
+            "MANIFEST_MISSING_SUPPORT_DOCX",
+            "error",
+            f"support DOCX does not exist: {path}",
+            path=str(path),
+        )
+    ]
+
+
+def _check_docx_bookmarks(manifest: dict[str, Any], support_docx: Path) -> list[Issue]:
+    expected = _expected_docx_bookmarks(manifest)
+    if not expected:
+        return []
+    try:
+        actual = _read_docx_bookmarks(support_docx)
+    except (OSError, KeyError, zipfile.BadZipFile, ElementTree.ParseError) as exc:
         return [
             _issue(
-                "MANIFEST_MISSING_SUPPORT_DOCX",
+                "DOCX_BOOKMARK_READ_ERROR",
                 "error",
-                f"support DOCX does not exist: {resolved}",
-                path=str(resolved),
+                f"could not read DOCX bookmarks from {support_docx}: {exc}",
+                path=str(support_docx),
             )
         ]
-    return []
+
+    issues: list[Issue] = []
+    for compound_id, bookmark in expected.items():
+        if bookmark not in actual:
+            issues.append(
+                _issue(
+                    "DOCX_MISSING_BOOKMARK",
+                    "error",
+                    f"bookmark '{bookmark}' for compound '{compound_id}' was not found in support DOCX.",
+                    compound_id=compound_id,
+                    path=str(support_docx),
+                )
+            )
+    return issues
+
+
+def _expected_docx_bookmarks(manifest: dict[str, Any]) -> dict[str, str]:
+    expected: dict[str, str] = {}
+    for compound_id, compound in (manifest.get("compounds", {}) or {}).items():
+        if isinstance(compound, dict) and compound.get("docx_bookmark"):
+            expected[str(compound_id)] = str(compound["docx_bookmark"])
+    return expected
+
+
+def _read_docx_bookmarks(path: Path) -> set[str]:
+    namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    with zipfile.ZipFile(path) as archive:
+        xml = archive.read("word/document.xml")
+    root = ElementTree.fromstring(xml)
+    return {
+        str(element.attrib.get(namespace + "name"))
+        for element in root.iter(namespace + "bookmarkStart")
+        if element.attrib.get(namespace + "name")
+    }
 
 
 def _check_artifact_paths(manifest: dict[str, Any], base_dir: Path) -> list[Issue]:
