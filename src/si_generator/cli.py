@@ -6,6 +6,7 @@ import sys
 from .domain.manifest import manifest_has_errors
 from .workflows.check_si import check_request_from_args, run_check_si
 from .workflows.generate_si import output_path_from_state, request_from_args, run_generate_si
+from .workflows.patch_si import patch_request_from_args, run_patch_si
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -23,8 +24,12 @@ def _main(argv: list[str] | None = None) -> int:
         result = run_check_si(check_request_from_args(args))
         _print_check_result(result)
         return 1 if manifest_has_errors(result.get("issues", [])) else 0
+    if args.patch_manifest:
+        result = run_patch_si(patch_request_from_args(args))
+        _print_patch_result(result)
+        return 1 if manifest_has_errors(result.get("issues", [])) else 0
     if not args.output:
-        parser.error("--output is required unless --check-manifest is used.")
+        parser.error("--output is required unless --check-manifest or --patch-manifest is used.")
     result = run_generate_si(request_from_args(args))
     print(f"Generated {output_path_from_state(result).resolve()}")
     return 0
@@ -36,8 +41,12 @@ def _build_parser() -> argparse.ArgumentParser:
     input_group.add_argument("--input", "-i", help="Path to compounds CSV.")
     input_group.add_argument("--word-input", help="Path to a Word table with ChemDraw/ChemSketch OLE structures.")
     input_group.add_argument("--check-manifest", help="Check an existing support_information.manifest.json file.")
+    input_group.add_argument("--patch-manifest", help="Patch an existing support_information.manifest.json file.")
     parser.add_argument("--output", "-o", help="Path to output DOCX.")
     parser.add_argument("--support-docx", help="Optional DOCX path override for --check-manifest.")
+    parser.add_argument("--renumber", help="For --patch-manifest, comma-separated OLD=NEW pairs, e.g. 2a=3a,2b=3b.")
+    parser.add_argument("--patched-output", help="For --patch-manifest, output path for the patched DOCX.")
+    parser.add_argument("--patched-manifest-output", help="For --patch-manifest, output path for the patched manifest JSON.")
     parser.add_argument(
         "--no-strict-artifacts",
         action="store_true",
@@ -117,3 +126,20 @@ def _print_check_result(result: dict) -> None:
         print("Manifest check passed.")
     else:
         print("Manifest check failed.")
+
+
+def _print_patch_result(result: dict) -> None:
+    for issue in result.get("issues", []):
+        severity = issue.get("severity", "warning").upper()
+        code = issue.get("code", "PATCH")
+        message = issue.get("message", "")
+        print(f"[{severity}] {code}: {message}")
+    artifacts = result.get("artifacts", {})
+    if artifacts.get("support_docx"):
+        print(f"Patched DOCX: {artifacts['support_docx']}")
+    if artifacts.get("manifest"):
+        print(f"Patched manifest: {artifacts['manifest']}")
+    if result.get("status") == "pass":
+        print("Patch check passed.")
+    else:
+        print("Patch check failed.")

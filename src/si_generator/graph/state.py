@@ -48,6 +48,16 @@ class CheckSIRequest:
     strict_artifacts: bool = True
 
 
+@dataclass(slots=True)
+class PatchSIRequest:
+    manifest_path: Path
+    renumber: dict[str, str]
+    support_docx: Path | None = None
+    output_docx: Path | None = None
+    output_manifest: Path | None = None
+    strict_artifacts: bool = True
+
+
 class Issue(TypedDict, total=False):
     code: str
     severity: Literal["info", "warning", "error"]
@@ -79,6 +89,15 @@ class GenerateSIState(TypedDict, total=False):
 class CheckSIState(TypedDict, total=False):
     run_id: str
     request: CheckSIRequest
+    manifest: dict[str, Any]
+    artifacts: dict[str, str]
+    issues: list[Issue]
+    status: Literal["pass", "fail"]
+
+
+class PatchSIState(TypedDict, total=False):
+    run_id: str
+    request: PatchSIRequest
     manifest: dict[str, Any]
     artifacts: dict[str, str]
     issues: list[Issue]

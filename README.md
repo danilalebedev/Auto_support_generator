@@ -594,6 +594,19 @@ py -m si_generator ^
 только manifest и итоговый документ, без строгой проверки всех PNG/MNova файлов, добавьте
 `--no-strict-artifacts`.
 
+Создать патченую копию уже сгенерированного SI с новой нумерацией соединений:
+
+```powershell
+py -m si_generator ^
+  --patch-manifest output\support_information.manifest.json ^
+  --renumber 2a=3a,2b=3b ^
+  --patched-output output\support_information_renumbered.docx
+```
+
+Сейчас patch workflow поддерживает безопасную перенумерацию по `manifest` и невидимым Word bookmarks:
+он создает новый `.docx`, новый `.manifest.json` и сразу проверяет, что bookmarks в документе совпадают
+с manifest. Перестановка блоков и замена отдельных структур будут добавлены отдельными patch-операциями.
+
 Отключить проверку:
 
 ```powershell

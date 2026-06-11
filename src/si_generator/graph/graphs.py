@@ -10,11 +10,12 @@ from .nodes.loadings import calculate_loadings_node
 from .nodes.nmr import apply_peak_picking_policy_node, parse_nmr_reports_node
 from .nodes.normalize import normalize_compounds_node
 from .nodes.packaging import write_manifest_node
+from .nodes.patching import apply_renumber_patch_node, check_patched_manifest_node, load_patch_manifest_node
 from .nodes.render import build_document_model_node, postprocess_word_objects_node, render_docx_node
 from .nodes.settings import load_settings_node
 from .nodes.spectra import mnova_batch_node, plan_nmr_processing_node, prepare_spectra_zip_node, route_nmr_processing
 from .nodes.validation import validate_input_node, validate_support_node
-from .state import CheckSIState, GenerateSIState
+from .state import CheckSIState, GenerateSIState, PatchSIState
 
 
 def build_generate_si_graph():
@@ -76,5 +77,20 @@ def build_check_si_graph():
     builder.add_edge(START, "load_manifest")
     builder.add_edge("load_manifest", "check_manifest")
     builder.add_edge("check_manifest", END)
+
+    return builder.compile()
+
+
+def build_patch_si_graph():
+    builder = StateGraph(PatchSIState)
+
+    builder.add_node("load_manifest", load_patch_manifest_node)
+    builder.add_node("apply_renumber_patch", apply_renumber_patch_node)
+    builder.add_node("check_patched_manifest", check_patched_manifest_node)
+
+    builder.add_edge(START, "load_manifest")
+    builder.add_edge("load_manifest", "apply_renumber_patch")
+    builder.add_edge("apply_renumber_patch", "check_patched_manifest")
+    builder.add_edge("check_patched_manifest", END)
 
     return builder.compile()
