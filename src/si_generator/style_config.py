@@ -118,6 +118,17 @@ DEFAULT_STYLE_CONFIG: dict[str, Any] = {
             "italic": False,
         },
     },
+    "elemental_analysis": {
+        "paragraph_style": "",
+        "label": {
+            "bold": True,
+            "italic": False,
+        },
+        "body": {
+            "bold": False,
+            "italic": False,
+        },
+    },
 }
 
 

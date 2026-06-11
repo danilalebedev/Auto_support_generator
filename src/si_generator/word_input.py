@@ -99,6 +99,7 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
                     c13_spectrum_path=fields.get("c13_spectrum_path", ""),
                     extra_nmr=fields.get("extra_nmr", ""),
                     ir=fields.get("ir", ""),
+                    elemental_analysis=_elemental_analysis_from_fields(fields),
                     references=parse_reference_keys(fields.get("references", "")),
                     has_word_structure=has_structure,
                 )
@@ -161,6 +162,7 @@ def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Comp
                 c13_spectrum_path=fields.get("c13_spectrum_path", ""),
                 extra_nmr=fields.get("extra_nmr", ""),
                 ir=fields.get("ir", ""),
+                elemental_analysis=_elemental_analysis_from_fields(fields),
                 references=parse_reference_keys(fields.get("references", "")),
                 has_word_structure=metadata is not None,
             )
@@ -340,6 +342,8 @@ def _map_row(headers: list[str], values: list[str]) -> dict[str, str]:
             result["formula"] = value
         elif key == "ir":
             result["ir"] = value
+        elif key in {"elementalanalysis", "elementaryanalysis", "analysis", "anal", "ea"}:
+            result["elemental_analysis"] = value
         elif key in {"references", "refs", "referencekeys"}:
             result["references"] = value
         elif "nmr" in key:
@@ -354,6 +358,11 @@ def _split_appearance(value: str, result: dict[str, str]) -> None:
         result["color"], result["state"] = parts
     else:
         result["state"] = value
+
+
+def _elemental_analysis_from_fields(fields: dict[str, str]) -> dict[str, str]:
+    value = fields.get("elemental_analysis", "")
+    return {"found": value} if value else {}
 
 
 def _first_number(value: str) -> str:
