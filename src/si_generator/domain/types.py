@@ -228,6 +228,7 @@ class ManifestCompound(TypedDict, total=False):
     source_row: int
     structure_placeholder: str
     docx_block_id: str
+    docx_bookmark: str
     references: list[str]
     artifacts: dict[str, str]
 

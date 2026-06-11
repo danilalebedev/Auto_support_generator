@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from docx import Document
 
 from si_generator.docx_builder import build_document_from_model
+from si_generator.domain.bookmarks import bookmark_name_for_block_id
 from si_generator.models import Compound
 from si_generator.render.document_model import build_si_document_model
 
@@ -26,11 +28,13 @@ class DocumentModelTests(unittest.TestCase):
         spectrum_block = model["sections"][1]["blocks"][0]
         self.assertEqual(compound_block["kind"], "compound_description")
         self.assertEqual(compound_block["block_id"], "compound:cmp_001")
+        self.assertEqual(compound_block["bookmark"], bookmark_name_for_block_id("compound:cmp_001"))
         self.assertEqual(compound_block["display_number"], "2a")
         self.assertEqual(compound_block["title_text"], "Example (2a)")
         self.assertEqual(compound_block["structure_placeholder"], "STRUCTURE:2a")
         self.assertEqual(spectrum_block["kind"], "spectrum_page")
         self.assertEqual(spectrum_block["block_id"], "spectrum:cmp_001:1H")
+        self.assertEqual(spectrum_block["bookmark"], bookmark_name_for_block_id("spectrum:cmp_001:1H"))
         self.assertEqual(spectrum_block["compound_id"], "cmp_001")
         self.assertEqual(spectrum_block["nucleus"], "1H")
         self.assertEqual(spectrum_block["structure_placeholder"], "SPECTRUM_STRUCTURE:2a:1H")
@@ -51,6 +55,22 @@ class DocumentModelTests(unittest.TestCase):
         self.assertIn("Example compound", text)
         self.assertIn("(2a)", text)
         self.assertIn("white solid.", text)
+
+    def test_renders_docx_bookmarks_for_patch_workflow(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "support_information.docx"
+            compound = Compound(id="cmp_001", number="2a", name="Example compound")
+            model = build_si_document_model([compound])
+
+            build_document_from_model(model, output_path)
+
+            with zipfile.ZipFile(output_path) as archive:
+                document_xml = archive.read("word/document.xml").decode("utf-8")
+            visible_text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
+
+        self.assertIn('w:bookmarkStart', document_xml)
+        self.assertIn(f'w:name="{bookmark_name_for_block_id("compound:cmp_001")}"', document_xml)
+        self.assertNotIn("asig_compound", visible_text)
 
     def test_renders_hrms_isotope_labels(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..domain.bookmarks import bookmark_name_for_block_id
 from ..domain.references import select_references_for_compounds
 from ..domain.types import JournalProfile
 from ..domain.types import ReferenceStore
@@ -62,9 +63,11 @@ def _section_order(journal_profile: JournalProfile | None) -> list[str]:
 
 def _compound_description_block(compound: Compound) -> DocumentBlock:
     compound_id = _compound_id(compound)
+    block_id = f"compound:{compound_id}"
     return {
         "kind": "compound_description",
-        "block_id": f"compound:{compound_id}",
+        "block_id": block_id,
+        "bookmark": bookmark_name_for_block_id(block_id),
         "compound_id": compound_id,
         "display_number": compound.number,
         "title_text": f"{compound.name} {compound.label}",
@@ -102,9 +105,11 @@ def _should_include_spectrum(compound: Compound, nucleus: str, embed_mode: Spect
 def _spectrum_block(compound: Compound, nucleus: str, embed_mode: SpectrumEmbedMode) -> DocumentBlock:
     compound_id = _compound_id(compound)
     image_path = _spectrum_image_path(compound, nucleus)
+    block_id = f"spectrum:{compound_id}:{nucleus}"
     return {
         "kind": "spectrum_page",
-        "block_id": f"spectrum:{compound_id}:{nucleus}",
+        "block_id": block_id,
+        "bookmark": bookmark_name_for_block_id(block_id),
         "compound_id": compound_id,
         "display_number": compound.number,
         "title_text": f"{compound.name} {compound.label}",
@@ -140,6 +145,7 @@ def _reference_blocks(compounds: list[Compound], reference_store: ReferenceStore
         {
             "kind": "reference",
             "block_id": f"reference:{index}",
+            "bookmark": bookmark_name_for_block_id(f"reference:{index}"),
             "title_text": f"Reference {index}",
             "content": {"index": index, "reference": reference},
         }

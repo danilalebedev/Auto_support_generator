@@ -13,6 +13,7 @@ DocumentBlockKind = Literal[
 class DocumentBlock(TypedDict, total=False):
     kind: DocumentBlockKind
     block_id: str
+    bookmark: str
     compound_id: str
     display_number: str
     title_text: str

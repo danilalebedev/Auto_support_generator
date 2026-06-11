@@ -7,6 +7,7 @@ from pathlib import Path
 from si_generator.graph.compound_store import make_compound_store
 from si_generator.graph.nodes.packaging import build_manifest, collect_output_artifacts
 from si_generator.graph.state import GenerateSIRequest
+from si_generator.domain.bookmarks import bookmark_name_for_block_id
 from si_generator.models import Compound
 
 
@@ -50,6 +51,10 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(manifest["output_paths"]["logs_dir"], artifacts["logs_dir"])
         self.assertEqual(manifest["artifacts"]["support_docx"], str(output_path))
         self.assertEqual(manifest["configs"]["spectra"]["extract_nmr"], False)
+        self.assertEqual(
+            manifest["compounds"]["cmp_001"]["docx_bookmark"],
+            bookmark_name_for_block_id("compound:cmp_001"),
+        )
 
 
 if __name__ == "__main__":

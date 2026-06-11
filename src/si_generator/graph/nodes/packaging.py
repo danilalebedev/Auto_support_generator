@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from ...domain.bookmarks import bookmark_name_for_block_id
 from ..state import GenerateSIState
 
 
@@ -57,6 +58,7 @@ def build_manifest(state: GenerateSIState) -> dict:
             "source_row": compound.source_row,
             "structure_placeholder": f"STRUCTURE:{compound.number}",
             "docx_block_id": f"compound:{compound_id}",
+            "docx_bookmark": bookmark_name_for_block_id(f"compound:{compound_id}"),
             "references": list(compound.references),
             "artifacts": _compound_artifacts(compound),
         }
