@@ -6,8 +6,8 @@ from ..compound_store import ordered_compounds
 from ..state import GenerateSIState
 from ...chemdraw_ole import insert_chemdraw_placeholders
 from ...docx_builder import build_document_from_model
+from ...domain.journal_profile import profile_template_path
 from ...render.document_model import build_si_document_model
-from ...render.journal_profile import profile_template_path
 from ...style_config import config_get
 from ...word_input import paste_word_structures
 

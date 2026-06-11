@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from ..state import GenerateSIState
 from ...domain.generation_config import build_generation_config
+from ...domain.journal_profile import load_journal_profile
 from ...domain.references import load_reference_store
 from ...domain.spectra_config import build_spectra_config
-from ...render.journal_profile import load_journal_profile
 from ...style_config import load_style_config
 
 

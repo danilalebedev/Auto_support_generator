@@ -5,13 +5,19 @@ import unittest
 from argparse import Namespace
 from pathlib import Path
 
+from si_generator.domain.journal_profile import load_journal_profile as load_domain_journal_profile
+from si_generator.domain.journal_profile import profile_template_path as domain_profile_template_path
 from si_generator.render.document_model import build_si_document_model
-from si_generator.render.journal_profile import available_builtin_profiles, load_journal_profile
+from si_generator.render.journal_profile import available_builtin_profiles, load_journal_profile, profile_template_path
 from si_generator.models import Compound
 from si_generator.workflows.generate_si import request_from_args
 
 
 class JournalProfileTests(unittest.TestCase):
+    def test_render_module_reexports_domain_journal_profile_api(self) -> None:
+        self.assertIs(load_journal_profile, load_domain_journal_profile)
+        self.assertIs(profile_template_path, domain_profile_template_path)
+
     def test_loads_builtin_profile(self) -> None:
         profile = load_journal_profile("acs")
 
