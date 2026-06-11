@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import queue
 import threading
@@ -48,6 +49,7 @@ class SIGeneratorApp:
         self.result_run_summary = StringVar(value="")
         self.result_warnings = StringVar(value="")
         self.result_support_warnings = StringVar(value="")
+        self.result_overview = StringVar(value="")
         self.existing_manifest = StringVar(value="")
         self.patch_output_docx = StringVar(value="")
         self.patch_renumber = StringVar(value="")
@@ -146,14 +148,15 @@ class SIGeneratorApp:
         results = ttk.LabelFrame(outer, text="Results", padding=12)
         results.grid(row=3, column=0, sticky="ew", pady=(0, 12))
         results.columnconfigure(1, weight=1)
-        self._result_row(results, 0, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"))
-        self._result_row(results, 1, "Spectra package", self.result_spectra, lambda: self._open_result_path(self.result_spectra, "Spectra package"))
-        self._result_row(results, 2, "Manifest", self.result_manifest, lambda: self._open_result_path(self.result_manifest, "Manifest"))
-        self._result_row(results, 3, "Run report", self.result_run_summary, lambda: self._open_result_path(self.result_run_summary, "Run report"))
-        self._result_row(results, 4, "Input warnings", self.result_warnings, lambda: self._open_result_path(self.result_warnings, "Input warnings"))
+        self._result_row(results, 0, "Summary", self.result_overview)
+        self._result_row(results, 1, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"))
+        self._result_row(results, 2, "Spectra package", self.result_spectra, lambda: self._open_result_path(self.result_spectra, "Spectra package"))
+        self._result_row(results, 3, "Manifest", self.result_manifest, lambda: self._open_result_path(self.result_manifest, "Manifest"))
+        self._result_row(results, 4, "Run report", self.result_run_summary, lambda: self._open_result_path(self.result_run_summary, "Run report"))
+        self._result_row(results, 5, "Input warnings", self.result_warnings, lambda: self._open_result_path(self.result_warnings, "Input warnings"))
         self._result_row(
             results,
-            5,
+            6,
             "Support warnings",
             self.result_support_warnings,
             lambda: self._open_result_path(self.result_support_warnings, "Support warnings"),
@@ -492,6 +495,7 @@ class SIGeneratorApp:
         self.result_run_summary.set("")
         self.result_warnings.set("")
         self.result_support_warnings.set("")
+        self.result_overview.set("")
 
     def _apply_result_summary(self, summary: dict[str, str]) -> None:
         self.result_support.set(summary.get("support_docx", ""))
@@ -500,6 +504,7 @@ class SIGeneratorApp:
         self.result_run_summary.set(summary.get("run_summary", ""))
         self.result_warnings.set(summary.get("input_warnings", ""))
         self.result_support_warnings.set(summary.get("support_warnings", ""))
+        self.result_overview.set(summary.get("overview", ""))
         support_path = summary.get("support_docx")
         if support_path:
             self._last_output_folder = Path(support_path).expanduser().parent
@@ -663,19 +668,23 @@ def _build_patch_request(
 
 def _build_patch_summary(state: dict[str, Any]) -> dict[str, str]:
     artifacts = state.get("artifacts", {})
+    report_path = _resolved_artifact(artifacts, "patch_report")
     summary = {
         "support_docx": _resolved_artifact(artifacts, "support_docx"),
         "manifest": _resolved_artifact(artifacts, "manifest"),
-        "run_summary": _resolved_artifact(artifacts, "patch_report"),
+        "run_summary": report_path,
+        "overview": _report_overview(report_path),
     }
     return {key: value for key, value in summary.items() if value}
 
 
 def _build_check_summary(state: dict[str, Any], request: CheckSIRequest) -> dict[str, str]:
     artifacts = state.get("artifacts", {})
+    report_path = _resolved_artifact(artifacts, "check_report")
     summary = {
         "manifest": str(Path(artifacts.get("manifest", request.manifest_path)).resolve()),
-        "run_summary": _resolved_artifact(artifacts, "check_report"),
+        "run_summary": report_path,
+        "overview": _report_overview(report_path),
     }
     return {key: value for key, value in summary.items() if value}
 
@@ -683,13 +692,15 @@ def _build_check_summary(state: dict[str, Any], request: CheckSIRequest) -> dict
 def _build_result_summary(state: dict[str, Any]) -> dict[str, str]:
     artifacts = state.get("artifacts", {})
     output_path = output_path_from_state(state)
+    report_path = _resolved_artifact(artifacts, "run_summary")
     summary = {
         "support_docx": str(Path(artifacts.get("support_docx", output_path)).resolve()),
         "processed_spectra_zip": _resolved_artifact(artifacts, "processed_spectra_zip"),
         "manifest": _resolved_artifact(artifacts, "manifest"),
-        "run_summary": _resolved_artifact(artifacts, "run_summary"),
+        "run_summary": report_path,
         "input_warnings": _resolved_artifact(artifacts, "input_warnings"),
         "support_warnings": _resolved_artifact(artifacts, "support_warnings"),
+        "overview": _report_overview(report_path),
     }
     return {key: value for key, value in summary.items() if value}
 
@@ -697,6 +708,39 @@ def _build_result_summary(state: dict[str, Any]) -> dict[str, str]:
 def _resolved_artifact(artifacts: dict[str, str], key: str) -> str:
     value = artifacts.get(key, "")
     return str(Path(value).resolve()) if value else ""
+
+
+def _report_overview(report_path: str) -> str:
+    if not report_path:
+        return ""
+    path = Path(report_path)
+    if not path.exists():
+        return ""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+
+    parts: list[str] = []
+    status = str(data.get("status") or "").replace("_", " ")
+    if status:
+        parts.append(f"Status: {status}")
+    compound_count = data.get("compound_count")
+    if compound_count is not None:
+        parts.append(f"Compounds: {compound_count}")
+    issue_counts = data.get("issue_counts", {}) or {}
+    total_issues = 0
+    for severity, label in [("error", "Errors"), ("warning", "Warnings"), ("info", "Info")]:
+        try:
+            count = int(issue_counts.get(severity, 0) or 0)
+        except (TypeError, ValueError):
+            count = 0
+        total_issues += count
+        if count:
+            parts.append(f"{label}: {count}")
+    if status and not total_issues:
+        parts.append("Issues: 0")
+    return " | ".join(parts)
 
 
 def _existing_result_path(raw_path: str, label: str) -> Path:

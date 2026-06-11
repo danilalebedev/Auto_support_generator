@@ -12,6 +12,7 @@ from si_generator.gui import (
     _build_patch_summary,
     _build_result_summary,
     _existing_result_path,
+    _report_overview,
 )
 from si_generator.graph.state import CheckSIRequest
 
@@ -62,6 +63,10 @@ class GuiWorkflowTests(unittest.TestCase):
             run_summary = root / "support_information.run_summary.json"
             warnings = root / "logs" / "input_warnings.txt"
             support_warnings = root / "logs" / "support_warnings.txt"
+            run_summary.write_text(
+                '{"status":"completed_with_warnings","compound_count":2,"issue_counts":{"warning":3}}',
+                encoding="utf-8",
+            )
             state = {
                 "request": _build_generate_request(
                     input_kind="word",
@@ -87,6 +92,7 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(summary["run_summary"], str(run_summary.resolve()))
         self.assertEqual(summary["input_warnings"], str(warnings.resolve()))
         self.assertEqual(summary["support_warnings"], str(support_warnings.resolve()))
+        self.assertEqual(summary["overview"], "Status: completed with warnings | Compounds: 2 | Warnings: 3")
 
     def test_builds_check_request_from_manifest_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -103,6 +109,7 @@ class GuiWorkflowTests(unittest.TestCase):
             manifest = root / "support_information.manifest.json"
             report = root / "support_information.check_report.json"
             manifest.write_text("{}", encoding="utf-8")
+            report.write_text('{"status":"pass","issue_counts":{}}', encoding="utf-8")
 
             summary = _build_check_summary(
                 {"artifacts": {"manifest": str(manifest), "check_report": str(report)}},
@@ -111,6 +118,7 @@ class GuiWorkflowTests(unittest.TestCase):
 
         self.assertEqual(summary["manifest"], str(manifest.resolve()))
         self.assertEqual(summary["run_summary"], str(report.resolve()))
+        self.assertEqual(summary["overview"], "Status: pass | Issues: 0")
 
     def test_builds_patch_request_from_gui_values(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -152,6 +160,7 @@ class GuiWorkflowTests(unittest.TestCase):
             support = root / "patched.docx"
             manifest = root / "patched.manifest.json"
             report = root / "patched.patch_report.json"
+            report.write_text('{"status":"fail","issue_counts":{"error":1,"warning":2}}', encoding="utf-8")
 
             summary = _build_patch_summary(
                 {
@@ -166,6 +175,18 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(summary["support_docx"], str(support.resolve()))
         self.assertEqual(summary["manifest"], str(manifest.resolve()))
         self.assertEqual(summary["run_summary"], str(report.resolve()))
+        self.assertEqual(summary["overview"], "Status: fail | Errors: 1 | Warnings: 2")
+
+    def test_report_overview_ignores_missing_or_invalid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "broken.json"
+            report.write_text("{", encoding="utf-8")
+
+            invalid_result = _report_overview(str(report))
+            missing_result = _report_overview(str(Path(tmp) / "missing.json"))
+
+        self.assertEqual(invalid_result, "")
+        self.assertEqual(missing_result, "")
 
     def test_existing_result_path_returns_resolved_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
