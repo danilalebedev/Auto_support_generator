@@ -3,6 +3,7 @@ from __future__ import annotations
 from langgraph.graph import END, START, StateGraph
 
 from .nodes.ingest import read_input_table_node
+from .nodes.hrms import calculate_hrms_node
 from .nodes.normalize import normalize_compounds_node
 from .nodes.packaging import write_manifest_node
 from .nodes.render import postprocess_word_objects_node, render_docx_node
@@ -21,6 +22,7 @@ def build_generate_si_graph():
     builder.add_node("prepare_spectra_zip", prepare_spectra_zip_node)
     builder.add_node("validate_input", validate_input_node)
     builder.add_node("mnova_batch", mnova_batch_node)
+    builder.add_node("calculate_hrms", calculate_hrms_node)
     builder.add_node("validate_support", validate_support_node)
     builder.add_node("render_docx", render_docx_node)
     builder.add_node("postprocess_word_objects", postprocess_word_objects_node)
@@ -36,10 +38,11 @@ def build_generate_si_graph():
         route_nmr_processing,
         {
             "run_mnova": "mnova_batch",
-            "skip_mnova": "validate_support",
+            "skip_mnova": "calculate_hrms",
         },
     )
-    builder.add_edge("mnova_batch", "validate_support")
+    builder.add_edge("mnova_batch", "calculate_hrms")
+    builder.add_edge("calculate_hrms", "validate_support")
     builder.add_edge("validate_support", "render_docx")
     builder.add_edge("render_docx", "postprocess_word_objects")
     builder.add_edge("postprocess_word_objects", "write_manifest")

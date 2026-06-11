@@ -19,6 +19,8 @@ class Compound:
     hrms_label: str = "HRMS (ESI-TOF) m/z"
     hrms_adduct: str = "[M+H]+"
     hrms_found: str = ""
+    hrms_calculated: float = 0.0
+    hrms_ion_formula: str = ""
     h1_nmr: str = ""
     h1_conditions: str = ""
     h1_spectrum_path: str = ""
