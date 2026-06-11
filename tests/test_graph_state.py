@@ -9,7 +9,7 @@ from si_generator.graph.nodes.hrms import calculate_hrms_node
 from si_generator.graph.nodes.nmr import apply_peak_picking_policy_node, parse_nmr_reports_node
 from si_generator.graph.nodes.settings import load_settings_node
 from si_generator.graph.nodes.spectra import plan_nmr_processing_node, route_nmr_processing
-from si_generator.graph.nodes.validation import validate_input_node
+from si_generator.graph.nodes.validation import validate_input_node, validate_support_node
 from si_generator.graph.state import GenerateSIRequest
 from si_generator.models import Compound
 from si_generator.workflows.generate_si import make_initial_generate_state
@@ -175,6 +175,41 @@ class GraphStateTests(unittest.TestCase):
 
         self.assertTrue(any(issue["code"] == "INPUT_WARNING" for issue in result["issues"]))
         self.assertIn("2a: missing generated/name field", text)
+
+    def test_support_validation_writes_warning_artifact_and_issues(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            request = GenerateSIRequest(
+                input_path=Path("examples/test_input.docx"),
+                input_kind="word",
+                output_path=Path(tmp) / "support_information.docx",
+            )
+            compound = Compound(
+                number="2a",
+                name="Test compound",
+                formula="C2H6O",
+                h1_nmr="delta = 3.70 (q, J = 7.0 Hz, 2H).",
+                c13_nmr="delta = 58.0.",
+                hrms_found="999.0000",
+            )
+            compounds, order = make_compound_store([compound])
+
+            result = validate_support_node(
+                {
+                    "request": request,
+                    "compounds": compounds,
+                    "order": order,
+                    "issues": [],
+                    "artifacts": {},
+                    "generation_config": {"check_support": True},
+                }
+            )
+
+            warning_path = Path(result["artifacts"]["support_warnings"])
+            text = warning_path.read_text(encoding="utf-8")
+
+        self.assertTrue(any(issue["code"] == "SUPPORT_CHECK_WARNING" for issue in result["issues"]))
+        self.assertIn("2a: H expected 6, found 2", text)
+        self.assertIn("HRMS calcd", text)
 
 
 if __name__ == "__main__":

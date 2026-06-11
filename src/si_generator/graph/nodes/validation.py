@@ -45,5 +45,26 @@ def validate_support_node(state: GenerateSIState) -> dict:
     check_support = bool(generation_config.get("check_support", not request.no_check_support))
     if check_support:
         validate_support(compounds)
-    return {"compounds": state.get("compounds", {})}
+    issues: list[Issue] = list(state.get("issues", []))
+    warnings = []
+    for compound in compounds:
+        if compound.nmr_check_warning:
+            message = f"{compound.number}: {compound.nmr_check_warning}" if compound.number else compound.nmr_check_warning
+            warnings.append(message)
+            issues.append(
+                {
+                    "code": "SUPPORT_CHECK_WARNING",
+                    "severity": "warning",
+                    "message": message,
+                    "compound_id": compound.id or compound.number,
+                }
+            )
+
+    result = {"compounds": state.get("compounds", {}), "issues": issues}
+    if warnings:
+        log_path = request.output_dir / "logs" / "support_warnings.txt"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("\n".join(warnings) + "\n", encoding="utf-8")
+        result["artifacts"] = {**state.get("artifacts", {}), "support_warnings": str(log_path)}
+    return result
 

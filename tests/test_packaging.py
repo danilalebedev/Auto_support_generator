@@ -25,6 +25,8 @@ class PackagingTests(unittest.TestCase):
                 (output_path.parent / folder).mkdir()
             input_warnings = output_path.parent / "logs" / "input_warnings.txt"
             input_warnings.write_text("warning", encoding="utf-8")
+            support_warnings = output_path.parent / "logs" / "support_warnings.txt"
+            support_warnings.write_text("warning", encoding="utf-8")
             h1_image = output_path.parent / "processed_spectra" / "2a" / "2a_1H.png"
             h1_image.parent.mkdir(parents=True)
 
@@ -35,7 +37,7 @@ class PackagingTests(unittest.TestCase):
                 "run_id": "run",
                 "request": GenerateSIRequest(input_path=input_path, input_kind="word", output_path=output_path),
                 "output_path": output_path,
-                "artifacts": {"input_warnings": str(input_warnings)},
+                "artifacts": {"input_warnings": str(input_warnings), "support_warnings": str(support_warnings)},
                 "compounds": compounds,
                 "order": order,
                 "spectra_config": {"extract_nmr": False},
@@ -58,6 +60,7 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(manifest["relative_paths"]["support_docx"], "support_information.docx")
         self.assertEqual(manifest["relative_paths"]["processed_spectra_zip"], "processed_spectra.zip")
         self.assertEqual(manifest["relative_paths"]["input_warnings"], str(Path("logs") / "input_warnings.txt"))
+        self.assertEqual(manifest["relative_paths"]["support_warnings"], str(Path("logs") / "support_warnings.txt"))
         self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_png"], str(Path("processed_spectra") / "2a" / "2a_1H.png"))
         self.assertEqual(manifest["configs"]["spectra"]["extract_nmr"], False)
         self.assertEqual(

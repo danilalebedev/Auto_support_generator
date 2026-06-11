@@ -46,6 +46,7 @@ class SIGeneratorApp:
         self.result_spectra = StringVar(value="")
         self.result_manifest = StringVar(value="")
         self.result_warnings = StringVar(value="")
+        self.result_support_warnings = StringVar(value="")
         self.existing_manifest = StringVar(value="")
         self.patch_output_docx = StringVar(value="")
         self.patch_renumber = StringVar(value="")
@@ -148,6 +149,7 @@ class SIGeneratorApp:
         self._result_row(results, 1, "Spectra package", self.result_spectra)
         self._result_row(results, 2, "Manifest", self.result_manifest)
         self._result_row(results, 3, "Input warnings", self.result_warnings)
+        self._result_row(results, 4, "Support warnings", self.result_support_warnings)
 
         tools = ttk.LabelFrame(outer, text="Existing SI Tools", padding=12)
         tools.grid(row=4, column=0, sticky="ew", pady=(0, 12))
@@ -383,6 +385,8 @@ class SIGeneratorApp:
                 self._log_queue.put(f"Manifest: {summary['manifest']}\n")
             if summary.get("input_warnings"):
                 self._log_queue.put(f"Input warnings: {summary['input_warnings']}\n")
+            if summary.get("support_warnings"):
+                self._log_queue.put(f"Support warnings: {summary['support_warnings']}\n")
             self._log_queue.put("\nDone.\n")
             self._log_queue.put({"type": "run_succeeded", "summary": summary})
         except Exception as exc:
@@ -459,12 +463,14 @@ class SIGeneratorApp:
         self.result_spectra.set("")
         self.result_manifest.set("")
         self.result_warnings.set("")
+        self.result_support_warnings.set("")
 
     def _apply_result_summary(self, summary: dict[str, str]) -> None:
         self.result_support.set(summary.get("support_docx", ""))
         self.result_spectra.set(summary.get("processed_spectra_zip", ""))
         self.result_manifest.set(summary.get("manifest", ""))
         self.result_warnings.set(summary.get("input_warnings", ""))
+        self.result_support_warnings.set(summary.get("support_warnings", ""))
         support_path = summary.get("support_docx")
         if support_path:
             self._last_output_folder = Path(support_path).expanduser().parent
@@ -643,6 +649,7 @@ def _build_result_summary(state: dict[str, Any]) -> dict[str, str]:
         "processed_spectra_zip": _resolved_artifact(artifacts, "processed_spectra_zip"),
         "manifest": _resolved_artifact(artifacts, "manifest"),
         "input_warnings": _resolved_artifact(artifacts, "input_warnings"),
+        "support_warnings": _resolved_artifact(artifacts, "support_warnings"),
     }
     return {key: value for key, value in summary.items() if value}
 
