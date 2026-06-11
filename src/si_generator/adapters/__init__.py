@@ -1,2 +1,2 @@
-"""Adapters between legacy implementation and domain models."""
+"""Adapters for external files and desktop chemistry tools."""
 
