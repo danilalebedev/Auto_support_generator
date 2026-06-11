@@ -11,6 +11,7 @@ from si_generator.gui import (
     _build_patch_request,
     _build_patch_summary,
     _build_result_summary,
+    _dialog_initialdir,
     _existing_result_path,
     _report_overview,
 )
@@ -262,6 +263,38 @@ class GuiWorkflowTests(unittest.TestCase):
             _existing_result_path("", "Manifest")
         with self.assertRaisesRegex(ValueError, "does not exist"):
             _existing_result_path("missing.manifest.json", "Manifest")
+
+    def test_dialog_initialdir_uses_existing_file_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            file_path = Path(tmp) / "input.docx"
+            file_path.write_text("placeholder", encoding="utf-8")
+
+            result = _dialog_initialdir(str(file_path))
+
+        self.assertEqual(result, str(file_path.parent.resolve()))
+
+    def test_dialog_initialdir_uses_existing_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            result = _dialog_initialdir(Path(tmp))
+
+        self.assertEqual(result, str(Path(tmp).resolve()))
+
+    def test_dialog_initialdir_uses_future_file_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            future_path = Path(tmp) / "support_information.docx"
+
+            result = _dialog_initialdir(str(future_path))
+
+        self.assertEqual(result, str(Path(tmp).resolve()))
+
+    def test_dialog_initialdir_falls_back_to_next_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fallback = Path(tmp) / "input.docx"
+            fallback.write_text("placeholder", encoding="utf-8")
+
+            result = _dialog_initialdir(Path(tmp) / "missing" / "out.docx", fallback)
+
+        self.assertEqual(result, str(fallback.parent.resolve()))
 
 
 if __name__ == "__main__":

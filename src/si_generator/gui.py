@@ -237,28 +237,40 @@ class SIGeneratorApp:
             self.output_docx.set(str(Path(self.input_path.get()).with_name("support_information.docx")))
 
     def _browse_file(self, variable: StringVar, filetypes) -> None:
-        path = filedialog.askopenfilename(filetypes=filetypes)
+        kwargs: dict[str, object] = {"filetypes": filetypes}
+        initialdir = _dialog_initialdir(variable.get(), self.input_path.get(), self.output_docx.get(), self._last_output_folder)
+        if initialdir:
+            kwargs["initialdir"] = initialdir
+        path = filedialog.askopenfilename(**kwargs)
         if path:
             variable.set(path)
             self._save_settings()
 
     def _browse_output(self) -> None:
-        path = filedialog.asksaveasfilename(
-            defaultextension=".docx",
-            filetypes=[("Word documents", "*.docx"), ("All files", "*.*")],
-            initialfile=Path(self.output_docx.get()).name if self.output_docx.get() else "support_information.docx",
-        )
+        kwargs: dict[str, object] = {
+            "defaultextension": ".docx",
+            "filetypes": [("Word documents", "*.docx"), ("All files", "*.*")],
+            "initialfile": Path(self.output_docx.get()).name if self.output_docx.get() else "support_information.docx",
+        }
+        initialdir = _dialog_initialdir(self.output_docx.get(), self.input_path.get(), self._last_output_folder)
+        if initialdir:
+            kwargs["initialdir"] = initialdir
+        path = filedialog.asksaveasfilename(**kwargs)
         if path:
             variable_path = Path(path)
             self.output_docx.set(str(variable_path))
             self._save_settings()
 
     def _browse_patch_output(self) -> None:
-        path = filedialog.asksaveasfilename(
-            defaultextension=".docx",
-            filetypes=[("Word documents", "*.docx"), ("All files", "*.*")],
-            initialfile="support_information_patched.docx",
-        )
+        kwargs: dict[str, object] = {
+            "defaultextension": ".docx",
+            "filetypes": [("Word documents", "*.docx"), ("All files", "*.*")],
+            "initialfile": "support_information_patched.docx",
+        }
+        initialdir = _dialog_initialdir(self.patch_output_docx.get(), self.existing_manifest.get(), self.output_docx.get(), self._last_output_folder)
+        if initialdir:
+            kwargs["initialdir"] = initialdir
+        path = filedialog.asksaveasfilename(**kwargs)
         if path:
             self.patch_output_docx.set(path)
             self._save_settings()
@@ -784,6 +796,23 @@ def _existing_result_path(raw_path: str, label: str) -> Path:
     if not path.exists():
         raise ValueError(f"{label} does not exist: {path}")
     return path.resolve()
+
+
+def _dialog_initialdir(*candidates: str | Path | None) -> str | None:
+    for candidate in candidates:
+        if not candidate:
+            continue
+        raw_path = str(candidate).strip().strip('"')
+        if not raw_path:
+            continue
+        path = Path(raw_path).expanduser()
+        if path.exists():
+            directory = path if path.is_dir() else path.parent
+            return str(directory.resolve())
+        parent = path.parent
+        if str(parent) not in {"", "."} and parent.exists():
+            return str(parent.resolve())
+    return None
 
 
 def _required_existing_file(raw_path: str, message: str, *, suffixes: tuple[str, ...] = ()) -> Path:
