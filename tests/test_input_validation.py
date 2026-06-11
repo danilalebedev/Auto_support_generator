@@ -29,12 +29,19 @@ class InputValidationTests(unittest.TestCase):
 
         self.assertNotIn("2a: state looks solid, but melting point is missing.", warnings)
 
+    def test_invalid_formula_is_reported_as_input_warning(self) -> None:
+        compound = _complete_compound(state="oil", color="yellow", formula="C2H6Xx")
 
-def _complete_compound(*, state: str, color: str, melting_point: str = "") -> Compound:
+        warnings = validate_compound_inputs([compound])
+
+        self.assertTrue(any("2a: formula could not be parsed" in warning for warning in warnings))
+
+
+def _complete_compound(*, state: str, color: str, melting_point: str = "", formula: str = "C2H6O") -> Compound:
     return Compound(
         number="2a",
         name="Example compound",
-        formula="C2H6O",
+        formula=formula,
         hrms_found="47.0491",
         color=color,
         state=state,

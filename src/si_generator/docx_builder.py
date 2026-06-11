@@ -263,15 +263,22 @@ def _add_reaction_loadings_line(document: Document, compound: Compound, style_co
 def _add_hrms_line(document: Document, compound: Compound, style_config: dict[str, Any]) -> None:
     hrms = compound.hrms or {}
     found_text = hrms_found_text(hrms, compound.hrms_found)
+    try:
+        found_value = float(found_text)
+    except (TypeError, ValueError):
+        return
     if not hrms.get("calculated_mz") or not hrms.get("ion_formula"):
-        hrms = build_hrms_block(
-            formula=compound.formula,
-            label=hrms_label_text(hrms, compound.hrms_label),
-            adduct=hrms_adduct_text(hrms, compound.hrms_adduct),
-            found_text=found_text,
-            isotope_policy=str(hrms.get("isotope_policy", "auto_halogen")),
-            isotope_labels=hrms.get("isotope_labels"),
-        )
+        try:
+            hrms = build_hrms_block(
+                formula=compound.formula,
+                label=hrms_label_text(hrms, compound.hrms_label),
+                adduct=hrms_adduct_text(hrms, compound.hrms_adduct),
+                found_text=found_text,
+                isotope_policy=str(hrms.get("isotope_policy", "auto_halogen")),
+                isotope_labels=hrms.get("isotope_labels"),
+            )
+        except ValueError:
+            return
         compound.hrms = hrms
         if not compound.hrms_found:
             compound.hrms_found = found_text
@@ -286,13 +293,16 @@ def _add_hrms_line(document: Document, compound: Compound, style_config: dict[st
     _add_adduct_runs(paragraph, str(hrms.get("adduct") or compound.hrms_adduct), style_config)
     paragraph.add_run(" calcd for ")
     _add_formula_runs(paragraph, str(hrms.get("ion_formula") or compound.hrms_ion_formula), style_config, hrms.get("isotope_labels", {}))
-    paragraph.add_run(f" {float(hrms['calculated_mz']):.4f}. Found {float(found_text):.4f}.")
+    paragraph.add_run(f" {float(hrms['calculated_mz']):.4f}. Found {found_value:.4f}.")
 
 
 def _add_elemental_analysis_line(document: Document, compound: Compound, style_config: dict[str, Any]) -> None:
     block = compound.elemental_analysis
     if not block.get("calculated"):
-        block = calculate_elemental_analysis_block(compound.formula, found=found_from_block(block))
+        try:
+            block = calculate_elemental_analysis_block(compound.formula, found=found_from_block(block))
+        except ValueError:
+            return
         compound.elemental_analysis = block
     calculated = block.get("calculated", {})
     found = block.get("found", {})

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .chemistry import parse_formula
 from .models import Compound
 
 
@@ -43,6 +44,11 @@ def validate_compound_inputs(compounds: list[Compound], *, require_structure: bo
 
         if not compound.formula.strip():
             warnings.append(f"{label}: formula is missing; HRMS and NMR count checks will be limited.")
+        else:
+            try:
+                parse_formula(compound.formula)
+            except ValueError as exc:
+                warnings.append(f"{label}: formula could not be parsed ({exc}); HRMS and formula-based checks will be limited.")
 
         if not compound.hrms_found.strip():
             warnings.append(f"{label}: HRMS found value is missing; HRMS line/check will be skipped.")
