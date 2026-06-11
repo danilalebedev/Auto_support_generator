@@ -111,7 +111,7 @@ def load_style_config(path: str | Path | None = None) -> dict[str, Any]:
     config = deepcopy(DEFAULT_STYLE_CONFIG)
     if not path:
         return config
-    data = _parse_simple_yaml(Path(path).read_text(encoding="utf-8-sig"))
+    data = parse_simple_yaml(Path(path).read_text(encoding="utf-8-sig"))
     _deep_update(config, data)
     return config
 
@@ -155,7 +155,7 @@ def _deep_update(target: dict[str, Any], source: dict[str, Any]) -> None:
             target[key] = value
 
 
-def _parse_simple_yaml(text: str) -> dict[str, Any]:
+def parse_simple_yaml(text: str) -> dict[str, Any]:
     root: dict[str, Any] = {}
     stack: list[tuple[int, dict[str, Any]]] = [(-1, root)]
 
@@ -186,6 +186,11 @@ def _parse_simple_yaml(text: str) -> dict[str, Any]:
 
 def _parse_scalar(value: str) -> Any:
     value = value.strip()
+    if value.startswith("[") and value.endswith("]"):
+        body = value[1:-1].strip()
+        if not body:
+            return []
+        return [_parse_scalar(item.strip()) for item in body.split(",")]
     if value.lower() in {"true", "yes", "on"}:
         return True
     if value.lower() in {"false", "no", "off"}:

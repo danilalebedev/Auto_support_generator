@@ -1,0 +1,9 @@
+id: wiley
+name: Wiley Supporting Information
+section_order: [compound_descriptions, spectra_appendix]
+nmr_format_style: wiley
+hrms_format_style: wiley
+reference_style: wiley
+use_subscripts_in_formulae: true
+use_superscript_isotopes: true
+use_italic_j: true

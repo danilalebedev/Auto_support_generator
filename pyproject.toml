@@ -20,6 +20,9 @@ build = [
 si-generator = "si_generator.cli:main"
 si-generator-gui = "si_generator.gui:main"
 
+[tool.setuptools.package-data]
+"si_generator.render" = ["journal_profiles/*.yml"]
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"

@@ -474,6 +474,28 @@ chem_formatting:
 
 Она делает символ `J` в константах спин-спинового взаимодействия курсивным.
 
+### journal_profile.yml
+
+Journal profile управляет общим форматом SI: порядком секций, названием профиля,
+путем к Word-шаблону и будущими правилами для ссылок/NMR/HRMS. Сейчас доступны
+встроенные профили:
+
+```text
+default
+acs
+rsc
+wiley
+```
+
+Профиль можно выбрать по имени или передать путь к своему YAML:
+
+```powershell
+py -m si_generator ^
+  --word-input C:\path\to\input.docx ^
+  --journal-profile acs ^
+  --output output\support_information.docx
+```
+
 ## CLI для продвинутых пользователей
 
 Если программа установлена через `AutoSupportGeneratorSetup.exe`, CLI можно
@@ -510,6 +532,7 @@ py -m si_generator ^
 py -m si_generator ^
   --word-input C:\path\to\input.docx ^
   --spectra-zip C:\path\to\spectra.zip ^
+  --journal-profile acs ^
   --no-check-support ^
   --output output\support_information.docx
 ```
@@ -542,6 +565,7 @@ NMR-строки теперь дополнительно разбираются 
 ```text
 src/si_generator/domain/
 src/si_generator/graph/
+src/si_generator/render/
 src/si_generator/workflows/
 ```
 

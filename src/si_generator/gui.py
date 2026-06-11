@@ -25,6 +25,7 @@ class SIGeneratorApp:
         self.spectra_zip = StringVar()
         self.template_docx = StringVar()
         self.style_config = StringVar()
+        self.journal_profile = StringVar()
         self.mnova_exe = StringVar()
         self.output_docx = StringVar(value=str(_default_output_path()))
         self.input_kind = StringVar(value="word")
@@ -79,16 +80,17 @@ class SIGeneratorApp:
         self._file_row(files, 2, "Spectra zip", self.spectra_zip, lambda: self._browse_file(self.spectra_zip, [("Zip archives", "*.zip"), ("All files", "*.*")]))
         self._file_row(files, 3, "Template .docx", self.template_docx, lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
         self._file_row(files, 4, "Style config .yml", self.style_config, lambda: self._browse_file(self.style_config, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
+        self._file_row(files, 5, "Journal profile", self.journal_profile, lambda: self._browse_file(self.journal_profile, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
         self._file_row(
             files,
-            5,
+            6,
             "MestReNova .exe",
             self.mnova_exe,
             lambda: self._browse_file(self.mnova_exe, [("MestReNova", "*.exe"), ("All files", "*.*")]),
             optional=True,
             extra_button=("Detect", self._detect_mnova),
         )
-        self._file_row(files, 6, "Output .docx", self.output_docx, self._browse_output)
+        self._file_row(files, 7, "Output .docx", self.output_docx, self._browse_output)
 
         options = ttk.LabelFrame(outer, text="Options", padding=12)
         options.grid(row=2, column=0, sticky="ew", pady=(12, 12))
@@ -215,6 +217,7 @@ class SIGeneratorApp:
             spectra_zip_text=self.spectra_zip.get(),
             template_docx_text=self.template_docx.get(),
             style_config_text=self.style_config.get(),
+            journal_profile_text=self.journal_profile.get(),
             mnova_exe_text=self.mnova_exe.get(),
             check_support=self.check_support.get(),
         )
@@ -306,6 +309,7 @@ def _build_generate_request(
     spectra_zip_text: str = "",
     template_docx_text: str = "",
     style_config_text: str = "",
+    journal_profile_text: str = "",
     mnova_exe_text: str = "",
     check_support: bool = True,
 ) -> GenerateSIRequest:
@@ -321,6 +325,7 @@ def _build_generate_request(
         spectra_zip=_optional_existing_file(spectra_zip_text, "Spectra zip"),
         template_docx=_optional_existing_file(template_docx_text, "Template .docx"),
         style_config_path=_optional_existing_file(style_config_text, "Style config"),
+        journal_profile=_optional_profile(journal_profile_text),
         mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe"),
         no_check_support=not check_support,
     )
@@ -341,6 +346,14 @@ def _optional_existing_file(raw_path: str, label: str) -> Path | None:
     if not path.exists():
         raise ValueError(f"{label} does not exist: {path}")
     return path
+
+
+def _optional_profile(raw_value: str) -> str | Path | None:
+    raw_value = raw_value.strip().strip('"')
+    if not raw_value:
+        return None
+    path = Path(raw_value).expanduser()
+    return path if path.exists() else raw_value
 
 
 def main() -> None:

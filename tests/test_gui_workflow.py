@@ -22,6 +22,7 @@ class GuiWorkflowTests(unittest.TestCase):
                 input_path_text=str(table),
                 output_docx_text=str(output),
                 spectra_zip_text=str(spectra),
+                journal_profile_text="acs",
                 check_support=False,
             )
 
@@ -29,6 +30,7 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(request.input_kind, "word")
         self.assertEqual(request.output_path, output)
         self.assertEqual(request.spectra_zip, spectra)
+        self.assertEqual(request.journal_profile, "acs")
         self.assertTrue(request.no_check_support)
 
     def test_rejects_missing_input_file(self) -> None:
