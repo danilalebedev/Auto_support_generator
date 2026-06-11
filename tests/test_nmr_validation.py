@@ -31,6 +31,15 @@ class NmrValidationTests(unittest.TestCase):
         self.assertEqual(compound.nmr_check_warning, "")
         self.assertEqual(compound.validation_issues, [])
 
+    def test_hrms_validation_accepts_decimal_comma(self) -> None:
+        found = f"{calc_hrms_mz('C2H6O', '[M+H]+'):.4f}".replace(".", ",")
+        compound = Compound(number="x", name="X", formula="C2H6O", hrms_found=found)
+
+        validate_hrms([compound])
+
+        self.assertEqual(compound.nmr_check_warning, "")
+        self.assertEqual(compound.validation_issues, [])
+
     def test_support_validation_accepts_matching_nmr_hrms_and_elemental_analysis(self) -> None:
         compound = Compound(
             number="x",
@@ -86,6 +95,14 @@ class NmrValidationTests(unittest.TestCase):
 
         self.assertIn("EA N found 1.25", compound.nmr_check_warning)
         self.assertEqual(compound.validation_issues[0]["code"], "ELEMENTAL_ANALYSIS_UNEXPECTED_ELEMENT")
+
+    def test_elemental_analysis_validation_warns_for_missing_expected_element(self) -> None:
+        compound = Compound(number="x", name="X", formula="C2H6O", elemental_analysis={"found": {"C": 52.10}})
+
+        validate_elemental_analysis([compound])
+
+        self.assertIn("EA H is missing from found values", compound.nmr_check_warning)
+        self.assertEqual(compound.validation_issues[0]["code"], "ELEMENTAL_ANALYSIS_MISSING_ELEMENT")
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ from pathlib import Path
 from docx import Document
 
 from si_generator.cli import main as cli_main
-from si_generator.word_input import read_word_compounds
+from si_generator.word_input import _first_number, read_word_compounds
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +21,9 @@ class WordAndDocxSmokeTests(unittest.TestCase):
         self.assertEqual([compound.number for compound in compounds[:2]], ["2a", "2b"])
         self.assertTrue(compounds[0].name.startswith("Methyl"))
         self.assertTrue(compounds[0].has_word_structure)
+
+    def test_hrms_number_extraction_accepts_decimal_comma(self) -> None:
+        self.assertEqual(_first_number("Found 272,9921"), "272.9921")
 
     def test_cli_generates_docx_without_mnova(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

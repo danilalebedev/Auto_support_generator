@@ -387,8 +387,8 @@ def _reaction_field_key(key: str) -> str:
 
 
 def _first_number(value: str) -> str:
-    match = re.search(r"\d+(?:\.\d+)?", value)
-    return match.group(0) if match else ""
+    match = re.search(r"\d+(?:[\.,]\d+)?", value)
+    return match.group(0).replace(",", ".") if match else ""
 
 
 def _adduct_from_headers(headers: list[str]) -> str | None:

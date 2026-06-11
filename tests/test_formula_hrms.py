@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from si_generator.chemistry import calc_hrms_mz, ion_formula, parse_formula
-from si_generator.domain.massspec import build_hrms_block, calculate_hrms, hrms_adduct_text, hrms_found_text, hrms_label_text
+from si_generator.domain.massspec import build_hrms_block, calculate_hrms, hrms_adduct_text, hrms_found_text, hrms_label_text, parse_mz_value
 
 
 class FormulaHrmsTests(unittest.TestCase):
@@ -36,6 +36,17 @@ class FormulaHrmsTests(unittest.TestCase):
         self.assertEqual(block["isotope_labels"], {"Cl": 35})
         self.assertEqual(block["ion_formula"], "C7H6ClO+")
         self.assertEqual(block["found_mz"], 141.0102)
+
+    def test_hrms_decimal_comma_is_accepted(self) -> None:
+        self.assertEqual(parse_mz_value("272,9921"), 272.9921)
+        block = build_hrms_block(
+            formula="C11H10BrFO2",
+            label="HRMS (ESI/Q-TOF) m/z",
+            adduct="[M+H]+",
+            found_text="272,9921",
+        )
+
+        self.assertEqual(block["found_mz"], 272.9921)
 
     def test_hrms_block_helpers_prefer_legacy_found_and_structured_adduct(self) -> None:
         block = {"adduct": "[M+Na]+", "found_text": "83.0104", "label": "HRMS (ESI/Q-TOF) m/z"}

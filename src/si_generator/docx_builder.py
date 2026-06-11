@@ -15,7 +15,7 @@ from docx.shared import Pt
 from .chemistry import parse_formula
 from .domain.elemental_analysis import calculate_elemental_analysis_block, found_from_block
 from .domain.ir import parse_ir_block
-from .domain.massspec import build_hrms_block, hrms_adduct_text, hrms_found_text, hrms_label_text
+from .domain.massspec import build_hrms_block, hrms_adduct_text, hrms_found_text, hrms_label_text, parse_mz_value
 from .domain.references import format_reference
 from .domain.reactions import calculate_reaction_loadings
 from .domain.types import JournalProfile
@@ -264,7 +264,7 @@ def _add_hrms_line(document: Document, compound: Compound, style_config: dict[st
     hrms = compound.hrms or {}
     found_text = hrms_found_text(hrms, compound.hrms_found)
     try:
-        found_value = float(found_text)
+        found_value = parse_mz_value(found_text)
     except (TypeError, ValueError):
         return
     if not hrms.get("calculated_mz") or not hrms.get("ion_formula"):

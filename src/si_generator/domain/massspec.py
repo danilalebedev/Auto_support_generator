@@ -62,10 +62,14 @@ def build_hrms_block(
         "isotope_labels": calculation.isotope_labels or {},
     }
     try:
-        block["found_mz"] = float(found_text)
+        block["found_mz"] = parse_mz_value(found_text)
     except (TypeError, ValueError):
         pass
     return block
+
+
+def parse_mz_value(value: object) -> float:
+    return float(str(value).strip().replace(",", "."))
 
 
 def hrms_found_text(block: HRMSBlock | None, legacy_found: str = "") -> str:

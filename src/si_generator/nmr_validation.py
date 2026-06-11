@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 
 from .chemistry import parse_formula
-from .domain.elemental_analysis import calculate_elemental_analysis_block, found_from_block
-from .domain.massspec import calculate_hrms, hrms_adduct_text, hrms_found_text
+from .domain.elemental_analysis import DEFAULT_ELEMENTS, calculate_elemental_analysis_block, found_from_block
+from .domain.massspec import calculate_hrms, hrms_adduct_text, hrms_found_text, parse_mz_value
 from .domain.types import Issue
 from .models import Compound
 
@@ -50,7 +50,7 @@ def validate_hrms(compounds: list[Compound], tolerance_da: float = 0.005) -> Non
             continue
         try:
             calcd = compound.hrms_calculated or float(compound.hrms.get("calculated_mz") or 0) or calculate_hrms(compound.formula, hrms_adduct_text(compound.hrms, compound.hrms_adduct)).calculated_mz
-            found = float(found_text)
+            found = parse_mz_value(found_text)
         except (ValueError, TypeError):
             _append_validation_issue(compound, "HRMS_CHECK_FAILED", "HRMS could not be checked")
             continue
@@ -78,6 +78,9 @@ def validate_elemental_analysis(compounds: list[Compound], tolerance_percent: fl
                 continue
             if abs(found_value - calculated_value) > tolerance_percent:
                 _append_validation_issue(compound, "ELEMENTAL_ANALYSIS_MISMATCH", f"EA {element} calcd {calculated_value:.2f}, found {found_value:.2f}")
+        for element in block.get("calculated", {}):
+            if element in DEFAULT_ELEMENTS and element not in block.get("found", {}):
+                _append_validation_issue(compound, "ELEMENTAL_ANALYSIS_MISSING_ELEMENT", f"EA {element} is missing from found values")
 
 
 def _reset_validation(compounds: list[Compound]) -> None:
