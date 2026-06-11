@@ -3,6 +3,7 @@ from __future__ import annotations
 from argparse import Namespace
 from pathlib import Path
 
+from ..domain.types import SpectrumEmbedMode
 from ..graph.graphs import build_generate_si_graph
 from ..graph.state import GenerateSIRequest, GenerateSIState, make_run_id
 
@@ -36,8 +37,15 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
         spectra_zip=Path(args.spectra_zip) if args.spectra_zip else None,
         mnova_exe=Path(args.mnova_exe) if args.mnova_exe else None,
         no_extract_nmr=bool(args.no_extract_nmr),
+        insert_spectra_as=_spectrum_embed_mode(getattr(args, "insert_spectra_as", "png")),
         extract_structure_metadata=bool(args.extract_structure_metadata),
         only=tuple(item.strip() for item in (args.only or "").split(",") if item.strip()),
         insert_chemdraw=bool(args.insert_chemdraw),
         no_check_support=bool(args.no_check_support),
     )
+
+
+def _spectrum_embed_mode(value: str | None) -> SpectrumEmbedMode:
+    if value in {"png", "mnova", "both", "none"}:
+        return value
+    return "png"

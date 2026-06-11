@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
-from ..domain.types import GenerationConfig, JournalProfile, ReferenceStore, RuntimeConfig, SpectraProcessingConfig, SpectrumRenderSpec
+from ..domain.types import GenerationConfig, JournalProfile, ReferenceStore, RuntimeConfig, SpectraProcessingConfig, SpectrumEmbedMode, SpectrumRenderSpec
 from ..models import Compound
 from ..render.si_document import SIDocument
 
@@ -25,6 +25,7 @@ class GenerateSIRequest:
     spectra_zip: Path | None = None
     mnova_exe: Path | None = None
     no_extract_nmr: bool = False
+    insert_spectra_as: SpectrumEmbedMode = "png"
     extract_structure_metadata: bool = False
     only: tuple[str, ...] = ()
     insert_chemdraw: bool = False

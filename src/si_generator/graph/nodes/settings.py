@@ -15,7 +15,7 @@ def load_settings_node(state: GenerateSIState) -> dict:
         "reference_store": load_reference_store(request.references_path),
         "spectra_config": {
             "extract_nmr": not request.no_extract_nmr,
-            "insert_spectra_as": "png",
+            "insert_spectra_as": request.insert_spectra_as,
             "target_signal_height_fraction": DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION,
             "solvent_suppression": True,
             "ignore_regions_ppm": {},

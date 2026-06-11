@@ -5,6 +5,7 @@ from pathlib import Path
 from ..domain.references import select_references_for_compounds
 from ..domain.types import JournalProfile
 from ..domain.types import ReferenceStore
+from ..domain.types import SpectrumEmbedMode
 from ..models import Compound
 from .si_document import DocumentBlock, SIDocument, SISection
 
@@ -13,6 +14,7 @@ def build_si_document_model(
     compounds: list[Compound],
     journal_profile: JournalProfile | None = None,
     reference_store: ReferenceStore | None = None,
+    spectra_embed_mode: SpectrumEmbedMode = "png",
 ) -> SIDocument:
     compound_blocks = [_compound_description_block(compound) for compound in compounds]
     sections_by_id: dict[str, SISection] = {
@@ -23,7 +25,7 @@ def build_si_document_model(
         }
     }
 
-    spectra_blocks = _spectrum_blocks(compounds)
+    spectra_blocks = _spectrum_blocks(compounds, spectra_embed_mode)
     if spectra_blocks:
         sections_by_id["spectra_appendix"] = {
             "id": "spectra_appendix",
@@ -71,18 +73,35 @@ def _compound_description_block(compound: Compound) -> DocumentBlock:
     }
 
 
-def _spectrum_blocks(compounds: list[Compound]) -> list[DocumentBlock]:
+def _spectrum_blocks(compounds: list[Compound], embed_mode: SpectrumEmbedMode) -> list[DocumentBlock]:
+    if embed_mode == "none":
+        return []
+
     blocks: list[DocumentBlock] = []
     for compound in compounds:
-        if compound.h1_image_path and Path(compound.h1_image_path).exists():
-            blocks.append(_spectrum_block(compound, "1H", compound.h1_image_path))
-        if compound.c13_image_path and Path(compound.c13_image_path).exists():
-            blocks.append(_spectrum_block(compound, "13C", compound.c13_image_path))
+        if _should_include_spectrum(compound, "1H", embed_mode):
+            blocks.append(_spectrum_block(compound, "1H", embed_mode))
+        if _should_include_spectrum(compound, "13C", embed_mode):
+            blocks.append(_spectrum_block(compound, "13C", embed_mode))
     return blocks
 
 
-def _spectrum_block(compound: Compound, nucleus: str, image_path: str) -> DocumentBlock:
+def _should_include_spectrum(compound: Compound, nucleus: str, embed_mode: SpectrumEmbedMode) -> bool:
+    image_path = _spectrum_image_path(compound, nucleus)
+    has_png = bool(image_path and Path(image_path).exists())
+    has_mnova = bool(compound.mnova_path and Path(compound.mnova_path).exists())
+    if embed_mode == "png":
+        return has_png
+    if embed_mode == "mnova":
+        return has_mnova and _has_spectrum_source(compound, nucleus)
+    if embed_mode == "both":
+        return (has_png or has_mnova) and _has_spectrum_source(compound, nucleus)
+    return False
+
+
+def _spectrum_block(compound: Compound, nucleus: str, embed_mode: SpectrumEmbedMode) -> DocumentBlock:
     compound_id = _compound_id(compound)
+    image_path = _spectrum_image_path(compound, nucleus)
     return {
         "kind": "spectrum_page",
         "block_id": f"spectrum:{compound_id}:{nucleus}",
@@ -92,9 +111,21 @@ def _spectrum_block(compound: Compound, nucleus: str, image_path: str) -> Docume
         "content": compound,
         "structure_placeholder": f"SPECTRUM_STRUCTURE:{compound.number}:{nucleus}",
         "nucleus": nucleus,
+        "embed_mode": embed_mode,
         "image_path": image_path,
-        "expected_artifact_path": image_path,
+        "mnova_path": compound.mnova_path,
+        "expected_artifact_path": image_path if embed_mode in {"png", "both"} and image_path else compound.mnova_path,
     }
+
+
+def _spectrum_image_path(compound: Compound, nucleus: str) -> str:
+    return compound.h1_image_path if nucleus == "1H" else compound.c13_image_path
+
+
+def _has_spectrum_source(compound: Compound, nucleus: str) -> bool:
+    if nucleus == "1H":
+        return bool(compound.h1_spectrum_path or compound.h1_nmr or compound.h1_image_path)
+    return bool(compound.c13_spectrum_path or compound.c13_nmr or compound.c13_image_path)
 
 
 def _compound_id(compound: Compound) -> str:

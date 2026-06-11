@@ -19,7 +19,9 @@ class DocumentBlock(TypedDict, total=False):
     content: Any
     structure_placeholder: str
     nucleus: str
+    embed_mode: str
     image_path: str
+    mnova_path: str
     expected_artifact_path: str
 
 

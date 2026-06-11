@@ -82,7 +82,7 @@ def _render_spectra_appendix_blocks(document: Document, blocks: list[DocumentBlo
     for index, block in enumerate(blocks):
         if index:
             document.add_page_break()
-        _add_spectrum_page(document, block["content"], block["nucleus"], block["image_path"], style_config)
+        _add_spectrum_page(document, block, style_config)
 
 
 def _render_reference_blocks(document: Document, blocks: list[DocumentBlock], style_config: dict[str, Any]) -> None:
@@ -290,7 +290,13 @@ def _add_nmr_warning(document: Document, text: str) -> None:
     run.bold = True
 
 
-def _add_spectrum_page(document: Document, compound: Compound, nucleus: str, image_path: str, style_config: dict[str, Any]) -> None:
+def _add_spectrum_page(document: Document, block: DocumentBlock, style_config: dict[str, Any]) -> None:
+    compound = block["content"]
+    nucleus = block["nucleus"]
+    image_path = block.get("image_path", "")
+    mnova_path = block.get("mnova_path", "")
+    embed_mode = block.get("embed_mode", "png")
+
     _add_spectrum_compound_title(document, compound, style_config)
     conditions = compound.h1_conditions if nucleus == "1H" else compound.c13_conditions
     _add_spectrum_nmr_title(document, nucleus, conditions, style_config)
@@ -299,12 +305,18 @@ def _add_spectrum_page(document: Document, compound: Compound, nucleus: str, ima
     structure.paragraph_format.space_after = Pt(0)
     structure.add_run(f"[[SPECTRUM_STRUCTURE:{compound.number}:{nucleus}]]")
 
-    picture = document.add_paragraph()
-    picture.paragraph_format.space_after = Pt(0)
-    picture.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    section = document.sections[-1]
-    picture_width = section.page_width - section.left_margin - section.right_margin
-    picture.add_run().add_picture(image_path, width=picture_width)
+    if embed_mode in {"mnova", "both"} and mnova_path:
+        mnova = document.add_paragraph()
+        mnova.paragraph_format.space_after = Pt(0)
+        mnova.add_run(f"[[MNOVA:{compound.number}:{nucleus}]]")
+
+    if embed_mode in {"png", "both"} and image_path:
+        picture = document.add_paragraph()
+        picture.paragraph_format.space_after = Pt(0)
+        picture.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        section = document.sections[-1]
+        picture_width = section.page_width - section.left_margin - section.right_margin
+        picture.add_run().add_picture(image_path, width=picture_width)
 
 
 def _add_spectrum_compound_title(document: Document, compound: Compound, style_config: dict[str, Any]) -> None:

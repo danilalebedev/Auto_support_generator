@@ -16,6 +16,7 @@ def build_document_model_node(state: GenerateSIState) -> dict:
             ordered_compounds(state),
             state.get("journal_profile"),
             state.get("reference_store"),
+            spectra_embed_mode=state.get("spectra_config", {}).get("insert_spectra_as", "png"),
         )
     }
 
@@ -26,6 +27,7 @@ def render_docx_node(state: GenerateSIState) -> dict:
         ordered_compounds(state),
         state.get("journal_profile"),
         state.get("reference_store"),
+        spectra_embed_mode=state.get("spectra_config", {}).get("insert_spectra_as", "png"),
     )
     output_path = build_document_from_model(
         document_model,

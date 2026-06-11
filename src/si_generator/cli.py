@@ -73,6 +73,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Do not run Mnova even if h1_spectrum_path/c13_spectrum_path columns are present.",
     )
     parser.add_argument(
+        "--insert-spectra-as",
+        choices=["png", "mnova", "both", "none"],
+        default="png",
+        help="How to place processed spectra in the appendix: PNG images, Mnova placeholders, both, or no appendix.",
+    )
+    parser.add_argument(
         "--extract-structure-metadata",
         action="store_true",
         help="Try to read names/formulas from ChemDraw OLE objects. Slower and may require responsive OLE servers.",

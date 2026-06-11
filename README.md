@@ -552,10 +552,16 @@ py -m si_generator ^
   --word-input C:\path\to\input.docx ^
   --spectra-zip C:\path\to\spectra.zip ^
   --mnova-exe "C:\Program Files\Mestrelab Research S.L\MestReNova\MestReNova.exe" ^
+  --insert-spectra-as png ^
   --style-config style_config.example.yml ^
   --references references.yml ^
   --output output\support_information.docx
 ```
+
+Параметр `--insert-spectra-as` управляет приложением спектров в конце SI:
+`png` вставляет изображения спектров, `mnova` добавляет placeholders для будущей вставки Mnova-объектов,
+`both` оставляет оба представления, `none` не добавляет спектральный appendix. В GUI это поле называется
+`Spectra appendix`.
 
 CSV workflow:
 

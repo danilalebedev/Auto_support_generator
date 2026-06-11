@@ -10,6 +10,7 @@ from tkinter import BooleanVar, StringVar, Tk, filedialog, messagebox
 from tkinter import ttk
 from typing import Any
 
+from .domain.types import SpectrumEmbedMode
 from .external_tools import find_mnova_executable
 from .graph.state import GenerateSIRequest
 from .workflows.generate_si import output_path_from_state, run_generate_si
@@ -31,6 +32,7 @@ class SIGeneratorApp:
         self.mnova_exe = StringVar()
         self.output_docx = StringVar(value=str(_default_output_path()))
         self.input_kind = StringVar(value="word")
+        self.insert_spectra_as = StringVar(value="png")
         self.check_support = BooleanVar(value=True)
         self.status_text = StringVar(value="Ready")
         self.result_support = StringVar(value="")
@@ -101,15 +103,23 @@ class SIGeneratorApp:
 
         options = ttk.LabelFrame(outer, text="Options", padding=12)
         options.grid(row=2, column=0, sticky="ew", pady=(12, 12))
-        options.columnconfigure(1, weight=1)
+        options.columnconfigure(3, weight=1)
         ttk.Checkbutton(
             options,
             text="Check support (NMR counts and HRMS values)",
             variable=self.check_support,
         ).grid(row=0, column=0, sticky="w")
-        ttk.Label(options, textvariable=self.status_text, style="Status.TLabel").grid(row=0, column=1, sticky="e")
+        ttk.Label(options, text="Spectra appendix").grid(row=0, column=1, sticky="e", padx=(12, 8))
+        ttk.Combobox(
+            options,
+            textvariable=self.insert_spectra_as,
+            values=("png", "mnova", "both", "none"),
+            state="readonly",
+            width=8,
+        ).grid(row=0, column=2, sticky="w")
+        ttk.Label(options, textvariable=self.status_text, style="Status.TLabel").grid(row=0, column=3, sticky="e")
         self.progress = ttk.Progressbar(options, mode="indeterminate", length=180)
-        self.progress.grid(row=0, column=2, sticky="e", padx=(12, 0))
+        self.progress.grid(row=0, column=4, sticky="e", padx=(12, 0))
 
         results = ttk.LabelFrame(outer, text="Results", padding=12)
         results.grid(row=3, column=0, sticky="ew", pady=(0, 12))
@@ -240,6 +250,7 @@ class SIGeneratorApp:
             journal_profile_text=self.journal_profile.get(),
             references_text=self.references_file.get(),
             mnova_exe_text=self.mnova_exe.get(),
+            insert_spectra_as=self.insert_spectra_as.get(),
             check_support=self.check_support.get(),
         )
 
@@ -350,6 +361,7 @@ def _build_generate_request(
     journal_profile_text: str = "",
     references_text: str = "",
     mnova_exe_text: str = "",
+    insert_spectra_as: str = "png",
     check_support: bool = True,
 ) -> GenerateSIRequest:
     input_path = _required_existing_file(input_path_text, "Choose an existing compound table.")
@@ -367,6 +379,7 @@ def _build_generate_request(
         journal_profile=_optional_profile(journal_profile_text),
         references_path=_optional_existing_file(references_text, "References .yml"),
         mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe"),
+        insert_spectra_as=_validated_spectrum_mode(insert_spectra_as),
         no_check_support=not check_support,
     )
 
@@ -410,6 +423,13 @@ def _optional_profile(raw_value: str) -> str | Path | None:
         return None
     path = Path(raw_value).expanduser()
     return path if path.exists() else raw_value
+
+
+def _validated_spectrum_mode(value: str) -> SpectrumEmbedMode:
+    value = value.strip().lower()
+    if value in {"png", "mnova", "both", "none"}:
+        return value
+    return "png"
 
 
 def main() -> None:
