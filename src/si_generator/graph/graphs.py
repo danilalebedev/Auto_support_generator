@@ -4,6 +4,7 @@ from langgraph.graph import END, START, StateGraph
 
 from .nodes.ingest import read_input_table_node
 from .nodes.hrms import calculate_hrms_node
+from .nodes.loadings import calculate_loadings_node
 from .nodes.nmr import apply_peak_picking_policy_node, parse_nmr_reports_node
 from .nodes.normalize import normalize_compounds_node
 from .nodes.packaging import write_manifest_node
@@ -27,6 +28,7 @@ def build_generate_si_graph():
     builder.add_node("parse_nmr_reports", parse_nmr_reports_node)
     builder.add_node("apply_peak_picking_policy", apply_peak_picking_policy_node)
     builder.add_node("calculate_hrms", calculate_hrms_node)
+    builder.add_node("calculate_loadings", calculate_loadings_node)
     builder.add_node("validate_support", validate_support_node)
     builder.add_node("build_document_model", build_document_model_node)
     builder.add_node("render_docx", render_docx_node)
@@ -50,7 +52,8 @@ def build_generate_si_graph():
     builder.add_edge("mnova_batch", "parse_nmr_reports")
     builder.add_edge("parse_nmr_reports", "apply_peak_picking_policy")
     builder.add_edge("apply_peak_picking_policy", "calculate_hrms")
-    builder.add_edge("calculate_hrms", "validate_support")
+    builder.add_edge("calculate_hrms", "calculate_loadings")
+    builder.add_edge("calculate_loadings", "validate_support")
     builder.add_edge("validate_support", "build_document_model")
     builder.add_edge("build_document_model", "render_docx")
     builder.add_edge("render_docx", "postprocess_word_objects")
