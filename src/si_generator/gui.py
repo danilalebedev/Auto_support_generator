@@ -8,6 +8,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from tkinter import BooleanVar, StringVar, Tk, filedialog, messagebox
 from tkinter import ttk
+from typing import Any
 
 from .external_tools import find_mnova_executable
 from .graph.state import GenerateSIRequest
@@ -32,9 +33,13 @@ class SIGeneratorApp:
         self.input_kind = StringVar(value="word")
         self.check_support = BooleanVar(value=True)
         self.status_text = StringVar(value="Ready")
+        self.result_support = StringVar(value="")
+        self.result_spectra = StringVar(value="")
+        self.result_manifest = StringVar(value="")
 
         self._is_running = False
-        self._log_queue: queue.Queue[str] = queue.Queue()
+        self._last_output_folder: Path | None = None
+        self._log_queue: queue.Queue[Any] = queue.Queue()
 
         self._configure_style()
         self._build_ui()
@@ -106,6 +111,13 @@ class SIGeneratorApp:
         self.progress = ttk.Progressbar(options, mode="indeterminate", length=180)
         self.progress.grid(row=0, column=2, sticky="e", padx=(12, 0))
 
+        results = ttk.LabelFrame(outer, text="Results", padding=12)
+        results.grid(row=3, column=0, sticky="ew", pady=(0, 12))
+        results.columnconfigure(1, weight=1)
+        self._result_row(results, 0, "Support .docx", self.result_support)
+        self._result_row(results, 1, "Spectra package", self.result_spectra)
+        self._result_row(results, 2, "Manifest", self.result_manifest)
+
         log_frame = ttk.LabelFrame(outer, text="Run Log", padding=8)
         log_frame.grid(row=4, column=0, sticky="nsew")
         log_frame.columnconfigure(0, weight=1)
@@ -134,6 +146,11 @@ class SIGeneratorApp:
             text, extra_command = extra_button
             ttk.Button(button_box, text=text, command=extra_command).pack(side="left", padx=(0, 6))
         ttk.Button(button_box, text="Browse...", command=command).pack(side="left")
+
+    def _result_row(self, parent, row: int, label: str, variable: StringVar) -> None:
+        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=3)
+        entry = ttk.Entry(parent, textvariable=variable, state="readonly")
+        entry.grid(row=row, column=1, sticky="ew", pady=3)
 
     def _browse_input(self) -> None:
         if self.input_kind.get() == "csv":
@@ -202,6 +219,7 @@ class SIGeneratorApp:
         self._is_running = True
         self.run_button.configure(state="disabled")
         self.status_text.set("Running")
+        self._clear_results()
         self.progress.start(12)
         self.log.write(
             "\n> Generate SI\n"
@@ -230,14 +248,17 @@ class SIGeneratorApp:
         try:
             with redirect_stdout(writer), redirect_stderr(writer):
                 result = run_generate_si(request)
-            self._log_queue.put(f"\nGenerated {output_path_from_state(result).resolve()}\n")
-            if result.get("artifacts", {}).get("manifest"):
-                self._log_queue.put(f"Manifest: {result['artifacts']['manifest']}\n")
+            summary = _build_result_summary(result)
+            self._log_queue.put(f"\nGenerated {summary['support_docx']}\n")
+            if summary.get("processed_spectra_zip"):
+                self._log_queue.put(f"Spectra package: {summary['processed_spectra_zip']}\n")
+            if summary.get("manifest"):
+                self._log_queue.put(f"Manifest: {summary['manifest']}\n")
             self._log_queue.put("\nDone.\n")
-            self._log_queue.put("__RUN_SUCCEEDED__")
+            self._log_queue.put({"type": "run_succeeded", "summary": summary})
         except Exception as exc:
             self._log_queue.put(f"\nERROR: {exc}\n")
-            self._log_queue.put("__RUN_FAILED__")
+            self._log_queue.put({"type": "run_failed", "error": str(exc)})
         finally:
             self._log_queue.put("__RUN_FINISHED__")
 
@@ -249,9 +270,10 @@ class SIGeneratorApp:
                     self._is_running = False
                     self.run_button.configure(state="normal")
                     self.progress.stop()
-                elif item == "__RUN_SUCCEEDED__":
+                elif isinstance(item, dict) and item.get("type") == "run_succeeded":
                     self.status_text.set("Done")
-                elif item == "__RUN_FAILED__":
+                    self._apply_result_summary(item.get("summary", {}))
+                elif isinstance(item, dict) and item.get("type") == "run_failed":
                     self.status_text.set("Failed")
                 else:
                     self.log.write(item)
@@ -260,10 +282,23 @@ class SIGeneratorApp:
         self.root.after(100, self._poll_log_queue)
 
     def _open_output_folder(self) -> None:
-        path = Path(self.output_docx.get() or ".").expanduser()
+        path = self._last_output_folder or Path(self.output_docx.get() or ".").expanduser()
         folder = path if path.is_dir() else path.parent
         folder.mkdir(parents=True, exist_ok=True)
         os.startfile(str(folder))
+
+    def _clear_results(self) -> None:
+        self.result_support.set("")
+        self.result_spectra.set("")
+        self.result_manifest.set("")
+
+    def _apply_result_summary(self, summary: dict[str, str]) -> None:
+        self.result_support.set(summary.get("support_docx", ""))
+        self.result_spectra.set(summary.get("processed_spectra_zip", ""))
+        self.result_manifest.set(summary.get("manifest", ""))
+        support_path = summary.get("support_docx")
+        if support_path:
+            self._last_output_folder = Path(support_path).expanduser().parent
 
 
 class _LogText(ttk.Frame):
@@ -334,6 +369,22 @@ def _build_generate_request(
         mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe"),
         no_check_support=not check_support,
     )
+
+
+def _build_result_summary(state: dict[str, Any]) -> dict[str, str]:
+    artifacts = state.get("artifacts", {})
+    output_path = output_path_from_state(state)
+    summary = {
+        "support_docx": str(Path(artifacts.get("support_docx", output_path)).resolve()),
+        "processed_spectra_zip": _resolved_artifact(artifacts, "processed_spectra_zip"),
+        "manifest": _resolved_artifact(artifacts, "manifest"),
+    }
+    return {key: value for key, value in summary.items() if value}
+
+
+def _resolved_artifact(artifacts: dict[str, str], key: str) -> str:
+    value = artifacts.get(key, "")
+    return str(Path(value).resolve()) if value else ""
 
 
 def _required_existing_file(raw_path: str, message: str) -> Path:

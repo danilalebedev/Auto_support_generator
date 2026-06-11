@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from si_generator.gui import _build_generate_request
+from si_generator.gui import _build_generate_request, _build_result_summary
 
 
 class GuiWorkflowTests(unittest.TestCase):
@@ -41,6 +41,32 @@ class GuiWorkflowTests(unittest.TestCase):
                 input_path_text="missing.csv",
                 output_docx_text="support_information.docx",
             )
+
+    def test_builds_result_summary_from_graph_state_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "support_information.docx"
+            package = root / "processed_spectra.zip"
+            manifest = root / "support_information.manifest.json"
+            state = {
+                "request": _build_generate_request(
+                    input_kind="word",
+                    input_path_text=__file__,
+                    output_docx_text=str(output),
+                ),
+                "output_path": output,
+                "artifacts": {
+                    "support_docx": str(output),
+                    "processed_spectra_zip": str(package),
+                    "manifest": str(manifest),
+                },
+            }
+
+            summary = _build_result_summary(state)
+
+        self.assertEqual(summary["support_docx"], str(output.resolve()))
+        self.assertEqual(summary["processed_spectra_zip"], str(package.resolve()))
+        self.assertEqual(summary["manifest"], str(manifest.resolve()))
 
 
 if __name__ == "__main__":
