@@ -208,6 +208,8 @@ support_information.docx
 ```text
 output/
   support_information.docx
+  support_information.manifest.json
+  support_information.run_summary.json
   processed_spectra.zip
   processed_spectra/
     2a/
@@ -227,6 +229,10 @@ output/
 Для пользователя обычно важны:
 
 - `support_information.docx` - финальный SI;
+- `support_information.manifest.json` - техническая карта результата: порядок
+  соединений, внутренние `cmp_...` id, Word bookmarks и пути к артефактам;
+- `support_information.run_summary.json` - краткий отчет генерации: статус,
+  количество warnings/errors, список issues и диагностика по каждому соединению;
 - `processed_spectra.zip` - архив с PNG-картинками спектров и обработанными
   `.mnova` файлами;
 - `processed_spectra/` - те же файлы в обычных папках.
@@ -258,6 +264,12 @@ output/
 В нижнем окне будет лог выполнения. После завершения нажмите `Open output
 folder`, чтобы открыть папку с результатами.
 
+В блоке `Results` GUI показывает основные артефакты. Кнопка `Run report`
+открывает JSON-отчет: после генерации это `support_information.run_summary.json`,
+после проверки manifest - `*.check_report.json`, после patch workflow -
+`*.patch_report.json`. Эти отчеты удобны для диагностики: в них есть общий
+статус, счетчики warnings/errors и привязка проблем к конкретным соединениям.
+
 ## Что получается на выходе
 
 Если выбран output:
@@ -271,6 +283,8 @@ output/support_information.docx
 ```text
 output/
   support_information.docx
+  support_information.manifest.json
+  support_information.run_summary.json
   processed_spectra.zip
   processed_spectra/
     2a/
@@ -290,12 +304,18 @@ output/
 Главные файлы для пользователя:
 
 - `support_information.docx` - готовый SI;
+- `support_information.run_summary.json` - машинно-читаемый отчет запуска. В нем
+  видно, какие соединения были обработаны, сколько warnings/errors найдено и к
+  каким соединениям они относятся;
+- `support_information.manifest.json` - карта результата для проверки,
+  перенумерации, удаления и перестановки compound-блоков без полной регенерации;
 - `processed_spectra.zip` - архив с обработанными спектрами, PNG-картинками и
   `.mnova` файлами;
 - `processed_spectra/` - то же самое, но в виде обычных папок.
 
-`logs/` - служебные файлы. Они нужны для отладки, но обычно пользователю их
-трогать не нужно.
+`logs/` - служебные файлы. Там лежат текстовые warnings по входным данным и
+проверке SI. Обычно пользователю достаточно открыть `Run report` в GUI, но эти
+файлы помогают быстро понять, какое поле в таблице нужно поправить.
 
 ## Примеры
 
@@ -594,6 +614,10 @@ py -m si_generator ^
 только manifest и итоговый документ, без строгой проверки всех PNG/MNova файлов, добавьте
 `--no-strict-artifacts`.
 
+Рядом с manifest создается файл `support_information.check_report.json`. В нем
+сохранены статус проверки, список найденных issues, счетчики по severity и
+`compound_issue_counts` для проблем, связанных с конкретными соединениями.
+
 Создать патченую копию уже сгенерированного SI с новой нумерацией соединений:
 
 ```powershell
@@ -607,6 +631,10 @@ py -m si_generator ^
 `manifest` и невидимым Word bookmarks: он создает новый `.docx`, новый `.manifest.json` и сразу
 проверяет, что bookmarks в документе совпадают с manifest. Замена отдельных структур будет добавлена
 отдельной patch-операцией.
+
+Для patch workflow дополнительно создается `*.patch_report.json`. Этот отчет
+фиксирует примененные операции (`renumber`, `remove`, `reorder`), итоговый
+статус проверки и issues по соединениям.
 
 Удалить одно или несколько соединений без полной регенерации:
 
@@ -660,9 +688,12 @@ $env:PYTHONPATH='src'
 Тесты покрывают расчет HRMS, проверку ЯМР, чтение текущего Word-примера,
 smoke-генерацию `.docx` без запуска MestReNova, LangGraph request/state,
 маршрутизацию генерации SI, расчет HRMS перед render-этапом и запись
-`support_information.manifest.json`, а также планирование NMR render spec для
-экспорта спектров. Отдельно проверяется промежуточная модель SI-документа
-перед записью `.docx`; GUI также проверяется как thin wrapper вокруг graph workflow.
+`support_information.manifest.json` и `support_information.run_summary.json`,
+а также планирование NMR render spec для экспорта спектров. Отдельно проверяется
+промежуточная модель SI-документа перед записью `.docx`; GUI также проверяется
+как thin wrapper вокруг graph workflow. Check/patch workflows покрыты тестами
+на `*.check_report.json`, `*.patch_report.json`, перенумерацию, удаление и
+перестановку compound-блоков.
 NMR-строки теперь дополнительно разбираются в структурированный список сигналов,
 а политика peak picking применяется отдельной graph node.
 Новая архитектурная основа лежит в:
