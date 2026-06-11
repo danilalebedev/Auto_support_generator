@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ..compound_store import ordered_compounds
 from ..state import GenerateSIState
 from ...chemdraw_ole import insert_chemdraw_placeholders
 from ...docx_builder import build_document
@@ -9,8 +10,9 @@ from ...word_input import paste_word_structures
 
 def render_docx_node(state: GenerateSIState) -> dict:
     request = state["request"]
+    compounds = ordered_compounds(state)
     output_path = build_document(
-        state.get("compounds", []),
+        compounds,
         request.output_path,
         style_config=state.get("style_config"),
         template_path=request.template_docx,
@@ -22,7 +24,7 @@ def render_docx_node(state: GenerateSIState) -> dict:
 def postprocess_word_objects_node(state: GenerateSIState) -> dict:
     request = state["request"]
     output_path = state["output_path"]
-    compounds = state.get("compounds", [])
+    compounds = ordered_compounds(state)
     style_config = state.get("style_config", {})
 
     if request.input_kind == "word":

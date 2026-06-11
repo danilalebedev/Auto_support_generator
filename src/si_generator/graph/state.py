@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
@@ -38,14 +39,22 @@ class Issue(TypedDict, total=False):
     code: str
     severity: Literal["info", "warning", "error"]
     message: str
-    compound_number: str
+    compound_id: str
     path: str
 
 
 class GenerateSIState(TypedDict, total=False):
+    run_id: str
     request: GenerateSIRequest
     style_config: dict[str, Any]
-    compounds: list[Compound]
+    input_compounds: list[Compound]
+    compounds: dict[str, Compound]
+    order: list[str]
     output_path: Path
     artifacts: dict[str, str]
     issues: list[Issue]
+    manifest: dict[str, Any]
+
+
+def make_run_id(now: datetime | None = None) -> str:
+    return (now or datetime.now()).strftime("%Y%m%dT%H%M%S")

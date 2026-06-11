@@ -4,11 +4,11 @@ from argparse import Namespace
 from pathlib import Path
 
 from ..graph.graphs import build_generate_si_graph
-from ..graph.state import GenerateSIRequest, GenerateSIState
+from ..graph.state import GenerateSIRequest, GenerateSIState, make_run_id
 
 
 def make_initial_generate_state(request: GenerateSIRequest) -> GenerateSIState:
-    return {"request": request, "artifacts": {}, "issues": []}
+    return {"run_id": make_run_id(), "request": request, "artifacts": {}, "issues": []}
 
 
 def run_generate_si(request: GenerateSIRequest) -> GenerateSIState:

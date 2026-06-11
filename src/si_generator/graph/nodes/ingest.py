@@ -16,5 +16,5 @@ def read_input_table_node(state: GenerateSIState) -> dict:
         wanted = set(request.only)
         compounds = [compound for compound in compounds if compound.number in wanted]
 
-    return {"compounds": compounds}
+    return {"input_compounds": compounds}
 
