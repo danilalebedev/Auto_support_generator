@@ -1,2 +1,2 @@
-"""Graph state helpers and future LangGraph entry points."""
+"""LangGraph runtime for SI generation workflows."""
 

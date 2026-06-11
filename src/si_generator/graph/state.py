@@ -1,83 +1,51 @@
 from __future__ import annotations
 
-from datetime import datetime
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Literal, TypedDict
 
-from ..adapters.legacy_compound import legacy_compounds_to_domain
-from ..domain.types import GenerationConfig, JournalProfile, RuntimeConfig, SIState, SpectraProcessingConfig
-from ..models import Compound as LegacyCompound
-
-
-def default_spectra_config() -> SpectraProcessingConfig:
-    return {
-        "extract_nmr": True,
-        "insert_spectra_as": "png",
-        "target_signal_height_fraction": 0.80,
-        "peak_picking": "normal",
-        "keep_intermediate_reports": True,
-    }
+from ..models import Compound
 
 
-def default_generation_config() -> GenerationConfig:
-    return {
-        "generate_loadings": False,
-        "include_ir": True,
-        "include_elemental_analysis": False,
-        "include_references": False,
-        "include_xrd": False,
-        "validate_only": False,
-        "patch_existing_support": False,
-    }
+InputKind = Literal["csv", "word"]
 
 
-def default_journal_profile() -> JournalProfile:
-    return {
-        "id": "default",
-        "name": "Default SI profile",
-        "section_order": ["compound_descriptions", "spectra_appendix"],
-        "use_subscripts_in_formulae": True,
-        "use_superscript_isotopes": True,
-        "use_italic_j": True,
-    }
+@dataclass(slots=True)
+class GenerateSIRequest:
+    input_path: Path
+    input_kind: InputKind
+    output_path: Path
+    template_docx: Path | None = None
+    style_config_path: Path | None = None
+    spectra_zip: Path | None = None
+    mnova_exe: Path | None = None
+    no_extract_nmr: bool = False
+    extract_structure_metadata: bool = False
+    only: tuple[str, ...] = ()
+    insert_chemdraw: bool = False
+    no_check_support: bool = False
+
+    @property
+    def input_base_dir(self) -> Path:
+        return self.input_path.parent
+
+    @property
+    def output_dir(self) -> Path:
+        return self.output_path.parent
 
 
-def default_runtime_config() -> RuntimeConfig:
-    return {"gui": False, "debug": False, "dry_run": False}
+class Issue(TypedDict, total=False):
+    code: str
+    severity: Literal["info", "warning", "error"]
+    message: str
+    compound_number: str
+    path: str
 
 
-def make_run_id(now: datetime | None = None) -> str:
-    now = now or datetime.now()
-    return now.strftime("%Y%m%dT%H%M%S")
-
-
-def make_initial_state(
-    *,
-    legacy_compounds: list[LegacyCompound] | None = None,
-    input_paths: dict[str, str] | None = None,
-    output_paths: dict[str, str] | None = None,
-    spectra_config: SpectraProcessingConfig | None = None,
-    generation_config: GenerationConfig | None = None,
-    journal_profile: JournalProfile | None = None,
-    runtime_config: RuntimeConfig | None = None,
-) -> SIState:
-    compounds, order = legacy_compounds_to_domain(legacy_compounds or [])
-    return {
-        "run_id": make_run_id(),
-        "compounds": compounds,
-        "order": order,
-        "spectra_config": spectra_config or default_spectra_config(),
-        "generation_config": generation_config or default_generation_config(),
-        "journal_profile": journal_profile or default_journal_profile(),
-        "runtime_config": runtime_config or default_runtime_config(),
-        "input_paths": _stringify_paths(input_paths or {}),
-        "output_paths": _stringify_paths(output_paths or {}),
-        "artifacts": {},
-        "issues": [],
-        "logs": [],
-        "manifest": {},
-    }
-
-
-def _stringify_paths(paths: dict[str, str]) -> dict[str, str]:
-    return {key: str(Path(value)) if value else "" for key, value in paths.items()}
-
+class GenerateSIState(TypedDict, total=False):
+    request: GenerateSIRequest
+    style_config: dict[str, Any]
+    compounds: list[Compound]
+    output_path: Path
+    artifacts: dict[str, str]
+    issues: list[Issue]

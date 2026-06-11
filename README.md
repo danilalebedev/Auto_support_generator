@@ -530,13 +530,13 @@ $env:PYTHONPATH='src'
 ```
 
 Тесты покрывают расчет HRMS, проверку ЯМР, чтение текущего Word-примера,
-smoke-генерацию `.docx` без запуска MestReNova и конвертеры между старой
-`Compound` dataclass и новой domain-моделью. Новая архитектурная основа лежит в:
+smoke-генерацию `.docx` без запуска MestReNova, LangGraph request/state и
+маршрутизацию генерации SI. Новая архитектурная основа лежит в:
 
 ```text
 src/si_generator/domain/
-src/si_generator/adapters/
 src/si_generator/graph/
+src/si_generator/workflows/
 ```
 
 ## Как собрать установщик

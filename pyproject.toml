@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Generate organic chemistry Supporting Information DOCX files from tabular compound data."
 requires-python = ">=3.10"
 dependencies = [
+    "langgraph>=1.2,<2",
     "olefile",
     "python-docx",
     "pywin32; platform_system == 'Windows'",
