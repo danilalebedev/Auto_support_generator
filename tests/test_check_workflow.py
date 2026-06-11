@@ -129,6 +129,34 @@ class CheckWorkflowTests(unittest.TestCase):
         self.assertTrue(manifest_has_errors(issues))
         self.assertIn("DOCX_MISSING_BOOKMARK", {issue["code"] for issue in issues})
 
+    def test_manifest_check_warns_for_unexpected_compound_bookmark(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            support_docx = root / "support_information.docx"
+            compounds = [
+                Compound(id="cmp_001", number="2a", name="Example A"),
+                Compound(id="cmp_002", number="2b", name="Example B"),
+            ]
+            build_document_from_model(build_si_document_model(compounds), support_docx)
+            manifest = {
+                "run_id": "run",
+                "artifacts": {"support_docx": str(support_docx)},
+                "order": ["cmp_001"],
+                "compounds": {
+                    "cmp_001": {
+                        "id": "cmp_001",
+                        "number": "2a",
+                        "docx_block_id": "compound:cmp_001",
+                        "docx_bookmark": bookmark_name_for_block_id("compound:cmp_001"),
+                    }
+                },
+            }
+
+            issues = check_manifest(manifest, manifest_path=root / "support_information.manifest.json")
+
+        self.assertFalse(manifest_has_errors(issues))
+        self.assertIn("DOCX_UNEXPECTED_COMPOUND_BOOKMARK", {issue["code"] for issue in issues})
+
     def test_cli_check_manifest_mode_returns_zero_on_valid_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

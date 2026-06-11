@@ -181,6 +181,15 @@ def _check_docx_bookmarks(manifest: dict[str, Any], support_docx: Path) -> list[
                     path=str(support_docx),
                 )
             )
+    for bookmark in sorted(_unexpected_compound_bookmarks(actual, expected)):
+        issues.append(
+            _issue(
+                "DOCX_UNEXPECTED_COMPOUND_BOOKMARK",
+                "warning",
+                f"compound bookmark '{bookmark}' was found in support DOCX but is not listed in manifest.",
+                path=str(support_docx),
+            )
+        )
     return issues
 
 
@@ -202,6 +211,11 @@ def _read_docx_bookmarks(path: Path) -> set[str]:
         for element in root.iter(namespace + "bookmarkStart")
         if element.attrib.get(namespace + "name")
     }
+
+
+def _unexpected_compound_bookmarks(actual: set[str], expected: dict[str, str]) -> set[str]:
+    expected_bookmarks = set(expected.values())
+    return {bookmark for bookmark in actual if bookmark.startswith("asig_compound_") and bookmark not in expected_bookmarks}
 
 
 def _check_artifact_paths(manifest: dict[str, Any], base_dir: Path) -> list[Issue]:
