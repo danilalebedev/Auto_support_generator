@@ -13,7 +13,7 @@ from si_generator.cli import main as cli_main
 from si_generator.docx_builder import build_document_from_model
 from si_generator.domain.bookmarks import bookmark_name_for_block_id
 from si_generator.domain.manifest import check_manifest, manifest_has_errors
-from si_generator.domain.patching import parse_renumber_map
+from si_generator.domain.patching import parse_renumber_map, parse_reorder_list
 from si_generator.graph.state import PatchSIRequest
 from si_generator.models import Compound
 from si_generator.render.document_model import build_si_document_model
@@ -27,6 +27,9 @@ class PatchWorkflowTests(unittest.TestCase):
     def test_parse_renumber_map_rejects_invalid_items(self) -> None:
         with self.assertRaisesRegex(ValueError, "OLD=NEW"):
             parse_renumber_map("2a")
+
+    def test_parse_reorder_list_accepts_numbers_or_ids(self) -> None:
+        self.assertEqual(parse_reorder_list("2b, cmp_001"), ("2b", "cmp_001"))
 
     def test_patch_workflow_renumbers_docx_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -83,28 +86,58 @@ class PatchWorkflowTests(unittest.TestCase):
         self.assertIn("Patch check passed", stdout.getvalue())
         self.assertIn("Example (6a)", text)
 
+    def test_patch_workflow_reorders_docx_and_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, source_manifest = _write_source_support(
+                root,
+                [
+                    Compound(id="cmp_001", number="2a", name="Example A", color="white", state="solid"),
+                    Compound(id="cmp_002", number="2b", name="Example B", color="yellow", state="solid"),
+                ],
+            )
+            patched_docx = root / "support_information_reordered.docx"
+            patched_manifest = root / "support_information_reordered.manifest.json"
 
-def _write_source_support(root: Path) -> tuple[Path, Path]:
+            state = run_patch_si(
+                PatchSIRequest(
+                    manifest_path=source_manifest,
+                    renumber={},
+                    reorder=("2b", "2a"),
+                    output_docx=patched_docx,
+                    output_manifest=patched_manifest,
+                )
+            )
+            patched = json.loads(patched_manifest.read_text(encoding="utf-8"))
+            text = "\n".join(paragraph.text for paragraph in Document(patched_docx).paragraphs)
+
+        self.assertEqual(state["status"], "pass")
+        self.assertEqual(patched["order"], ["cmp_002", "cmp_001"])
+        self.assertLess(text.index("Example B (2b)"), text.index("Example A (2a)"))
+
+
+def _write_source_support(root: Path, compounds: list[Compound] | None = None) -> tuple[Path, Path]:
     source_docx = root / "support_information.docx"
     source_manifest = root / "support_information.manifest.json"
-    compound = Compound(id="cmp_001", number="2a", name="Example")
-    build_document_from_model(build_si_document_model([compound]), source_docx)
+    compounds = compounds or [Compound(id="cmp_001", number="2a", name="Example")]
+    build_document_from_model(build_si_document_model(compounds), source_docx)
+    compound_entries = {}
+    for index, compound in enumerate(compounds, start=2):
+        compound_entries[compound.id] = {
+            "id": compound.id,
+            "number": compound.number,
+            "source_row": index,
+            "structure_placeholder": f"STRUCTURE:{compound.number}",
+            "docx_block_id": f"compound:{compound.id}",
+            "docx_bookmark": bookmark_name_for_block_id(f"compound:{compound.id}"),
+            "artifacts": {},
+        }
     manifest = {
         "run_id": "run",
         "artifacts": {"support_docx": str(source_docx), "manifest": str(source_manifest)},
         "output_paths": {"support_docx": str(source_docx), "manifest": str(source_manifest)},
-        "order": ["cmp_001"],
-        "compounds": {
-            "cmp_001": {
-                "id": "cmp_001",
-                "number": "2a",
-                "source_row": 2,
-                "structure_placeholder": "STRUCTURE:2a",
-                "docx_block_id": "compound:cmp_001",
-                "docx_bookmark": bookmark_name_for_block_id("compound:cmp_001"),
-                "artifacts": {},
-            }
-        },
+        "order": [compound.id for compound in compounds],
+        "compounds": compound_entries,
     }
     source_manifest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     return source_docx, source_manifest

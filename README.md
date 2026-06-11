@@ -603,9 +603,22 @@ py -m si_generator ^
   --patched-output output\support_information_renumbered.docx
 ```
 
-Сейчас patch workflow поддерживает безопасную перенумерацию по `manifest` и невидимым Word bookmarks:
-он создает новый `.docx`, новый `.manifest.json` и сразу проверяет, что bookmarks в документе совпадают
-с manifest. Перестановка блоков и замена отдельных структур будут добавлены отдельными patch-операциями.
+Сейчас patch workflow поддерживает безопасную перенумерацию и перестановку compound-блоков по
+`manifest` и невидимым Word bookmarks: он создает новый `.docx`, новый `.manifest.json` и сразу
+проверяет, что bookmarks в документе совпадают с manifest. Замена отдельных структур будет добавлена
+отдельной patch-операцией.
+
+Поменять порядок compound-блоков без полной регенерации:
+
+```powershell
+py -m si_generator ^
+  --patch-manifest output\support_information.manifest.json ^
+  --reorder 2b,2a,2c ^
+  --patched-output output\support_information_reordered.docx
+```
+
+В `--reorder` нужно перечислить все соединения из manifest ровно один раз, по номеру соединения
+или внутреннему `cmp_...` id.
 
 Отключить проверку:
 

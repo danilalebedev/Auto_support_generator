@@ -4,9 +4,12 @@ from pathlib import Path
 
 from ...domain.manifest import check_manifest, load_manifest, manifest_has_errors
 from ...domain.patching import (
+    bookmark_order_for_compounds,
     default_patched_docx_path,
     patch_docx_numbers,
     renumber_manifest,
+    reorder_docx_blocks,
+    reorder_manifest,
     set_manifest_output_paths,
     support_docx_from_manifest,
     write_patched_manifest,
@@ -27,8 +30,21 @@ def apply_renumber_patch_node(state: PatchSIState) -> dict:
     output_docx = request.output_docx or default_patched_docx_path(source_docx)
     output_manifest = request.output_manifest or output_docx.with_suffix(".manifest.json")
 
-    patched_manifest, applied = renumber_manifest(source_manifest, request.renumber)
-    patch_docx_numbers(source_docx, output_docx, applied)
+    patched_manifest = source_manifest
+    applied_numbers: dict[str, str] = {}
+    if request.renumber:
+        patched_manifest, applied_numbers = renumber_manifest(patched_manifest, request.renumber)
+    if request.reorder:
+        patched_manifest, reordered_ids = reorder_manifest(patched_manifest, request.reorder)
+    else:
+        reordered_ids = []
+
+    if applied_numbers:
+        patch_docx_numbers(source_docx, output_docx, applied_numbers)
+    else:
+        patch_docx_numbers(source_docx, output_docx, {})
+    if reordered_ids:
+        reorder_docx_blocks(output_docx, output_docx, bookmark_order_for_compounds(patched_manifest, reordered_ids))
     set_manifest_output_paths(patched_manifest, support_docx=output_docx, manifest_path=output_manifest)
     write_patched_manifest(patched_manifest, output_manifest)
 

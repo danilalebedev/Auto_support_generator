@@ -45,6 +45,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", "-o", help="Path to output DOCX.")
     parser.add_argument("--support-docx", help="Optional DOCX path override for --check-manifest.")
     parser.add_argument("--renumber", help="For --patch-manifest, comma-separated OLD=NEW pairs, e.g. 2a=3a,2b=3b.")
+    parser.add_argument("--reorder", help="For --patch-manifest, comma-separated compound ids or numbers in the desired order.")
     parser.add_argument("--patched-output", help="For --patch-manifest, output path for the patched DOCX.")
     parser.add_argument("--patched-manifest-output", help="For --patch-manifest, output path for the patched manifest JSON.")
     parser.add_argument(

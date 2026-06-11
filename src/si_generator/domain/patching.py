@@ -29,6 +29,10 @@ def parse_renumber_map(text: str) -> dict[str, str]:
     return result
 
 
+def parse_reorder_list(text: str) -> tuple[str, ...]:
+    return tuple(item.strip() for item in text.split(",") if item.strip())
+
+
 def renumber_manifest(manifest: dict[str, Any], renumber: dict[str, str]) -> tuple[dict[str, Any], dict[str, str]]:
     patched = json.loads(json.dumps(manifest, ensure_ascii=False))
     compounds = patched.get("compounds", {})
@@ -52,6 +56,42 @@ def renumber_manifest(manifest: dict[str, Any], renumber: dict[str, str]) -> tup
     return patched, applied
 
 
+def reorder_manifest(manifest: dict[str, Any], order_tokens: tuple[str, ...]) -> tuple[dict[str, Any], list[str]]:
+    if not order_tokens:
+        return json.loads(json.dumps(manifest, ensure_ascii=False)), []
+
+    patched = json.loads(json.dumps(manifest, ensure_ascii=False))
+    current_order = [str(item) for item in patched.get("order", [])]
+    compounds = patched.get("compounds", {}) or {}
+    id_by_number = {
+        str(compound.get("number")): str(compound_id)
+        for compound_id, compound in compounds.items()
+        if isinstance(compound, dict) and compound.get("number")
+    }
+
+    resolved: list[str] = []
+    for token in order_tokens:
+        compound_id = token if token in compounds else id_by_number.get(token)
+        if not compound_id:
+            raise ValueError(f"Reorder token '{token}' does not match a compound id or number.")
+        if compound_id in resolved:
+            raise ValueError(f"Reorder token '{token}' resolves to duplicate compound id '{compound_id}'.")
+        resolved.append(compound_id)
+
+    missing = [compound_id for compound_id in current_order if compound_id not in resolved]
+    extra = [compound_id for compound_id in resolved if compound_id not in current_order]
+    if missing or extra:
+        details = []
+        if missing:
+            details.append("missing: " + ", ".join(missing))
+        if extra:
+            details.append("extra: " + ", ".join(extra))
+        raise ValueError("Reorder must include every manifest compound exactly once (" + "; ".join(details) + ").")
+
+    patched["order"] = resolved
+    return patched, resolved
+
+
 def patch_docx_numbers(input_docx: str | Path, output_docx: str | Path, renumber: dict[str, str]) -> Path:
     input_docx = Path(input_docx)
     output_docx = Path(output_docx)
@@ -67,6 +107,55 @@ def patch_docx_numbers(input_docx: str | Path, output_docx: str | Path, renumber
     for text_node in root.iter(f"{{{WORD_NS}}}t"):
         if text_node.text:
             text_node.text = _renumber_text(text_node.text, renumber)
+
+    with zipfile.ZipFile(output_docx, "w", zipfile.ZIP_DEFLATED) as target:
+        for name, data in members.items():
+            target.writestr(name, data)
+        target.writestr("word/document.xml", ET.tostring(root, encoding="utf-8", xml_declaration=True))
+    return output_docx
+
+
+def reorder_docx_blocks(input_docx: str | Path, output_docx: str | Path, bookmark_order: list[str]) -> Path:
+    if not bookmark_order:
+        return Path(output_docx)
+
+    input_docx = Path(input_docx)
+    output_docx = Path(output_docx)
+    output_docx.parent.mkdir(parents=True, exist_ok=True)
+    if input_docx.resolve() != output_docx.resolve():
+        shutil.copy2(input_docx, output_docx)
+
+    with zipfile.ZipFile(output_docx, "r") as source:
+        document_xml = source.read("word/document.xml")
+        members = {item.filename: source.read(item.filename) for item in source.infolist() if item.filename != "word/document.xml"}
+
+    root = ET.fromstring(document_xml)
+    body = root.find(f"{{{WORD_NS}}}body")
+    if body is None:
+        raise ValueError("DOCX document body was not found.")
+
+    ranges = _bookmark_body_ranges(body, bookmark_order)
+    if len(ranges) != len(bookmark_order):
+        missing = [name for name in bookmark_order if name not in ranges]
+        raise ValueError("DOCX is missing bookmark ranges: " + ", ".join(missing))
+
+    children = list(body)
+    first_index = min(start for start, _ in ranges.values())
+    moving_indexes = {index for name in bookmark_order for index in range(ranges[name][0], ranges[name][1] + 1)}
+    moving_blocks = {name: children[ranges[name][0] : ranges[name][1] + 1] for name in bookmark_order}
+
+    for child in children:
+        body.remove(child)
+
+    insert_done = False
+    for index, child in enumerate(children):
+        if index == first_index and not insert_done:
+            for name in bookmark_order:
+                for item in moving_blocks[name]:
+                    body.append(item)
+            insert_done = True
+        if index not in moving_indexes:
+            body.append(child)
 
     with zipfile.ZipFile(output_docx, "w", zipfile.ZIP_DEFLATED) as target:
         for name, data in members.items():
@@ -108,6 +197,15 @@ def set_manifest_output_paths(manifest: dict[str, Any], *, support_docx: str | P
     return manifest
 
 
+def bookmark_order_for_compounds(manifest: dict[str, Any], compound_ids: list[str]) -> list[str]:
+    compounds = manifest.get("compounds", {}) or {}
+    return [
+        str(compounds[compound_id]["docx_bookmark"])
+        for compound_id in compound_ids
+        if isinstance(compounds.get(compound_id), dict) and compounds[compound_id].get("docx_bookmark")
+    ]
+
+
 def _renumber_text(text: str, renumber: dict[str, str]) -> str:
     result = text
     for old, new in renumber.items():
@@ -132,3 +230,24 @@ def _raise_on_duplicate_numbers(manifest: dict[str, Any]) -> None:
         seen.add(number)
     if duplicates:
         raise ValueError("Renumbering would create duplicate compound numbers: " + ", ".join(sorted(duplicates)))
+
+
+def _bookmark_body_ranges(body, bookmark_names: list[str]) -> dict[str, tuple[int, int]]:
+    wanted = set(bookmark_names)
+    starts: dict[str, int] = {}
+    ends_by_id: dict[str, int] = {}
+    names_by_id: dict[str, str] = {}
+    name_attr = f"{{{WORD_NS}}}name"
+    id_attr = f"{{{WORD_NS}}}id"
+
+    for index, child in enumerate(list(body)):
+        for item in child.iter(f"{{{WORD_NS}}}bookmarkStart"):
+            name = str(item.attrib.get(name_attr, ""))
+            if name in wanted:
+                starts[name] = index
+                names_by_id[str(item.attrib.get(id_attr, ""))] = name
+        for item in child.iter(f"{{{WORD_NS}}}bookmarkEnd"):
+            name = names_by_id.get(str(item.attrib.get(id_attr, "")))
+            if name in wanted:
+                ends_by_id[name] = index
+    return {name: (starts[name], ends_by_id[name]) for name in wanted if name in starts and name in ends_by_id}
