@@ -4,6 +4,7 @@ from langgraph.graph import END, START, StateGraph
 
 from .nodes.ingest import read_input_table_node
 from .nodes.hrms import calculate_hrms_node
+from .nodes.nmr import apply_peak_picking_policy_node, parse_nmr_reports_node
 from .nodes.normalize import normalize_compounds_node
 from .nodes.packaging import write_manifest_node
 from .nodes.render import build_document_model_node, postprocess_word_objects_node, render_docx_node
@@ -23,6 +24,8 @@ def build_generate_si_graph():
     builder.add_node("plan_nmr_processing", plan_nmr_processing_node)
     builder.add_node("validate_input", validate_input_node)
     builder.add_node("mnova_batch", mnova_batch_node)
+    builder.add_node("parse_nmr_reports", parse_nmr_reports_node)
+    builder.add_node("apply_peak_picking_policy", apply_peak_picking_policy_node)
     builder.add_node("calculate_hrms", calculate_hrms_node)
     builder.add_node("validate_support", validate_support_node)
     builder.add_node("build_document_model", build_document_model_node)
@@ -41,10 +44,12 @@ def build_generate_si_graph():
         route_nmr_processing,
         {
             "run_mnova": "mnova_batch",
-            "skip_mnova": "calculate_hrms",
+            "skip_mnova": "parse_nmr_reports",
         },
     )
-    builder.add_edge("mnova_batch", "calculate_hrms")
+    builder.add_edge("mnova_batch", "parse_nmr_reports")
+    builder.add_edge("parse_nmr_reports", "apply_peak_picking_policy")
+    builder.add_edge("apply_peak_picking_policy", "calculate_hrms")
     builder.add_edge("calculate_hrms", "validate_support")
     builder.add_edge("validate_support", "build_document_model")
     builder.add_edge("build_document_model", "render_docx")

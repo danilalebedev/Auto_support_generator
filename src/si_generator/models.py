@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from .domain.types import NMRSpectrumBlock
 
 
 @dataclass(slots=True)
@@ -29,6 +31,7 @@ class Compound:
     c13_conditions: str = ""
     c13_spectrum_path: str = ""
     c13_image_path: str = ""
+    nmr_spectra: dict[str, NMRSpectrumBlock] = field(default_factory=dict)
     mnova_path: str = ""
     extra_nmr: str = ""
     ir: str = ""
