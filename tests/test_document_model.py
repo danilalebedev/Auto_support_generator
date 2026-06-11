@@ -22,10 +22,21 @@ class DocumentModelTests(unittest.TestCase):
 
         self.assertEqual(model["title"], "Supporting Information")
         self.assertEqual([section["id"] for section in model["sections"]], ["compound_descriptions", "spectra_appendix"])
-        self.assertEqual(model["sections"][0]["blocks"][0]["kind"], "compound_description")
-        self.assertEqual(model["sections"][1]["blocks"][0]["kind"], "spectrum_page")
-        self.assertEqual(model["sections"][1]["blocks"][0]["compound_id"], "cmp_001")
-        self.assertEqual(model["sections"][1]["blocks"][0]["nucleus"], "1H")
+        compound_block = model["sections"][0]["blocks"][0]
+        spectrum_block = model["sections"][1]["blocks"][0]
+        self.assertEqual(compound_block["kind"], "compound_description")
+        self.assertEqual(compound_block["block_id"], "compound:cmp_001")
+        self.assertEqual(compound_block["display_number"], "2a")
+        self.assertEqual(compound_block["title_text"], "Example (2a)")
+        self.assertEqual(compound_block["structure_placeholder"], "STRUCTURE:2a")
+        self.assertEqual(spectrum_block["kind"], "spectrum_page")
+        self.assertEqual(spectrum_block["block_id"], "spectrum:cmp_001:1H")
+        self.assertEqual(spectrum_block["compound_id"], "cmp_001")
+        self.assertEqual(spectrum_block["nucleus"], "1H")
+        self.assertEqual(spectrum_block["structure_placeholder"], "SPECTRUM_STRUCTURE:2a:1H")
+        self.assertEqual(spectrum_block["expected_artifact_path"], str(image_path))
+        self.assertEqual(model["metadata"]["spectrum_count"], "1")
+        self.assertEqual(model["metadata"]["references_count"], "0")
 
     def test_renders_docx_from_document_model(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

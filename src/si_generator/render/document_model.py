@@ -46,6 +46,8 @@ def build_si_document_model(
         "sections": sections,
         "metadata": {
             "compound_count": str(len(compounds)),
+            "spectrum_count": str(len(spectra_blocks)),
+            "references_count": str(len(reference_blocks)),
             "journal_profile": (journal_profile or {}).get("id", "default"),
         },
     }
@@ -57,9 +59,14 @@ def _section_order(journal_profile: JournalProfile | None) -> list[str]:
 
 
 def _compound_description_block(compound: Compound) -> DocumentBlock:
+    compound_id = _compound_id(compound)
     return {
         "kind": "compound_description",
-        "compound_id": compound.id,
+        "block_id": f"compound:{compound_id}",
+        "compound_id": compound_id,
+        "display_number": compound.number,
+        "title_text": f"{compound.name} {compound.label}",
+        "structure_placeholder": f"STRUCTURE:{compound.number}",
         "content": compound,
     }
 
@@ -75,13 +82,23 @@ def _spectrum_blocks(compounds: list[Compound]) -> list[DocumentBlock]:
 
 
 def _spectrum_block(compound: Compound, nucleus: str, image_path: str) -> DocumentBlock:
+    compound_id = _compound_id(compound)
     return {
         "kind": "spectrum_page",
-        "compound_id": compound.id,
+        "block_id": f"spectrum:{compound_id}:{nucleus}",
+        "compound_id": compound_id,
+        "display_number": compound.number,
+        "title_text": f"{compound.name} {compound.label}",
         "content": compound,
+        "structure_placeholder": f"SPECTRUM_STRUCTURE:{compound.number}:{nucleus}",
         "nucleus": nucleus,
         "image_path": image_path,
+        "expected_artifact_path": image_path,
     }
+
+
+def _compound_id(compound: Compound) -> str:
+    return compound.id or compound.number
 
 
 def _reference_blocks(compounds: list[Compound], reference_store: ReferenceStore | None) -> list[DocumentBlock]:
@@ -91,6 +108,8 @@ def _reference_blocks(compounds: list[Compound], reference_store: ReferenceStore
     return [
         {
             "kind": "reference",
+            "block_id": f"reference:{index}",
+            "title_text": f"Reference {index}",
             "content": {"index": index, "reference": reference},
         }
         for index, reference in enumerate(references, start=1)
