@@ -75,6 +75,7 @@ class NMRSpectrumBlock(TypedDict, total=False):
     signals: list[NMRSignal]
     formatted_text: str
     conditions: str
+    peak_picking: PeakPickingPolicy
 
 
 class NMRBlock(TypedDict, total=False):

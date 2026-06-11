@@ -535,6 +535,8 @@ smoke-генерацию `.docx` без запуска MestReNova, LangGraph req
 `support_information.manifest.json`, а также планирование NMR render spec для
 экспорта спектров. Отдельно проверяется промежуточная модель SI-документа
 перед записью `.docx`; GUI также проверяется как thin wrapper вокруг graph workflow.
+NMR-строки теперь дополнительно разбираются в структурированный список сигналов,
+а политика peak picking применяется отдельной graph node.
 Новая архитектурная основа лежит в:
 
 ```text

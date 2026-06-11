@@ -5,6 +5,7 @@ import unittest
 
 from si_generator.graph.compound_store import make_compound_store, ordered_compounds
 from si_generator.graph.nodes.hrms import calculate_hrms_node
+from si_generator.graph.nodes.nmr import apply_peak_picking_policy_node, parse_nmr_reports_node
 from si_generator.graph.nodes.spectra import plan_nmr_processing_node, route_nmr_processing
 from si_generator.graph.state import GenerateSIRequest
 from si_generator.models import Compound
@@ -96,6 +97,28 @@ class GraphStateTests(unittest.TestCase):
         self.assertEqual(updated.hrms_calculated, 272.9921)
         self.assertEqual(updated.hrms_ion_formula, "C11H11BrFO2+")
         self.assertEqual(result["issues"], [])
+
+    def test_nmr_nodes_parse_text_and_apply_policy(self) -> None:
+        compound = Compound(
+            number="2a",
+            name="Test compound",
+            h1_nmr="δ = 8.07 (d, J = 15.8 Hz, 1H, CH), 4.59 (s, 2H, CH2Br).",
+            h1_conditions="CDCl3, 600 MHz",
+        )
+        compounds, order = make_compound_store([compound])
+        state = {
+            "compounds": compounds,
+            "order": order,
+            "spectra_plan": {"cmp_001": {"1H": {"nucleus": "1H", "peak_picking": "minimal"}}},
+        }
+
+        parse_nmr_reports_node(state)
+        result = apply_peak_picking_policy_node(state)
+
+        spectrum = result["compounds"]["cmp_001"].nmr_spectra["1H"]
+        self.assertEqual(spectrum["conditions"], "CDCl3, 600 MHz")
+        self.assertEqual(spectrum["signals"][0]["shift"], 8.07)
+        self.assertEqual(spectrum["peak_picking"], "minimal")
 
 
 if __name__ == "__main__":
