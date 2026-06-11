@@ -4,6 +4,7 @@ import csv
 from pathlib import Path
 
 from .domain.references import parse_reference_keys
+from .domain.reactions import reaction_from_fields
 from .models import Compound
 
 
@@ -39,6 +40,9 @@ def read_compounds(path: str | Path) -> list[Compound]:
                 kwargs["references"] = parse_reference_keys(row.get("references", ""))
                 if "elemental_analysis" in row:
                     kwargs["elemental_analysis"] = {"found": row.get("elemental_analysis", "")}
+                reaction = reaction_from_fields(row)
+                if reaction:
+                    kwargs["reaction"] = reaction
                 compound = Compound(**kwargs)
                 compound.source_row = row_number
                 compounds.append(compound)

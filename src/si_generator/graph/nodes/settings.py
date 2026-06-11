@@ -24,7 +24,7 @@ def load_settings_node(state: GenerateSIState) -> dict:
             **({"mnova_executable_path": str(request.mnova_exe)} if request.mnova_exe else {}),
         },
         "generation_config": {
-            "generate_loadings": False,
+            "generate_loadings": request.generate_loadings,
             "include_ir": True,
             "include_elemental_analysis": False,
             "include_references": bool(request.references_path),

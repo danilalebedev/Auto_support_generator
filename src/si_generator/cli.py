@@ -79,6 +79,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="How to place processed spectra in the appendix: PNG images, Mnova placeholders, both, or no appendix.",
     )
     parser.add_argument(
+        "--generate-loadings",
+        action="store_true",
+        help="Calculate reagent loadings from target_mmol/reagent_N_* input columns when present.",
+    )
+    parser.add_argument(
         "--extract-structure-metadata",
         action="store_true",
         help="Try to read names/formulas from ChemDraw OLE objects. Slower and may require responsive OLE servers.",

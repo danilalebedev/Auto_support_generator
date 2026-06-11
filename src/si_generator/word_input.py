@@ -19,6 +19,7 @@ from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 
 from .domain.references import parse_reference_keys
+from .domain.reactions import reaction_from_fields
 from .models import Compound
 from .structure_metadata import extract_structure_metadata_by_row
 
@@ -100,6 +101,7 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
                     extra_nmr=fields.get("extra_nmr", ""),
                     ir=fields.get("ir", ""),
                     elemental_analysis=_elemental_analysis_from_fields(fields),
+                    reaction=reaction_from_fields(fields),
                     references=parse_reference_keys(fields.get("references", "")),
                     has_word_structure=has_structure,
                 )
@@ -163,6 +165,7 @@ def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Comp
                 extra_nmr=fields.get("extra_nmr", ""),
                 ir=fields.get("ir", ""),
                 elemental_analysis=_elemental_analysis_from_fields(fields),
+                reaction=reaction_from_fields(fields),
                 references=parse_reference_keys(fields.get("references", "")),
                 has_word_structure=metadata is not None,
             )
@@ -346,6 +349,10 @@ def _map_row(headers: list[str], values: list[str]) -> dict[str, str]:
             result["elemental_analysis"] = value
         elif key in {"references", "refs", "referencekeys"}:
             result["references"] = value
+        elif key in {"targetmmol", "reactiontargetmmol"}:
+            result["target_mmol"] = value
+        elif re.fullmatch(r"reagent\d+(?:name|role|formula|mw|equiv|equivalents|mmol|massmg|volumeul|density|densitygml|concentration|concentrationm)", key):
+            result[_reaction_field_key(key)] = value
         elif "nmr" in key:
             result["extra_nmr"] = value
 
@@ -363,6 +370,20 @@ def _split_appearance(value: str, result: dict[str, str]) -> None:
 def _elemental_analysis_from_fields(fields: dict[str, str]) -> dict[str, str]:
     value = fields.get("elemental_analysis", "")
     return {"found": value} if value else {}
+
+
+def _reaction_field_key(key: str) -> str:
+    match = re.fullmatch(r"reagent(\d+)(.+)", key)
+    if not match:
+        return key
+    index, field = match.groups()
+    aliases = {
+        "massmg": "mass_mg",
+        "volumeul": "volume_ul",
+        "densitygml": "density_g_ml",
+        "concentrationm": "concentration_m",
+    }
+    return f"reagent_{index}_{aliases.get(field, field)}"
 
 
 def _first_number(value: str) -> str:

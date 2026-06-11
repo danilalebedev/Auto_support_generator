@@ -5,6 +5,45 @@ from typing import Any
 from .types import ReactionBlock, ReagentAmount
 
 
+REAGENT_FIELD_NAMES = {
+    "name": "name",
+    "role": "role",
+    "formula": "formula",
+    "mw": "mw",
+    "equiv": "equivalents",
+    "equivalents": "equivalents",
+    "mmol": "mmol",
+    "mass_mg": "mass_mg",
+    "massmg": "mass_mg",
+    "volume_ul": "volume_uL",
+    "volumeuL": "volume_uL",
+    "volumeul": "volume_uL",
+    "density": "density_g_mL",
+    "density_g_ml": "density_g_mL",
+    "densitygml": "density_g_mL",
+    "concentration": "concentration_M",
+    "concentration_m": "concentration_M",
+    "concentrationm": "concentration_M",
+}
+
+
+def reaction_from_fields(fields: dict[str, str]) -> ReactionBlock:
+    reaction: ReactionBlock = {}
+    target_mmol = _field_value(fields, "target_mmol", "targetmmol", "reaction_target_mmol", "reactiontargetmmol")
+    if target_mmol:
+        reaction["target_mmol"] = _float_or_text(target_mmol)
+
+    reagents: list[ReagentAmount] = []
+    for index in range(1, 21):
+        reagent = _reagent_from_fields(fields, index)
+        if reagent:
+            reagents.append(reagent)
+    if reagents:
+        reaction["reagents"] = reagents
+
+    return reaction
+
+
 def calculate_reaction_loadings(reaction: ReactionBlock) -> ReactionBlock:
     """Calculate reagent mmol, mass and volume values from a structured reaction block."""
     result: ReactionBlock = dict(reaction)
@@ -75,3 +114,34 @@ def _float_or_none(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _float_or_text(value: str) -> float | str:
+    parsed = _float_or_none(value)
+    return parsed if parsed is not None else value
+
+
+def _reagent_from_fields(fields: dict[str, str], index: int) -> ReagentAmount:
+    amount: ReagentAmount = {}
+    for source_name, target_name in REAGENT_FIELD_NAMES.items():
+        value = _field_value(
+            fields,
+            f"reagent_{index}_{source_name}",
+            f"reagent{index}_{source_name}",
+            f"reagent{index}{source_name}",
+        )
+        if not value:
+            continue
+        if target_name in {"name", "role", "formula"}:
+            amount[target_name] = value
+        else:
+            amount[target_name] = _float_or_text(value)
+    return amount if amount.get("name") else {}
+
+
+def _field_value(fields: dict[str, str], *keys: str) -> str:
+    for key in keys:
+        value = fields.get(key)
+        if value not in {None, ""}:
+            return str(value).strip()
+    return ""

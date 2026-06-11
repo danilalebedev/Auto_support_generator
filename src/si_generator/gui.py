@@ -34,6 +34,7 @@ class SIGeneratorApp:
         self.input_kind = StringVar(value="word")
         self.insert_spectra_as = StringVar(value="png")
         self.check_support = BooleanVar(value=True)
+        self.generate_loadings = BooleanVar(value=False)
         self.status_text = StringVar(value="Ready")
         self.result_support = StringVar(value="")
         self.result_spectra = StringVar(value="")
@@ -120,6 +121,11 @@ class SIGeneratorApp:
         ttk.Label(options, textvariable=self.status_text, style="Status.TLabel").grid(row=0, column=3, sticky="e")
         self.progress = ttk.Progressbar(options, mode="indeterminate", length=180)
         self.progress.grid(row=0, column=4, sticky="e", padx=(12, 0))
+        ttk.Checkbutton(
+            options,
+            text="Calculate reagent loadings",
+            variable=self.generate_loadings,
+        ).grid(row=1, column=0, sticky="w", pady=(8, 0))
 
         results = ttk.LabelFrame(outer, text="Results", padding=12)
         results.grid(row=3, column=0, sticky="ew", pady=(0, 12))
@@ -251,6 +257,7 @@ class SIGeneratorApp:
             references_text=self.references_file.get(),
             mnova_exe_text=self.mnova_exe.get(),
             insert_spectra_as=self.insert_spectra_as.get(),
+            generate_loadings=self.generate_loadings.get(),
             check_support=self.check_support.get(),
         )
 
@@ -362,6 +369,7 @@ def _build_generate_request(
     references_text: str = "",
     mnova_exe_text: str = "",
     insert_spectra_as: str = "png",
+    generate_loadings: bool = False,
     check_support: bool = True,
 ) -> GenerateSIRequest:
     input_path = _required_existing_file(input_path_text, "Choose an existing compound table.")
@@ -380,6 +388,7 @@ def _build_generate_request(
         references_path=_optional_existing_file(references_text, "References .yml"),
         mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe"),
         insert_spectra_as=_validated_spectrum_mode(insert_spectra_as),
+        generate_loadings=generate_loadings,
         no_check_support=not check_support,
     )
 

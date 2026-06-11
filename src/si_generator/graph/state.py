@@ -26,6 +26,7 @@ class GenerateSIRequest:
     mnova_exe: Path | None = None
     no_extract_nmr: bool = False
     insert_spectra_as: SpectrumEmbedMode = "png"
+    generate_loadings: bool = False
     extract_structure_metadata: bool = False
     only: tuple[str, ...] = ()
     insert_chemdraw: bool = False

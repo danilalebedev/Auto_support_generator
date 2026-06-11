@@ -16,6 +16,7 @@ from .chemistry import parse_formula
 from .domain.elemental_analysis import calculate_elemental_analysis_block, found_from_block
 from .domain.massspec import build_hrms_block
 from .domain.references import format_reference
+from .domain.reactions import calculate_reaction_loadings
 from .domain.types import JournalProfile
 from .domain.types import ReferenceStore
 from .models import Compound
@@ -148,6 +149,9 @@ def _add_compound_block(document: Document, compound: Compound, style_config: di
         text = "; ".join(summary_parts) + "." if summary_parts else ""
         _add_summary_paragraph(document, text, style_config)
 
+    if compound.reaction:
+        _add_reaction_loadings_line(document, compound, style_config)
+
     if compound.h1_nmr:
         _add_nmr_line(document, "1H NMR", compound.h1_nmr, compound.h1_conditions, style_config)
     if compound.c13_nmr:
@@ -230,6 +234,22 @@ def _add_ir_line(document: Document, text: str, style_config: dict[str, Any]) ->
     run = paragraph.add_run("): ")
     apply_run_style(run, style_config, "ir.label")
     paragraph.add_run(text.strip())
+
+
+def _add_reaction_loadings_line(document: Document, compound: Compound, style_config: dict[str, Any]) -> None:
+    block = compound.reaction
+    if not block.get("formatted_text"):
+        block = calculate_reaction_loadings(block)
+        compound.reaction = block
+    text = str(block.get("formatted_text", "")).strip()
+    if not text:
+        return
+    paragraph = document.add_paragraph()
+    paragraph.paragraph_format.space_after = Pt(0)
+    apply_paragraph_style(paragraph, style_config, "compound.summary")
+    label = paragraph.add_run("Reaction loadings: ")
+    label.bold = True
+    paragraph.add_run(text.rstrip(".") + ".")
 
 
 def _add_hrms_line(document: Document, compound: Compound, style_config: dict[str, Any]) -> None:
