@@ -67,6 +67,7 @@ class GenerateWorkflowTests(unittest.TestCase):
             self.assertEqual(run_summary["output_paths"]["support_docx"], str(output_path))
             self.assertEqual(run_summary["artifacts"]["manifest"], str(manifest_path))
             self.assertEqual(run_summary["issue_counts"]["warning"], len(state["issues"]))
+            self.assertGreater(run_summary["compounds"][0]["issue_count"], 0)
             text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
             self.assertIn("Methyl (E)-3-(2-(bromomethyl)phenyl)acrylate", text)
             self.assertNotIn("Compound 2a", text)

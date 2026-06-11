@@ -14,7 +14,7 @@ def validate_input_node(state: GenerateSIState) -> dict:
     issues: list[Issue] = list(state.get("issues", []))
     for warning in warnings:
         print(f"[Input warning] {warning}", flush=True)
-        issues.append({"code": "INPUT_WARNING", "severity": "warning", "message": warning})
+        issues.append(_input_warning_issue(warning, state))
     result = {"issues": issues}
     if warnings:
         log_path = request.output_dir / "logs" / "input_warnings.txt"
@@ -22,6 +22,24 @@ def validate_input_node(state: GenerateSIState) -> dict:
         log_path.write_text("\n".join(warnings) + "\n", encoding="utf-8")
         result["artifacts"] = {**state.get("artifacts", {}), "input_warnings": str(log_path)}
     return result
+
+
+def _input_warning_issue(warning: str, state: GenerateSIState) -> Issue:
+    issue: Issue = {"code": "INPUT_WARNING", "severity": "warning", "message": warning}
+    compound_id = _compound_id_from_warning(warning, state)
+    if compound_id:
+        issue["compound_id"] = compound_id
+    return issue
+
+
+def _compound_id_from_warning(warning: str, state: GenerateSIState) -> str:
+    label = warning.split(":", 1)[0].strip()
+    if not label or label == warning:
+        return ""
+    for compound_id, compound in state.get("compounds", {}).items():
+        if compound.number == label:
+            return compound_id
+    return ""
 
 
 def _reference_warnings(compounds, state: GenerateSIState) -> list[str]:

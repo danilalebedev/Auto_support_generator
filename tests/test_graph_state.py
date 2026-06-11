@@ -174,6 +174,9 @@ class GraphStateTests(unittest.TestCase):
             text = warning_path.read_text(encoding="utf-8")
 
         self.assertTrue(any(issue["code"] == "INPUT_WARNING" for issue in result["issues"]))
+        self.assertTrue(
+            any(issue["code"] == "INPUT_WARNING" and issue.get("compound_id") == "cmp_001" for issue in result["issues"])
+        )
         self.assertIn("2a: missing generated/name field", text)
 
     def test_support_validation_writes_warning_artifact_and_issues(self) -> None:
