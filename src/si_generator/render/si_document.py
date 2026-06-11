@@ -12,10 +12,15 @@ DocumentBlockKind = Literal[
 
 class DocumentBlock(TypedDict, total=False):
     kind: DocumentBlockKind
+    block_id: str
     compound_id: str
+    display_number: str
+    title_text: str
     content: Any
+    structure_placeholder: str
     nucleus: str
     image_path: str
+    expected_artifact_path: str
 
 
 class SISection(TypedDict, total=False):
