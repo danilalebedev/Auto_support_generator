@@ -10,11 +10,11 @@ from ..state import GenerateSIState
 def write_manifest_node(state: GenerateSIState) -> dict:
     output_path = Path(state["output_path"])
     manifest_path = output_path.with_suffix(".manifest.json")
-    artifacts = {**state.get("artifacts", {}), "manifest": str(manifest_path)}
-    manifest = build_manifest({**state, "artifacts": artifacts})
+    state_with_manifest = {**state, "artifacts": {**state.get("artifacts", {}), "manifest": str(manifest_path)}}
+    manifest = build_manifest(state_with_manifest)
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    return {"manifest": manifest, "artifacts": artifacts}
+    return {"manifest": manifest, "artifacts": manifest["artifacts"]}
 
 
 def build_manifest(state: GenerateSIState) -> dict:
@@ -22,6 +22,7 @@ def build_manifest(state: GenerateSIState) -> dict:
     compounds = state.get("compounds", {})
     order = list(state.get("order", []))
     output_path = Path(state["output_path"])
+    artifacts = collect_output_artifacts(state)
 
     manifest = {
         "run_id": state.get("run_id", ""),
@@ -34,17 +35,14 @@ def build_manifest(state: GenerateSIState) -> dict:
                 "references": request.references_path,
             }
         ),
-        "output_paths": {
-            "support_docx": str(output_path),
-            "manifest": str(output_path.with_suffix(".manifest.json")),
-        },
+        "output_paths": _output_paths(output_path, artifacts),
         "configs": {
             "spectra": state.get("spectra_config", {}),
             "generation": state.get("generation_config", {}),
             "runtime": state.get("runtime_config", {}),
             "journal_profile": state.get("journal_profile", {}).get("id", "default"),
         },
-        "artifacts": {key: str(path) for key, path in state.get("artifacts", {}).items()},
+        "artifacts": artifacts,
         "order": order,
         "compounds": {},
     }
@@ -64,6 +62,42 @@ def build_manifest(state: GenerateSIState) -> dict:
         }
 
     return manifest
+
+
+def collect_output_artifacts(state: GenerateSIState) -> dict[str, str]:
+    output_path = Path(state["output_path"])
+    output_dir = output_path.parent
+    artifacts = {key: str(path) for key, path in state.get("artifacts", {}).items()}
+    artifacts.setdefault("support_docx", str(output_path))
+    artifacts.setdefault("manifest", str(output_path.with_suffix(".manifest.json")))
+
+    for key, path in {
+        "processed_spectra_zip": output_dir / "processed_spectra.zip",
+        "processed_spectra_dir": output_dir / "processed_spectra",
+        "processed_mnova_dir": output_dir / "processed_mnova",
+        "mnova_reports_dir": output_dir / "mnova_reports",
+        "logs_dir": output_dir / "logs",
+    }.items():
+        if Path(path).exists():
+            artifacts[key] = str(path)
+    return artifacts
+
+
+def _output_paths(output_path: Path, artifacts: dict[str, str]) -> dict[str, str]:
+    output_paths = {
+        "support_docx": str(output_path),
+        "manifest": str(output_path.with_suffix(".manifest.json")),
+    }
+    for key in [
+        "processed_spectra_zip",
+        "processed_spectra_dir",
+        "processed_mnova_dir",
+        "mnova_reports_dir",
+        "logs_dir",
+    ]:
+        if key in artifacts:
+            output_paths[key] = artifacts[key]
+    return output_paths
 
 
 def _input_hashes(paths: dict[str, Path | None]) -> dict[str, str]:
