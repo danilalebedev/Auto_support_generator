@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from si_generator.graph.compound_store import make_compound_store
-from si_generator.graph.nodes.packaging import build_manifest, collect_output_artifacts
+from si_generator.graph.nodes.packaging import build_manifest, build_run_summary, collect_output_artifacts
 from si_generator.graph.state import GenerateSIRequest
 from si_generator.domain.bookmarks import bookmark_name_for_block_id
 from si_generator.models import Compound
@@ -44,10 +44,12 @@ class PackagingTests(unittest.TestCase):
                 "generation_config": {"check_support": False},
                 "runtime_config": {"dry_run": False},
                 "journal_profile": {"id": "default"},
+                "issues": [{"code": "INPUT_WARNING", "severity": "warning", "message": "2a: missing HRMS", "compound_id": "cmp_001"}],
             }
 
             artifacts = collect_output_artifacts(state)
             manifest = build_manifest(state)
+            run_summary = build_run_summary(state, manifest)
 
         self.assertIn("processed_spectra_zip", artifacts)
         self.assertIn("processed_spectra_dir", artifacts)
@@ -56,6 +58,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("logs_dir", artifacts)
         self.assertEqual(manifest["output_paths"]["processed_spectra_zip"], artifacts["processed_spectra_zip"])
         self.assertEqual(manifest["output_paths"]["logs_dir"], artifacts["logs_dir"])
+        self.assertEqual(manifest["output_paths"]["run_summary"], str(output_path.with_suffix(".run_summary.json")))
         self.assertEqual(manifest["artifacts"]["support_docx"], str(output_path))
         self.assertEqual(manifest["relative_paths"]["support_docx"], "support_information.docx")
         self.assertEqual(manifest["relative_paths"]["processed_spectra_zip"], "processed_spectra.zip")
@@ -67,6 +70,12 @@ class PackagingTests(unittest.TestCase):
             manifest["compounds"]["cmp_001"]["docx_bookmark"],
             bookmark_name_for_block_id("compound:cmp_001"),
         )
+        self.assertEqual(run_summary["status"], "completed_with_warnings")
+        self.assertEqual(run_summary["compound_count"], 1)
+        self.assertEqual(run_summary["issue_counts"]["warning"], 1)
+        self.assertEqual(run_summary["compounds"][0]["id"], "cmp_001")
+        self.assertEqual(run_summary["compounds"][0]["issue_count"], 1)
+        self.assertEqual(run_summary["output_paths"]["support_docx"], str(output_path))
 
 
 if __name__ == "__main__":

@@ -25,7 +25,8 @@ class WordAndDocxSmokeTests(unittest.TestCase):
     def test_cli_generates_docx_without_mnova(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_path = Path(tmp) / "support_information.docx"
-            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            stdout = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
                 exit_code = cli_main(
                     [
                         "--word-input",
@@ -41,6 +42,8 @@ class WordAndDocxSmokeTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertTrue(output_path.exists())
+            self.assertTrue(output_path.with_suffix(".run_summary.json").exists())
+            self.assertIn("Run summary:", stdout.getvalue())
             text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
             self.assertIn("Methyl (E)-3-(2-(bromomethyl)phenyl)acrylate", text)
             self.assertNotIn("Compound 2a", text)

@@ -45,6 +45,7 @@ class SIGeneratorApp:
         self.result_support = StringVar(value="")
         self.result_spectra = StringVar(value="")
         self.result_manifest = StringVar(value="")
+        self.result_run_summary = StringVar(value="")
         self.result_warnings = StringVar(value="")
         self.result_support_warnings = StringVar(value="")
         self.existing_manifest = StringVar(value="")
@@ -148,10 +149,11 @@ class SIGeneratorApp:
         self._result_row(results, 0, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"))
         self._result_row(results, 1, "Spectra package", self.result_spectra, lambda: self._open_result_path(self.result_spectra, "Spectra package"))
         self._result_row(results, 2, "Manifest", self.result_manifest, lambda: self._open_result_path(self.result_manifest, "Manifest"))
-        self._result_row(results, 3, "Input warnings", self.result_warnings, lambda: self._open_result_path(self.result_warnings, "Input warnings"))
+        self._result_row(results, 3, "Run summary", self.result_run_summary, lambda: self._open_result_path(self.result_run_summary, "Run summary"))
+        self._result_row(results, 4, "Input warnings", self.result_warnings, lambda: self._open_result_path(self.result_warnings, "Input warnings"))
         self._result_row(
             results,
-            4,
+            5,
             "Support warnings",
             self.result_support_warnings,
             lambda: self._open_result_path(self.result_support_warnings, "Support warnings"),
@@ -391,6 +393,8 @@ class SIGeneratorApp:
                 self._log_queue.put(f"Spectra package: {summary['processed_spectra_zip']}\n")
             if summary.get("manifest"):
                 self._log_queue.put(f"Manifest: {summary['manifest']}\n")
+            if summary.get("run_summary"):
+                self._log_queue.put(f"Run summary: {summary['run_summary']}\n")
             if summary.get("input_warnings"):
                 self._log_queue.put(f"Input warnings: {summary['input_warnings']}\n")
             if summary.get("support_warnings"):
@@ -478,6 +482,7 @@ class SIGeneratorApp:
         self.result_support.set("")
         self.result_spectra.set("")
         self.result_manifest.set("")
+        self.result_run_summary.set("")
         self.result_warnings.set("")
         self.result_support_warnings.set("")
 
@@ -485,6 +490,7 @@ class SIGeneratorApp:
         self.result_support.set(summary.get("support_docx", ""))
         self.result_spectra.set(summary.get("processed_spectra_zip", ""))
         self.result_manifest.set(summary.get("manifest", ""))
+        self.result_run_summary.set(summary.get("run_summary", ""))
         self.result_warnings.set(summary.get("input_warnings", ""))
         self.result_support_warnings.set(summary.get("support_warnings", ""))
         support_path = summary.get("support_docx")
@@ -664,6 +670,7 @@ def _build_result_summary(state: dict[str, Any]) -> dict[str, str]:
         "support_docx": str(Path(artifacts.get("support_docx", output_path)).resolve()),
         "processed_spectra_zip": _resolved_artifact(artifacts, "processed_spectra_zip"),
         "manifest": _resolved_artifact(artifacts, "manifest"),
+        "run_summary": _resolved_artifact(artifacts, "run_summary"),
         "input_warnings": _resolved_artifact(artifacts, "input_warnings"),
         "support_warnings": _resolved_artifact(artifacts, "support_warnings"),
     }

@@ -57,6 +57,7 @@ class GuiWorkflowTests(unittest.TestCase):
             output = root / "support_information.docx"
             package = root / "processed_spectra.zip"
             manifest = root / "support_information.manifest.json"
+            run_summary = root / "support_information.run_summary.json"
             warnings = root / "logs" / "input_warnings.txt"
             support_warnings = root / "logs" / "support_warnings.txt"
             state = {
@@ -70,6 +71,7 @@ class GuiWorkflowTests(unittest.TestCase):
                     "support_docx": str(output),
                     "processed_spectra_zip": str(package),
                     "manifest": str(manifest),
+                    "run_summary": str(run_summary),
                     "input_warnings": str(warnings),
                     "support_warnings": str(support_warnings),
                 },
@@ -80,6 +82,7 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(summary["support_docx"], str(output.resolve()))
         self.assertEqual(summary["processed_spectra_zip"], str(package.resolve()))
         self.assertEqual(summary["manifest"], str(manifest.resolve()))
+        self.assertEqual(summary["run_summary"], str(run_summary.resolve()))
         self.assertEqual(summary["input_warnings"], str(warnings.resolve()))
         self.assertEqual(summary["support_warnings"], str(support_warnings.resolve()))
 

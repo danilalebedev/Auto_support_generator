@@ -11,9 +11,19 @@ from ..state import GenerateSIState
 def write_manifest_node(state: GenerateSIState) -> dict:
     output_path = Path(state["output_path"])
     manifest_path = output_path.with_suffix(".manifest.json")
-    state_with_manifest = {**state, "artifacts": {**state.get("artifacts", {}), "manifest": str(manifest_path)}}
+    run_summary_path = output_path.with_suffix(".run_summary.json")
+    state_with_manifest = {
+        **state,
+        "artifacts": {
+            **state.get("artifacts", {}),
+            "manifest": str(manifest_path),
+            "run_summary": str(run_summary_path),
+        },
+    }
     manifest = build_manifest(state_with_manifest)
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    run_summary = build_run_summary(state_with_manifest, manifest)
+    run_summary_path.write_text(json.dumps(run_summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
     return {"manifest": manifest, "artifacts": manifest["artifacts"]}
 
@@ -70,6 +80,37 @@ def build_manifest(state: GenerateSIState) -> dict:
     return manifest
 
 
+def build_run_summary(state: GenerateSIState, manifest: dict | None = None) -> dict:
+    manifest = manifest or build_manifest(state)
+    issues = list(state.get("issues", []))
+    issue_counts = _issue_counts(issues)
+    compounds = state.get("compounds", {})
+    order = list(state.get("order", []))
+
+    return {
+        "run_id": state.get("run_id", ""),
+        "status": _run_status(issue_counts),
+        "compound_count": len(order),
+        "issue_counts": issue_counts,
+        "issues": issues,
+        "output_paths": manifest.get("output_paths", {}),
+        "artifacts": manifest.get("artifacts", {}),
+        "relative_paths": manifest.get("relative_paths", {}),
+        "configs": manifest.get("configs", {}),
+        "compounds": [
+            {
+                "id": compound_id,
+                "number": compounds[compound_id].number,
+                "name": compounds[compound_id].name,
+                "formula": compounds[compound_id].formula,
+                "issue_count": len(_issues_for_compound(issues, compound_id)),
+            }
+            for compound_id in order
+            if compound_id in compounds
+        ],
+    }
+
+
 def collect_output_artifacts(state: GenerateSIState) -> dict[str, str]:
     output_path = Path(state["output_path"])
     output_dir = output_path.parent
@@ -93,6 +134,7 @@ def _output_paths(output_path: Path, artifacts: dict[str, str]) -> dict[str, str
     output_paths = {
         "support_docx": str(output_path),
         "manifest": str(output_path.with_suffix(".manifest.json")),
+        "run_summary": artifacts.get("run_summary", str(output_path.with_suffix(".run_summary.json"))),
     }
     for key in [
         "processed_spectra_zip",
@@ -131,6 +173,28 @@ def _compound_artifacts(compound) -> dict[str, str]:
     if compound.mnova_path:
         artifacts["mnova"] = compound.mnova_path
     return artifacts
+
+
+def _issue_counts(issues: list[dict]) -> dict[str, int]:
+    counts = {"info": 0, "warning": 0, "error": 0}
+    for issue in issues:
+        severity = str(issue.get("severity", "warning")).lower()
+        if severity not in counts:
+            severity = "warning"
+        counts[severity] += 1
+    return counts
+
+
+def _run_status(issue_counts: dict[str, int]) -> str:
+    if issue_counts.get("error", 0):
+        return "failed"
+    if issue_counts.get("warning", 0):
+        return "completed_with_warnings"
+    return "completed"
+
+
+def _issues_for_compound(issues: list[dict], compound_id: str) -> list[dict]:
+    return [issue for issue in issues if issue.get("compound_id") == compound_id]
 
 
 def _relative_paths(base_dir: Path, paths: dict[str, str]) -> dict[str, str]:

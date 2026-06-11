@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from .domain.manifest import manifest_has_errors
 from .runtime_diagnostics import format_preflight_issues, issue_has_errors, preflight_generate_request
@@ -38,7 +39,7 @@ def _main(argv: list[str] | None = None) -> int:
     if issue_has_errors(preflight_issues):
         return 1
     result = run_generate_si(request)
-    print(f"Generated {output_path_from_state(result).resolve()}")
+    _print_generate_result(result)
     return 0
 
 
@@ -152,3 +153,18 @@ def _print_patch_result(result: dict) -> None:
         print("Patch check passed.")
     else:
         print("Patch check failed.")
+
+
+def _print_generate_result(result: dict) -> None:
+    print(f"Generated {output_path_from_state(result).resolve()}")
+    artifacts = result.get("artifacts", {})
+    for label, key in [
+        ("Spectra package", "processed_spectra_zip"),
+        ("Manifest", "manifest"),
+        ("Run summary", "run_summary"),
+        ("Input warnings", "input_warnings"),
+        ("Support warnings", "support_warnings"),
+    ]:
+        value = artifacts.get(key)
+        if value:
+            print(f"{label}: {Path(value).resolve()}")
