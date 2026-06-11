@@ -1,0 +1,48 @@
+from __future__ import annotations
+
+import unittest
+
+from si_generator.input_validation import validate_compound_inputs
+from si_generator.models import Compound
+
+
+class InputValidationTests(unittest.TestCase):
+    def test_solid_state_variants_require_melting_point(self) -> None:
+        cases = [
+            {"state": "solid", "color": ""},
+            {"state": "white solid", "color": ""},
+            {"state": "", "color": "белый порошок"},
+            {"state": "кристаллический порошок", "color": "yellow"},
+        ]
+        for case in cases:
+            with self.subTest(case=case):
+                compound = _complete_compound(**case)
+
+                warnings = validate_compound_inputs([compound])
+
+                self.assertIn("2a: state looks solid, but melting point is missing.", warnings)
+
+    def test_melting_point_suppresses_solid_state_warning(self) -> None:
+        compound = _complete_compound(state="твёрдое вещество", color="white", melting_point="168-170")
+
+        warnings = validate_compound_inputs([compound])
+
+        self.assertNotIn("2a: state looks solid, but melting point is missing.", warnings)
+
+
+def _complete_compound(*, state: str, color: str, melting_point: str = "") -> Compound:
+    return Compound(
+        number="2a",
+        name="Example compound",
+        formula="C2H6O",
+        hrms_found="47.0491",
+        color=color,
+        state=state,
+        melting_point=melting_point,
+        h1_nmr="1.23 (s, 6H)",
+        c13_nmr="58.0",
+    )
+
+
+if __name__ == "__main__":
+    unittest.main()

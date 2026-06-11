@@ -3,6 +3,17 @@ from __future__ import annotations
 from .models import Compound
 
 
+SOLID_STATE_MARKERS = (
+    "solid",
+    "powder",
+    "crystal",
+    "тверд",
+    "твёрд",
+    "порош",
+    "кристалл",
+)
+
+
 def validate_compound_inputs(compounds: list[Compound], *, require_structure: bool = False) -> list[str]:
     """Validate input rows and return non-fatal warnings.
 
@@ -39,7 +50,7 @@ def validate_compound_inputs(compounds: list[Compound], *, require_structure: bo
         if not compound.color.strip() and not compound.state.strip():
             warnings.append(f"{label}: color/state is missing; appearance line will be incomplete.")
 
-        if compound.state.strip().lower() in {"solid", "powder", "crystal", "crystals", "твердое", "порошок"}:
+        if _looks_solid(compound.state) or _looks_solid(compound.color):
             if not compound.melting_point.strip():
                 warnings.append(f"{label}: state looks solid, but melting point is missing.")
 
@@ -51,3 +62,8 @@ def validate_compound_inputs(compounds: list[Compound], *, require_structure: bo
     if errors:
         raise ValueError("Input table has blocking errors:\n" + "\n".join(f"- {item}" for item in errors))
     return warnings
+
+
+def _looks_solid(value: str) -> bool:
+    normalized = value.strip().lower().replace("ё", "е")
+    return any(marker.replace("ё", "е") in normalized for marker in SOLID_STATE_MARKERS)
