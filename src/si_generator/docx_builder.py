@@ -78,8 +78,9 @@ def _render_compound_description_blocks(document: Document, blocks: list[Documen
     for index, block in enumerate(blocks):
         if index:
             document.add_paragraph()
-        first_paragraph = _add_compound_block(document, block["content"], style_config)
-        _add_bookmark(first_paragraph, block.get("bookmark", ""))
+        first_index = len(document.paragraphs)
+        _add_compound_block(document, block["content"], style_config)
+        _add_bookmark_range(document.paragraphs[first_index], document.paragraphs[-1], block.get("bookmark", ""))
 
 
 def _render_spectra_appendix_blocks(document: Document, blocks: list[DocumentBlock], style_config: dict[str, Any]) -> None:
@@ -87,7 +88,9 @@ def _render_spectra_appendix_blocks(document: Document, blocks: list[DocumentBlo
     for index, block in enumerate(blocks):
         if index:
             document.add_page_break()
+        first_index = len(document.paragraphs)
         _add_spectrum_page(document, block, style_config)
+        _add_bookmark_range(document.paragraphs[first_index], document.paragraphs[-1], block.get("bookmark", ""))
 
 
 def _render_reference_blocks(document: Document, blocks: list[DocumentBlock], style_config: dict[str, Any]) -> None:
@@ -102,7 +105,7 @@ def _render_reference_blocks(document: Document, blocks: list[DocumentBlock], st
         paragraph = document.add_paragraph()
         paragraph.paragraph_format.space_after = Pt(0)
         apply_paragraph_style(paragraph, style_config, "references.body")
-        _add_bookmark(paragraph, block.get("bookmark", ""))
+        _add_bookmark_range(paragraph, paragraph, block.get("bookmark", ""))
         text = format_reference(content["reference"], int(content["index"]))
         paragraph.add_run(text)
 
@@ -119,7 +122,7 @@ def _configure_styles(document: Document) -> None:
         section.right_margin = Pt(42.5)
 
 
-def _add_compound_block(document: Document, compound: Compound, style_config: dict[str, Any]):
+def _add_compound_block(document: Document, compound: Compound, style_config: dict[str, Any]) -> None:
     title = document.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.LEFT
     title.paragraph_format.space_after = Pt(0)
@@ -166,7 +169,6 @@ def _add_compound_block(document: Document, compound: Compound, style_config: di
         _add_ir_line(document, compound.ir, style_config)
     if compound.nmr_check_warning:
         _add_nmr_warning(document, compound.nmr_check_warning)
-    return title
 
 
 def _add_sentence_paragraph(document: Document, text: str, style_config: dict[str, Any]):
@@ -316,7 +318,7 @@ def _add_nmr_warning(document: Document, text: str) -> None:
     run.bold = True
 
 
-def _add_bookmark(paragraph, name: str) -> None:
+def _add_bookmark_range(start_paragraph, end_paragraph, name: str) -> None:
     if not name:
         return
     bookmark_id = str(int(hashlib.sha1(name.encode("utf-8")).hexdigest()[:8], 16))
@@ -325,9 +327,9 @@ def _add_bookmark(paragraph, name: str) -> None:
     start.set(qn("w:name"), name)
     end = OxmlElement("w:bookmarkEnd")
     end.set(qn("w:id"), bookmark_id)
-    insert_at = 1 if len(paragraph._p) and paragraph._p[0].tag == qn("w:pPr") else 0
-    paragraph._p.insert(insert_at, start)
-    paragraph._p.append(end)
+    insert_at = 1 if len(start_paragraph._p) and start_paragraph._p[0].tag == qn("w:pPr") else 0
+    start_paragraph._p.insert(insert_at, start)
+    end_paragraph._p.append(end)
 
 
 def _add_spectrum_page(document: Document, block: DocumentBlock, style_config: dict[str, Any]) -> None:
@@ -337,8 +339,7 @@ def _add_spectrum_page(document: Document, block: DocumentBlock, style_config: d
     mnova_path = block.get("mnova_path", "")
     embed_mode = block.get("embed_mode", "png")
 
-    title_paragraph = _add_spectrum_compound_title(document, compound, style_config)
-    _add_bookmark(title_paragraph, block.get("bookmark", ""))
+    _add_spectrum_compound_title(document, compound, style_config)
     conditions = compound.h1_conditions if nucleus == "1H" else compound.c13_conditions
     _add_spectrum_nmr_title(document, nucleus, conditions, style_config)
 

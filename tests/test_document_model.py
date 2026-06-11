@@ -59,7 +59,7 @@ class DocumentModelTests(unittest.TestCase):
     def test_renders_docx_bookmarks_for_patch_workflow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_path = Path(tmp) / "support_information.docx"
-            compound = Compound(id="cmp_001", number="2a", name="Example compound")
+            compound = Compound(id="cmp_001", number="2a", name="Example compound", color="white", state="solid")
             model = build_si_document_model([compound])
 
             build_document_from_model(model, output_path)
@@ -70,6 +70,8 @@ class DocumentModelTests(unittest.TestCase):
 
         self.assertIn('w:bookmarkStart', document_xml)
         self.assertIn(f'w:name="{bookmark_name_for_block_id("compound:cmp_001")}"', document_xml)
+        self.assertLess(document_xml.index('w:bookmarkStart'), document_xml.index("Example compound"))
+        self.assertLess(document_xml.index("white solid."), document_xml.index('w:bookmarkEnd'))
         self.assertNotIn("asig_compound", visible_text)
 
     def test_renders_hrms_isotope_labels(self) -> None:
