@@ -9,7 +9,11 @@ from ...nmr_validation import validate_support
 def validate_input_node(state: GenerateSIState) -> dict:
     request = state["request"]
     compounds = ordered_compounds(state)
-    warnings = validate_compound_inputs(compounds, require_structure=request.input_kind == "word")
+    warnings = validate_compound_inputs(
+        compounds,
+        require_structure=request.input_kind == "word",
+        base_dir=request.input_base_dir,
+    )
     warnings.extend(_reference_warnings(compounds, state))
     issues: list[Issue] = list(state.get("issues", []))
     for warning in warnings:

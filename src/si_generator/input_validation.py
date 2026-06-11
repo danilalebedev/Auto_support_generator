@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from .chemistry import parse_formula
 from .models import Compound
 
@@ -15,7 +17,12 @@ SOLID_STATE_MARKERS = (
 )
 
 
-def validate_compound_inputs(compounds: list[Compound], *, require_structure: bool = False) -> list[str]:
+def validate_compound_inputs(
+    compounds: list[Compound],
+    *,
+    require_structure: bool = False,
+    base_dir: str | Path | None = None,
+) -> list[str]:
     """Validate input rows and return non-fatal warnings.
 
     Fatal problems raise ValueError. Optional chemistry fields are reported as
@@ -27,6 +34,7 @@ def validate_compound_inputs(compounds: list[Compound], *, require_structure: bo
     errors: list[str] = []
     warnings: list[str] = []
     seen_numbers: set[str] = set()
+    resolved_base_dir = Path(base_dir).resolve() if base_dir else None
 
     for index, compound in enumerate(compounds, start=1):
         label = compound.number.strip() or f"row {index + 1}"
@@ -62,8 +70,10 @@ def validate_compound_inputs(compounds: list[Compound], *, require_structure: bo
 
         if not compound.h1_nmr.strip() and not compound.h1_spectrum_path.strip():
             warnings.append(f"{label}: 1H NMR text/spectrum is missing.")
+        warnings.extend(_spectrum_path_warnings(label, "1H", compound.h1_spectrum_path, resolved_base_dir))
         if not compound.c13_nmr.strip() and not compound.c13_spectrum_path.strip():
             warnings.append(f"{label}: 13C NMR text/spectrum is missing.")
+        warnings.extend(_spectrum_path_warnings(label, "13C", compound.c13_spectrum_path, resolved_base_dir))
 
     if errors:
         raise ValueError("Input table has blocking errors:\n" + "\n".join(f"- {item}" for item in errors))
@@ -73,3 +83,28 @@ def validate_compound_inputs(compounds: list[Compound], *, require_structure: bo
 def _looks_solid(value: str) -> bool:
     normalized = value.strip().lower().replace("ё", "е")
     return any(marker.replace("ё", "е") in normalized for marker in SOLID_STATE_MARKERS)
+
+
+def _spectrum_path_warnings(label: str, nucleus: str, raw_path: str, base_dir: Path | None) -> list[str]:
+    raw_path = raw_path.strip().strip('"')
+    if not raw_path:
+        return []
+    path = _resolve_input_path(raw_path, base_dir)
+    if not path.exists():
+        return [f"{label}: {nucleus} spectrum path does not exist: {path}."]
+    if path.is_dir() and not _contains_bruker_fid(path):
+        return [f"{label}: {nucleus} spectrum folder does not contain a Bruker fid file: {path}."]
+    return []
+
+
+def _resolve_input_path(raw_path: str, base_dir: Path | None) -> Path:
+    path = Path(raw_path).expanduser()
+    if not path.is_absolute() and base_dir:
+        path = base_dir / path
+    return path.resolve()
+
+
+def _contains_bruker_fid(path: Path) -> bool:
+    if (path / "fid").exists():
+        return True
+    return any(child.is_file() and child.name.lower() == "fid" for child in path.rglob("fid"))
