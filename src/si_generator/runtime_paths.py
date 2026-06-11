@@ -31,10 +31,17 @@ def bundled_resource_path(
     package_file: str | Path | None = None,
     bundle_root: str | Path | None = None,
 ) -> Path:
+    relative_path = Path(relative_path)
     root = bundle_root if bundle_root is not None else getattr(sys, "_MEIPASS", None)
     if root:
         return Path(root) / relative_path
-    return app_base_dir(package_file=package_file) / relative_path
+    source_layout_path = app_base_dir(package_file=package_file) / relative_path
+    if source_layout_path.exists():
+        return source_layout_path
+    package_resource_path = Path(package_file or __file__).resolve().parent / "resources" / relative_path
+    if package_resource_path.exists():
+        return package_resource_path
+    return source_layout_path
 
 
 def examples_dir() -> Path:

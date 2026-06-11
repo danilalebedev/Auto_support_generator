@@ -35,6 +35,20 @@ class RuntimePathsTests(unittest.TestCase):
 
         self.assertEqual(path, bundle / "scripts" / "extract_nmr_report.qs")
 
+    def test_bundled_resource_path_falls_back_to_package_resources(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_file = root / "src" / "si_generator" / "runtime_paths.py"
+            resource = root / "src" / "si_generator" / "resources" / "scripts" / "extract_nmr_report.qs"
+            package_file.parent.mkdir(parents=True)
+            resource.parent.mkdir(parents=True)
+            package_file.write_text("placeholder", encoding="utf-8")
+            resource.write_text("script", encoding="utf-8")
+
+            path = bundled_resource_path("scripts/extract_nmr_report.qs", package_file=package_file)
+
+        self.assertEqual(path, resource.resolve())
+
     def test_local_app_data_paths_use_app_folder(self) -> None:
         env = {"LOCALAPPDATA": "C:/Users/test/AppData/Local"}
 

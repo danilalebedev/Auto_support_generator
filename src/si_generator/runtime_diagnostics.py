@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .external_tools import find_mnova_executable
 from .graph.state import GenerateSIRequest, Issue
+from .mnova import SCRIPT_PATH
 
 
 MnovaFinder = Callable[[str | Path | None], Path]
@@ -16,6 +17,7 @@ def preflight_generate_request(
     request: GenerateSIRequest,
     *,
     mnova_finder: MnovaFinder = find_mnova_executable,
+    mnova_script_path: str | Path = SCRIPT_PATH,
 ) -> list[Issue]:
     """Run cheap checks that catch common setup failures before a long run."""
     issues: list[Issue] = []
@@ -23,7 +25,9 @@ def preflight_generate_request(
     issues.extend(_check_output_path(request.output_path))
     if request.spectra_zip:
         issues.extend(_check_spectra_zip(request.spectra_zip))
-    issues.extend(_check_mnova(request, mnova_finder))
+    if _mnova_required(request):
+        issues.extend(_check_mnova_script(Path(mnova_script_path)))
+        issues.extend(_check_mnova(request, mnova_finder))
     return issues
 
 
@@ -94,8 +98,6 @@ def _check_spectra_zip(spectra_zip: Path) -> list[Issue]:
 
 
 def _check_mnova(request: GenerateSIRequest, mnova_finder: MnovaFinder) -> list[Issue]:
-    if not _mnova_required(request):
-        return []
     try:
         mnova_finder(request.mnova_exe)
     except (FileNotFoundError, OSError) as exc:
@@ -109,6 +111,19 @@ def _check_mnova(request: GenerateSIRequest, mnova_finder: MnovaFinder) -> list[
             )
         ]
     return []
+
+
+def _check_mnova_script(script_path: Path) -> list[Issue]:
+    if script_path.exists():
+        return []
+    return [
+        _issue(
+            "PREFLIGHT_MNOVA_SCRIPT_MISSING",
+            "error",
+            "MestReNova automation script was not found. Reinstall Auto Support Generator or use a complete application bundle.",
+            script_path,
+        )
+    ]
 
 
 def _mnova_required(request: GenerateSIRequest) -> bool:

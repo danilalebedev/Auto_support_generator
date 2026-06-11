@@ -68,6 +68,31 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(issue_has_errors(issues))
         self.assertIn("PREFLIGHT_MNOVA_NOT_FOUND", {issue["code"] for issue in issues})
 
+    def test_preflight_reports_missing_mnova_script(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_docx = root / "input.docx"
+            spectra_zip = root / "spectra.zip"
+            input_docx.write_bytes(b"placeholder")
+            with zipfile.ZipFile(spectra_zip, "w") as archive:
+                archive.writestr("2a/1H/fid", "fid")
+            request = GenerateSIRequest(
+                input_path=input_docx,
+                input_kind="word",
+                output_path=root / "support_information.docx",
+                spectra_zip=spectra_zip,
+                no_extract_nmr=False,
+            )
+
+            issues = preflight_generate_request(
+                request,
+                mnova_finder=_successful_mnova_finder,
+                mnova_script_path=root / "missing.qs",
+            )
+
+        self.assertTrue(issue_has_errors(issues))
+        self.assertIn("PREFLIGHT_MNOVA_SCRIPT_MISSING", {issue["code"] for issue in issues})
+
     def test_preflight_skips_mnova_when_extraction_is_disabled(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -98,6 +123,10 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
 def _raising_mnova_finder(path):
     raise FileNotFoundError("not found")
+
+
+def _successful_mnova_finder(path):
+    return Path("C:/Program Files/MestReNova/MestReNova.exe")
 
 
 if __name__ == "__main__":
