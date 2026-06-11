@@ -12,9 +12,9 @@ from typing import Any
 
 from .domain.manifest import manifest_has_errors
 from .domain.patching import parse_remove_list, parse_renumber_map, parse_reorder_list
+from .domain.requests import CheckSIRequest, GenerateSIRequest, PatchSIRequest
 from .domain.types import SpectrumEmbedMode
 from .external_tools import find_mnova_executable
-from .graph.state import CheckSIRequest, GenerateSIRequest, PatchSIRequest
 from .gui_settings import load_gui_settings, save_gui_settings
 from .runtime_diagnostics import format_preflight_issues, issue_has_errors, preflight_generate_request
 from .runtime_paths import default_output_path, examples_dir

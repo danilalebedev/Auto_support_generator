@@ -3,9 +3,10 @@ from __future__ import annotations
 from argparse import Namespace
 from pathlib import Path
 
+from ..domain.requests import GenerateSIRequest
 from ..domain.types import SpectrumEmbedMode
 from ..graph.graphs import build_generate_si_graph
-from ..graph.state import GenerateSIRequest, GenerateSIState, make_run_id
+from ..graph.state import GenerateSIState, make_run_id
 
 
 def make_initial_generate_state(request: GenerateSIRequest) -> GenerateSIState:

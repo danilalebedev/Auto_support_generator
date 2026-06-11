@@ -5,8 +5,9 @@ import zipfile
 from collections.abc import Callable
 from pathlib import Path
 
+from .domain.requests import GenerateSIRequest
+from .domain.types import Issue
 from .external_tools import find_mnova_executable
-from .graph.state import GenerateSIRequest, Issue
 from .mnova import SCRIPT_PATH
 
 

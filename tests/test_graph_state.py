@@ -5,6 +5,9 @@ from pathlib import Path
 import unittest
 
 from si_generator.chemistry import calc_hrms_mz
+from si_generator.domain.requests import CheckSIRequest as DomainCheckSIRequest
+from si_generator.domain.requests import GenerateSIRequest as DomainGenerateSIRequest
+from si_generator.domain.requests import PatchSIRequest as DomainPatchSIRequest
 from si_generator.domain.types import Issue as DomainIssue
 from si_generator.graph.compound_store import make_compound_store, ordered_compounds
 from si_generator.graph.nodes.hrms import calculate_hrms_node
@@ -13,7 +16,9 @@ from si_generator.graph.nodes.render import build_document_model_node
 from si_generator.graph.nodes.settings import load_settings_node
 from si_generator.graph.nodes.spectra import plan_nmr_processing_node, route_nmr_processing
 from si_generator.graph.nodes.validation import validate_input_node, validate_support_node
+from si_generator.graph.state import CheckSIRequest as GraphCheckSIRequest
 from si_generator.graph.state import GenerateSIRequest
+from si_generator.graph.state import PatchSIRequest as GraphPatchSIRequest
 from si_generator.graph.state import Issue as GraphIssue
 from si_generator.models import Compound
 from si_generator.workflows.generate_si import make_initial_generate_state
@@ -22,6 +27,11 @@ from si_generator.workflows.generate_si import make_initial_generate_state
 class GraphStateTests(unittest.TestCase):
     def test_graph_state_reexports_domain_issue_type(self) -> None:
         self.assertIs(GraphIssue, DomainIssue)
+
+    def test_graph_state_reexports_domain_request_types(self) -> None:
+        self.assertIs(GenerateSIRequest, DomainGenerateSIRequest)
+        self.assertIs(GraphCheckSIRequest, DomainCheckSIRequest)
+        self.assertIs(GraphPatchSIRequest, DomainPatchSIRequest)
 
     def test_initial_state_stores_request_artifacts_and_issues(self) -> None:
         request = GenerateSIRequest(

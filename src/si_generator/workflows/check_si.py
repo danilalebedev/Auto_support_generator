@@ -3,8 +3,9 @@ from __future__ import annotations
 from argparse import Namespace
 from pathlib import Path
 
+from ..domain.requests import CheckSIRequest
 from ..graph.graphs import build_check_si_graph
-from ..graph.state import CheckSIRequest, CheckSIState, make_run_id
+from ..graph.state import CheckSIState, make_run_id
 
 
 def make_initial_check_state(request: CheckSIRequest) -> CheckSIState:

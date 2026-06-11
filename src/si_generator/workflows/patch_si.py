@@ -4,8 +4,9 @@ from argparse import Namespace
 from pathlib import Path
 
 from ..domain.patching import parse_remove_list, parse_renumber_map, parse_reorder_list
+from ..domain.requests import PatchSIRequest
 from ..graph.graphs import build_patch_si_graph
-from ..graph.state import PatchSIRequest, PatchSIState, make_run_id
+from ..graph.state import PatchSIState, make_run_id
 
 
 def make_initial_patch_state(request: PatchSIRequest) -> PatchSIState:
