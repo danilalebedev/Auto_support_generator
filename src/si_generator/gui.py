@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import os
 import queue
-import subprocess
 import sys
 import threading
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from tkinter import BooleanVar, StringVar, Tk, filedialog, messagebox
 from tkinter import ttk
 
 from .external_tools import find_mnova_executable
-
-
-CLI_FLAG = "--si-generator-cli"
+from .graph.state import GenerateSIRequest
+from .workflows.generate_si import output_path_from_state, run_generate_si
 
 
 class SIGeneratorApp:
@@ -32,7 +31,7 @@ class SIGeneratorApp:
         self.check_support = BooleanVar(value=True)
         self.status_text = StringVar(value="Ready")
 
-        self._process: subprocess.Popen[str] | None = None
+        self._is_running = False
         self._log_queue: queue.Queue[str] = queue.Queue()
 
         self._configure_style()
@@ -185,92 +184,51 @@ class SIGeneratorApp:
         self.status_text.set("MestReNova detected")
 
     def _start_generation(self) -> None:
-        if self._process and self._process.poll() is None:
+        if self._is_running:
             messagebox.showinfo("SI Generator", "Generation is already running.")
             return
 
         try:
-            command = self._build_command()
+            request = self._build_request()
         except ValueError as exc:
             messagebox.showerror("SI Generator", str(exc))
             return
 
-        output_parent = Path(self.output_docx.get()).expanduser().resolve().parent
-        output_parent.mkdir(parents=True, exist_ok=True)
-
+        request.output_path.parent.mkdir(parents=True, exist_ok=True)
+        self._is_running = True
         self.run_button.configure(state="disabled")
         self.status_text.set("Running")
         self.progress.start(12)
-        self.log.write("\n> " + " ".join(f'"{part}"' if " " in part else part for part in command) + "\n\n")
-        thread = threading.Thread(target=self._run_command, args=(command,), daemon=True)
+        self.log.write(
+            "\n> Generate SI\n"
+            f"Input: {request.input_path}\n"
+            f"Output: {request.output_path}\n\n"
+        )
+        thread = threading.Thread(target=self._run_workflow, args=(request,), daemon=True)
         thread.start()
 
-    def _build_command(self) -> list[str]:
-        input_path = Path(self.input_path.get().strip('"')).expanduser()
-        output_docx = Path(self.output_docx.get().strip('"')).expanduser()
-        if not input_path.exists():
-            raise ValueError("Choose an existing compound table.")
-        if not output_docx.name.lower().endswith(".docx"):
-            raise ValueError("Output file must be a .docx file.")
+    def _build_request(self) -> GenerateSIRequest:
+        return _build_generate_request(
+            input_kind=self.input_kind.get(),
+            input_path_text=self.input_path.get(),
+            output_docx_text=self.output_docx.get(),
+            spectra_zip_text=self.spectra_zip.get(),
+            template_docx_text=self.template_docx.get(),
+            style_config_text=self.style_config.get(),
+            mnova_exe_text=self.mnova_exe.get(),
+            check_support=self.check_support.get(),
+        )
 
-        if getattr(sys, "frozen", False):
-            command = [sys.executable, CLI_FLAG]
-        else:
-            command = [sys.executable, "-m", "si_generator"]
-        if self.input_kind.get() == "csv":
-            command += ["--input", str(input_path)]
-        else:
-            command += ["--word-input", str(input_path)]
-        command += ["--output", str(output_docx)]
-
-        optional_files = [
-            (self.spectra_zip.get(), "--spectra-zip", "Spectra zip"),
-            (self.template_docx.get(), "--template-docx", "Template .docx"),
-            (self.style_config.get(), "--style-config", "Style config"),
-            (self.mnova_exe.get(), "--mnova-exe", "MestReNova .exe"),
-        ]
-        for raw_path, flag, label in optional_files:
-            raw_path = raw_path.strip().strip('"')
-            if not raw_path:
-                continue
-            path = Path(raw_path).expanduser()
-            if not path.exists():
-                raise ValueError(f"{label} does not exist: {path}")
-            command += [flag, str(path)]
-
-        if not self.check_support.get():
-            command.append("--no-check-support")
-
-        return command
-
-    def _run_command(self, command: list[str]) -> None:
-        env = os.environ.copy()
-        env["PYTHONIOENCODING"] = "utf-8"
-        env["PYTHONUTF8"] = "1"
-        if not getattr(sys, "frozen", False):
-            src_path = str(Path(__file__).resolve().parents[1])
-            env["PYTHONPATH"] = src_path + os.pathsep + env.get("PYTHONPATH", "")
+    def _run_workflow(self, request: GenerateSIRequest) -> None:
+        writer = _QueueWriter(self._log_queue)
         try:
-            self._process = subprocess.Popen(
-                command,
-                cwd=str(Path.cwd()),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                env=env,
-            )
-            assert self._process.stdout is not None
-            for line in self._process.stdout:
-                self._log_queue.put(line)
-            return_code = self._process.wait()
-            if return_code == 0:
-                self._log_queue.put("\nDone.\n")
-                self._log_queue.put("__RUN_SUCCEEDED__")
-            else:
-                self._log_queue.put(f"\nGeneration failed with exit code {return_code}.\n")
-                self._log_queue.put("__RUN_FAILED__")
+            with redirect_stdout(writer), redirect_stderr(writer):
+                result = run_generate_si(request)
+            self._log_queue.put(f"\nGenerated {output_path_from_state(result).resolve()}\n")
+            if result.get("artifacts", {}).get("manifest"):
+                self._log_queue.put(f"Manifest: {result['artifacts']['manifest']}\n")
+            self._log_queue.put("\nDone.\n")
+            self._log_queue.put("__RUN_SUCCEEDED__")
         except Exception as exc:
             self._log_queue.put(f"\nERROR: {exc}\n")
             self._log_queue.put("__RUN_FAILED__")
@@ -282,6 +240,7 @@ class SIGeneratorApp:
             while True:
                 item = self._log_queue.get_nowait()
                 if item == "__RUN_FINISHED__":
+                    self._is_running = False
                     self.run_button.configure(state="normal")
                     self.progress.stop()
                 elif item == "__RUN_SUCCEEDED__":
@@ -324,6 +283,64 @@ class _LogText(ttk.Frame):
 
     def clear(self) -> None:
         self.text.delete("1.0", "end")
+
+
+class _QueueWriter:
+    def __init__(self, log_queue: queue.Queue[str]) -> None:
+        self.log_queue = log_queue
+
+    def write(self, text: str) -> int:
+        if text:
+            self.log_queue.put(text)
+        return len(text)
+
+    def flush(self) -> None:
+        return None
+
+
+def _build_generate_request(
+    *,
+    input_kind: str,
+    input_path_text: str,
+    output_docx_text: str,
+    spectra_zip_text: str = "",
+    template_docx_text: str = "",
+    style_config_text: str = "",
+    mnova_exe_text: str = "",
+    check_support: bool = True,
+) -> GenerateSIRequest:
+    input_path = _required_existing_file(input_path_text, "Choose an existing compound table.")
+    output_docx = Path(output_docx_text.strip().strip('"')).expanduser()
+    if not output_docx.name.lower().endswith(".docx"):
+        raise ValueError("Output file must be a .docx file.")
+
+    return GenerateSIRequest(
+        input_path=input_path,
+        input_kind="csv" if input_kind == "csv" else "word",
+        output_path=output_docx,
+        spectra_zip=_optional_existing_file(spectra_zip_text, "Spectra zip"),
+        template_docx=_optional_existing_file(template_docx_text, "Template .docx"),
+        style_config_path=_optional_existing_file(style_config_text, "Style config"),
+        mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe"),
+        no_check_support=not check_support,
+    )
+
+
+def _required_existing_file(raw_path: str, message: str) -> Path:
+    path = Path(raw_path.strip().strip('"')).expanduser()
+    if not path.exists():
+        raise ValueError(message)
+    return path
+
+
+def _optional_existing_file(raw_path: str, label: str) -> Path | None:
+    raw_path = raw_path.strip().strip('"')
+    if not raw_path:
+        return None
+    path = Path(raw_path).expanduser()
+    if not path.exists():
+        raise ValueError(f"{label} does not exist: {path}")
+    return path
 
 
 def main() -> None:

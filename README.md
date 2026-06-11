@@ -533,7 +533,7 @@ $env:PYTHONPATH='src'
 smoke-генерацию `.docx` без запуска MestReNova, LangGraph request/state,
 маршрутизацию генерации SI, расчет HRMS перед render-этапом и запись
 `support_information.manifest.json`, а также планирование NMR render spec для
-экспорта спектров.
+экспорта спектров. GUI также проверяется как thin wrapper вокруг graph workflow.
 Новая архитектурная основа лежит в:
 
 ```text
