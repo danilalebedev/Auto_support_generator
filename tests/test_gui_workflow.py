@@ -15,7 +15,9 @@ from si_generator.gui import (
     _example_field_updates,
     _existing_result_path,
     _mousewheel_units,
+    _format_peak_threshold_percent,
     _report_overview,
+    _validated_peak_threshold_fraction,
 )
 from si_generator.graph.state import CheckSIRequest
 
@@ -37,6 +39,8 @@ class GuiWorkflowTests(unittest.TestCase):
                 spectra_zip_text=str(spectra),
                 journal_profile_text="acs",
                 references_text="",
+                peak_threshold_1h_percent_text="8",
+                peak_threshold_13c_percent_text="3,5",
                 generate_loadings=True,
                 check_support=False,
             )
@@ -46,8 +50,41 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(request.output_path, output)
         self.assertEqual(request.spectra_zip, spectra)
         self.assertEqual(request.journal_profile, "acs")
+        self.assertEqual(request.peak_threshold_fraction_1h, 0.08)
+        self.assertEqual(request.peak_threshold_fraction_13c, 0.035)
         self.assertTrue(request.generate_loadings)
         self.assertTrue(request.no_check_support)
+
+    def test_legacy_shared_peak_threshold_populates_both_nuclei(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            table = root / "input.docx"
+            output = root / "support_information.docx"
+            table.write_text("placeholder", encoding="utf-8")
+
+            request = _build_generate_request(
+                input_kind="word",
+                input_path_text=str(table),
+                output_docx_text=str(output),
+                peak_threshold_percent_text="9",
+            )
+
+        self.assertEqual(request.peak_threshold_fraction, 0.09)
+        self.assertEqual(request.peak_threshold_fraction_1h, 0.09)
+        self.assertEqual(request.peak_threshold_fraction_13c, 0.09)
+
+    def test_peak_threshold_validation_accepts_percent_fraction_and_comma(self) -> None:
+        self.assertEqual(_validated_peak_threshold_fraction("6"), 0.06)
+        self.assertEqual(_validated_peak_threshold_fraction("0.06"), 0.06)
+        self.assertEqual(_validated_peak_threshold_fraction("3,5"), 0.035)
+        self.assertEqual(_validated_peak_threshold_fraction("", 0.04), 0.04)
+        self.assertEqual(_format_peak_threshold_percent(0.04), "4")
+
+    def test_peak_threshold_validation_rejects_invalid_values(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Peak threshold must be a number"):
+            _validated_peak_threshold_fraction("abc")
+        with self.assertRaisesRegex(ValueError, "between 0 and 100"):
+            _validated_peak_threshold_fraction("120")
 
     def test_rejects_missing_input_file(self) -> None:
         with self.assertRaisesRegex(ValueError, "compound table"):

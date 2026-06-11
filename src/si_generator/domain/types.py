@@ -45,6 +45,7 @@ class SpectrumRenderSpec(TypedDict, total=False):
     nucleus: Literal["1H", "13C", "19F", "31P"]
     x_range_ppm: tuple[float, float]
     target_signal_height_fraction: float
+    peak_threshold_fraction: float
     ignore_regions_ppm: list[tuple[float, float]]
     peak_picking: PeakPickingPolicy
 
@@ -185,6 +186,9 @@ class SpectraConfig(TypedDict, total=False):
     extract_nmr: bool
     insert_spectra_as: SpectrumEmbedMode
     target_signal_height_fraction: float
+    peak_threshold_fraction: float
+    peak_threshold_fraction_1h: float
+    peak_threshold_fraction_13c: float
     solvent_suppression: bool
     ignore_regions_ppm: dict[str, list[tuple[float, float]]]
     peak_picking: PeakPickingPolicy

@@ -39,6 +39,9 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
         mnova_exe=Path(args.mnova_exe) if args.mnova_exe else None,
         no_extract_nmr=bool(args.no_extract_nmr),
         insert_spectra_as=_spectrum_embed_mode(getattr(args, "insert_spectra_as", "png")),
+        peak_threshold_fraction=_peak_threshold_arg(getattr(args, "peak_threshold", None)),
+        peak_threshold_fraction_1h=_peak_threshold_arg(getattr(args, "peak_threshold_1h", None)),
+        peak_threshold_fraction_13c=_peak_threshold_arg(getattr(args, "peak_threshold_13c", None)),
         generate_loadings=bool(getattr(args, "generate_loadings", False)),
         extract_structure_metadata=bool(args.extract_structure_metadata),
         only=tuple(item.strip() for item in (args.only or "").split(",") if item.strip()),
@@ -51,3 +54,9 @@ def _spectrum_embed_mode(value: str | None) -> SpectrumEmbedMode:
     if value in {"png", "mnova", "both", "none"}:
         return value
     return "png"
+
+
+def _peak_threshold_arg(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return value / 100 if value > 1 else value

@@ -14,6 +14,7 @@ from typing import Any
 from .domain.manifest import manifest_has_errors
 from .domain.patching import parse_remove_list, parse_renumber_map, parse_reorder_list
 from .domain.requests import CheckSIRequest, GenerateSIRequest, PatchSIRequest
+from .domain.spectra_config import DEFAULT_C13_PEAK_THRESHOLD_FRACTION, DEFAULT_H1_PEAK_THRESHOLD_FRACTION
 from .domain.types import SpectrumEmbedMode
 from .external_tools import find_mnova_executable
 from .gui_settings import load_gui_settings, save_gui_settings
@@ -43,6 +44,8 @@ class SIGeneratorApp:
         self.output_docx = StringVar(value=str(default_output_path()))
         self.input_kind = StringVar(value="word")
         self.insert_spectra_as = StringVar(value="png")
+        self.peak_threshold_1h_percent = StringVar(value=_format_peak_threshold_percent(DEFAULT_H1_PEAK_THRESHOLD_FRACTION))
+        self.peak_threshold_13c_percent = StringVar(value=_format_peak_threshold_percent(DEFAULT_C13_PEAK_THRESHOLD_FRACTION))
         self.check_support = BooleanVar(value=True)
         self.generate_loadings = BooleanVar(value=False)
         self.status_text = StringVar(value="Ready")
@@ -130,7 +133,7 @@ class SIGeneratorApp:
 
         options = ttk.LabelFrame(outer, text="Options", padding=12)
         options.grid(row=2, column=0, sticky="ew", pady=(12, 12))
-        options.columnconfigure(3, weight=1)
+        options.columnconfigure(5, weight=1)
         ttk.Checkbutton(
             options,
             text="Check support (NMR, HRMS, elemental analysis)",
@@ -144,14 +147,18 @@ class SIGeneratorApp:
             state="readonly",
             width=8,
         ).grid(row=0, column=2, sticky="w")
-        ttk.Label(options, textvariable=self.status_text, style="Status.TLabel").grid(row=0, column=3, sticky="e")
+        ttk.Label(options, textvariable=self.status_text, style="Status.TLabel").grid(row=0, column=5, sticky="e", padx=(12, 0))
         self.progress = ttk.Progressbar(options, mode="indeterminate", length=180)
-        self.progress.grid(row=0, column=4, sticky="e", padx=(12, 0))
+        self.progress.grid(row=0, column=6, sticky="e", padx=(12, 0))
         ttk.Checkbutton(
             options,
             text="Calculate reagent loadings",
             variable=self.generate_loadings,
         ).grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(options, text="1H threshold (%)").grid(row=1, column=1, sticky="e", padx=(12, 8), pady=(8, 0))
+        ttk.Entry(options, textvariable=self.peak_threshold_1h_percent, width=6).grid(row=1, column=2, sticky="w", pady=(8, 0))
+        ttk.Label(options, text="13C threshold (%)").grid(row=1, column=3, sticky="e", padx=(12, 8), pady=(8, 0))
+        ttk.Entry(options, textvariable=self.peak_threshold_13c_percent, width=6).grid(row=1, column=4, sticky="w", pady=(8, 0))
 
         results = ttk.LabelFrame(outer, text="Results", padding=12)
         results.grid(row=3, column=0, sticky="ew", pady=(0, 12))
@@ -402,6 +409,8 @@ class SIGeneratorApp:
             references_text=self.references_file.get(),
             mnova_exe_text=self.mnova_exe.get(),
             insert_spectra_as=self.insert_spectra_as.get(),
+            peak_threshold_1h_percent_text=self.peak_threshold_1h_percent.get(),
+            peak_threshold_13c_percent_text=self.peak_threshold_13c_percent.get(),
             generate_loadings=self.generate_loadings.get(),
             check_support=self.check_support.get(),
         )
@@ -545,6 +554,12 @@ class SIGeneratorApp:
             value = settings.get(key)
             if isinstance(value, str):
                 variable.set(value)
+        legacy_threshold = settings.get("peak_threshold_percent")
+        if isinstance(legacy_threshold, str):
+            if not isinstance(settings.get("peak_threshold_1h_percent"), str):
+                self.peak_threshold_1h_percent.set(legacy_threshold)
+            if not isinstance(settings.get("peak_threshold_13c_percent"), str):
+                self.peak_threshold_13c_percent.set(legacy_threshold)
         for key, variable in self._bool_settings_variables().items():
             value = settings.get(key)
             if isinstance(value, bool):
@@ -571,6 +586,8 @@ class SIGeneratorApp:
             "references_file": self.references_file,
             "mnova_exe": self.mnova_exe,
             "output_docx": self.output_docx,
+            "peak_threshold_1h_percent": self.peak_threshold_1h_percent,
+            "peak_threshold_13c_percent": self.peak_threshold_13c_percent,
             "input_kind": self.input_kind,
             "insert_spectra_as": self.insert_spectra_as,
             "existing_manifest": self.existing_manifest,
@@ -684,6 +701,9 @@ def _build_generate_request(
     references_text: str = "",
     mnova_exe_text: str = "",
     insert_spectra_as: str = "png",
+    peak_threshold_percent_text: str = "",
+    peak_threshold_1h_percent_text: str = "",
+    peak_threshold_13c_percent_text: str = "",
     generate_loadings: bool = False,
     check_support: bool = True,
 ) -> GenerateSIRequest:
@@ -692,6 +712,7 @@ def _build_generate_request(
     output_docx = Path(output_docx_text.strip().strip('"')).expanduser()
     if not output_docx.name.lower().endswith(".docx"):
         raise ValueError("Output file must be a .docx file.")
+    shared_peak_threshold = _optional_peak_threshold_fraction(peak_threshold_percent_text)
 
     return GenerateSIRequest(
         input_path=input_path,
@@ -704,6 +725,15 @@ def _build_generate_request(
         references_path=_optional_existing_file(references_text, "References .yml", suffixes=(".yml", ".yaml")),
         mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe", suffixes=(".exe",)),
         insert_spectra_as=_validated_spectrum_mode(insert_spectra_as),
+        peak_threshold_fraction=shared_peak_threshold,
+        peak_threshold_fraction_1h=_validated_peak_threshold_fraction(
+            peak_threshold_1h_percent_text,
+            shared_peak_threshold if shared_peak_threshold is not None else DEFAULT_H1_PEAK_THRESHOLD_FRACTION,
+        ),
+        peak_threshold_fraction_13c=_validated_peak_threshold_fraction(
+            peak_threshold_13c_percent_text,
+            shared_peak_threshold if shared_peak_threshold is not None else DEFAULT_C13_PEAK_THRESHOLD_FRACTION,
+        ),
         generate_loadings=generate_loadings,
         no_check_support=not check_support,
     )
@@ -929,6 +959,31 @@ def _validated_spectrum_mode(value: str) -> SpectrumEmbedMode:
     if value in {"png", "mnova", "both", "none"}:
         return value
     return "png"
+
+
+def _optional_peak_threshold_fraction(raw_value: str) -> float | None:
+    raw_value = str(raw_value).strip()
+    if not raw_value:
+        return None
+    return _validated_peak_threshold_fraction(raw_value, DEFAULT_H1_PEAK_THRESHOLD_FRACTION)
+
+
+def _validated_peak_threshold_fraction(raw_value: str, default: float = DEFAULT_H1_PEAK_THRESHOLD_FRACTION) -> float:
+    raw_value = str(raw_value).strip().replace(",", ".")
+    if not raw_value:
+        return default
+    try:
+        value = float(raw_value)
+    except ValueError as exc:
+        raise ValueError("Peak threshold must be a number, for example 6 or 0.06.") from exc
+    fraction = value / 100 if value > 1 else value
+    if fraction < 0 or fraction > 1:
+        raise ValueError("Peak threshold must be between 0 and 100%.")
+    return fraction
+
+
+def _format_peak_threshold_percent(fraction: float) -> str:
+    return f"{fraction * 100:g}"
 
 
 def main() -> None:

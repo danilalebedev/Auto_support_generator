@@ -95,7 +95,25 @@ def _build_parser() -> argparse.ArgumentParser:
         "--insert-spectra-as",
         choices=["png", "mnova", "both", "none"],
         default="png",
-        help="How to place processed spectra in the appendix: PNG images, Mnova placeholders, both, or no appendix.",
+        help="How to place processed spectra in the appendix: PNG images, Mnova OLE objects, both, or no appendix.",
+    )
+    parser.add_argument(
+        "--peak-threshold",
+        type=float,
+        default=None,
+        help="Shared peak picking threshold. Use 6 or 0.06 for 6%% of the highest non-solvent peak.",
+    )
+    parser.add_argument(
+        "--peak-threshold-1h",
+        type=float,
+        default=None,
+        help="1H peak picking threshold. Use 6 or 0.06 for 6%%. Overrides --peak-threshold.",
+    )
+    parser.add_argument(
+        "--peak-threshold-13c",
+        type=float,
+        default=None,
+        help="13C peak picking threshold. Use 4 or 0.04 for 4%%. Overrides --peak-threshold.",
     )
     parser.add_argument(
         "--generate-loadings",

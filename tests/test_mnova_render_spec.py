@@ -19,6 +19,7 @@ class MnovaRenderSpecTests(unittest.TestCase):
             "nucleus": "1H",
             "x_range_ppm": (-1.0, 12.0),
             "target_signal_height_fraction": 0.72,
+            "peak_threshold_fraction": 0.08,
             "ignore_regions_ppm": [(7.20, 7.35)],
             "peak_picking": "minimal",
         }
@@ -36,6 +37,7 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertEqual(len(parts), 6)
         parsed = json.loads(parts[5])
         self.assertEqual(parsed["target_signal_height_fraction"], 0.72)
+        self.assertEqual(parsed["peak_threshold_fraction"], 0.08)
         self.assertEqual(parsed["ignore_regions_ppm"], [[7.2, 7.35]])
         self.assertEqual(parsed["peak_picking"], "minimal")
 
@@ -51,6 +53,8 @@ class MnovaRenderSpecTests(unittest.TestCase):
             "order": order,
             "spectra_config": {
                 "target_signal_height_fraction": 0.7,
+                "peak_threshold_fraction_1h": 0.075,
+                "peak_threshold_fraction_13c": 0.04,
                 "peak_picking": "dense",
                 "ignore_regions_ppm": {"1H": [(7.2, 7.4)], "13C": [(76.0, 78.2)]},
             },
@@ -61,8 +65,10 @@ class MnovaRenderSpecTests(unittest.TestCase):
         h1 = result["spectra_plan"]["cmp_001"]["1H"]
         c13 = result["spectra_plan"]["cmp_001"]["13C"]
         self.assertEqual(h1["target_signal_height_fraction"], 0.7)
+        self.assertEqual(h1["peak_threshold_fraction"], 0.075)
         self.assertEqual(h1["peak_picking"], "dense")
         self.assertEqual(h1["ignore_regions_ppm"], [(7.2, 7.4)])
+        self.assertEqual(c13["peak_threshold_fraction"], 0.04)
         self.assertEqual(c13["ignore_regions_ppm"], [(76.0, 78.2)])
 
     def test_mnova_qs_consumes_render_spec_column(self) -> None:
@@ -72,6 +78,7 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertIn("x_range_ppm", script)
         self.assertIn("_targetSignalHeightFraction(renderSpec", script)
         self.assertIn("_peakThresholdFraction(nucleus, renderSpec", script)
+        self.assertIn("_filterMultipletReportByPeakThreshold", script)
         self.assertIn("_isIgnoredByRenderSpec(delta, renderSpec", script)
         self.assertIn("_prepareSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {})", script)
 

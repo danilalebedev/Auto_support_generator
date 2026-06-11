@@ -66,6 +66,8 @@ class GraphStateTests(unittest.TestCase):
             mnova_exe=Path("C:/Tools/MestReNova.exe"),
             no_extract_nmr=True,
             no_check_support=True,
+            peak_threshold_fraction_1h=0.08,
+            peak_threshold_fraction_13c=0.04,
         )
 
         result = load_settings_node({"request": request})
@@ -73,6 +75,8 @@ class GraphStateTests(unittest.TestCase):
         self.assertFalse(result["spectra_config"]["extract_nmr"])
         self.assertEqual(result["spectra_config"]["insert_spectra_as"], "png")
         self.assertEqual(result["spectra_config"]["target_signal_height_fraction"], 0.80)
+        self.assertEqual(result["spectra_config"]["peak_threshold_fraction_1h"], 0.08)
+        self.assertEqual(result["spectra_config"]["peak_threshold_fraction_13c"], 0.04)
         self.assertEqual(result["spectra_config"]["mnova_executable_path"], "C:\\Tools\\MestReNova.exe")
         self.assertFalse(result["generation_config"]["check_support"])
         self.assertTrue(result["generation_config"]["include_ir"])

@@ -85,6 +85,16 @@ function _targetSignalHeightFraction(renderSpec)
 
 function _peakThresholdFraction(nucleus, renderSpec)
 {
+    var explicitValue = renderSpec && renderSpec.peak_threshold_fraction !== undefined ? Number(renderSpec.peak_threshold_fraction) : NaN;
+    if (!isNaN(explicitValue)) {
+        if (explicitValue < 0) {
+            return 0;
+        }
+        if (explicitValue > 1) {
+            return 1;
+        }
+        return explicitValue;
+    }
     var policy = renderSpec && renderSpec.peak_picking ? String(renderSpec.peak_picking) : "normal";
     if (policy === "manual") {
         return 0;
@@ -118,7 +128,7 @@ function _isIgnoredByRenderSpec(delta, renderSpec)
     return false;
 }
 
-function _plainMultipletReport(spectrum, nucleus)
+function _plainMultipletReport(spectrum, nucleus, renderSpec)
 {
     var reporter = MultipletReporter.getReporterByName("J. Am. Chem. Soc.");
     if (reporter === undefined) {
@@ -138,7 +148,138 @@ function _plainMultipletReport(spectrum, nucleus)
     reporter.deltaPrecision = nucleus === "13C" ? 1 : 2;
     reporter.jPrecision = 1;
 
-    return reporter.report(spectrum, false);
+    return _filterMultipletReportByPeakThreshold(reporter.report(spectrum, false), spectrum, nucleus, renderSpec || {});
+}
+
+function _filterMultipletReportByPeakThreshold(report, spectrum, nucleus, renderSpec)
+{
+    var thresholdFraction = _peakThresholdFraction(nucleus, renderSpec || {});
+    var bodyStart, header, body, trailingPeriod, segments, kept, peaks, maxIntensity, threshold, i, segment, bounds;
+
+    if (!report || thresholdFraction <= 0) {
+        return report;
+    }
+
+    peaks = _thresholdPeakData(spectrum, nucleus, renderSpec || {});
+    maxIntensity = peaks.maxIntensity;
+    if (maxIntensity <= 0) {
+        return report;
+    }
+    threshold = maxIntensity * thresholdFraction;
+
+    bodyStart = report.indexOf("\u03b4");
+    if (bodyStart < 0) {
+        return report;
+    }
+
+    header = report.substring(0, bodyStart + 1);
+    body = report.substring(bodyStart + 1).replace(/^\s*=?\s*/, "");
+    trailingPeriod = /\.\s*$/.test(body);
+    body = body.replace(/\.\s*$/, "");
+    segments = _splitSignalSegments(body);
+    kept = [];
+
+    for (i = 0; i < segments.length; i++) {
+        segment = _trim(segments[i]);
+        if (!segment) {
+            continue;
+        }
+        bounds = _signalBounds(segment, nucleus);
+        if (!bounds || _hasPeakAboveThreshold(peaks.values, bounds[0], bounds[1], threshold)) {
+            kept.push(segment);
+        }
+    }
+
+    if (!kept.length) {
+        return report;
+    }
+    return header + " " + kept.join(", ") + (trailingPeriod ? "." : "");
+}
+
+function _thresholdPeakData(spectrum, nucleus, renderSpec)
+{
+    var peaks, peak, i, values, delta, intensity, maxIntensity;
+    values = [];
+    maxIntensity = 0;
+
+    try {
+        peaks = new Peaks(spectrum.peaks());
+        if (!peaks || !peaks.count) {
+            peaks = new Peaks(spectrum, _visibleRegion(nucleus, renderSpec || {}));
+        }
+        for (i = 0; i < peaks.count; i++) {
+            peak = peaks.at(i);
+            delta = peak.delta();
+            if (_isIgnoredImagePeak(spectrum, nucleus, delta, renderSpec || {})) {
+                continue;
+            }
+            intensity = Math.abs(peak.intensity);
+            values.push({delta: delta, intensity: intensity});
+            if (intensity > maxIntensity) {
+                maxIntensity = intensity;
+            }
+        }
+    } catch (e) {
+    }
+
+    return {values: values, maxIntensity: maxIntensity};
+}
+
+function _hasPeakAboveThreshold(peaks, left, right, threshold)
+{
+    var i, peak;
+    for (i = 0; i < peaks.length; i++) {
+        peak = peaks[i];
+        if (peak.delta >= left && peak.delta <= right && peak.intensity >= threshold) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function _signalBounds(segment, nucleus)
+{
+    var match, a, b, tolerance;
+    match = segment.match(/^\s*(-?\d+(?:\.\d+)?)\s*(?:[-\u2013]\s*(-?\d+(?:\.\d+)?))?/);
+    if (!match) {
+        return null;
+    }
+    a = Number(match[1]);
+    b = match[2] !== undefined ? Number(match[2]) : a;
+    if (isNaN(a) || isNaN(b)) {
+        return null;
+    }
+    tolerance = nucleus === "13C" ? 0.18 : 0.04;
+    return [Math.min(a, b) - tolerance, Math.max(a, b) + tolerance];
+}
+
+function _splitSignalSegments(body)
+{
+    var result, current, depth, i, ch;
+    result = [];
+    current = "";
+    depth = 0;
+    for (i = 0; i < body.length; i++) {
+        ch = body.charAt(i);
+        if (ch === "(") {
+            depth++;
+        } else if (ch === ")" && depth > 0) {
+            depth--;
+        }
+        if (ch === "," && depth === 0) {
+            result.push(current);
+            current = "";
+        } else {
+            current += ch;
+        }
+    }
+    result.push(current);
+    return result;
+}
+
+function _trim(value)
+{
+    return String(value).replace(/^\s+|\s+$/g, "");
 }
 
 function _referenceValue(spectrum, nucleus)
@@ -357,7 +498,7 @@ function _fitVerticalScaleForImage(spectrum, nucleus, renderSpec)
 
 function _plainPeakReport(spectrum, nucleus, renderSpec)
 {
-    var peaks, peak, i, delta, values, solvent, frequency, header, precision, range;
+    var peaks, peak, i, delta, values, solvent, frequency, header, precision, range, intensity, maxIntensity, threshold;
     range = _xRange(nucleus, renderSpec || {});
     var minDelta = range[0];
     var maxDelta = range[1];
@@ -371,6 +512,7 @@ function _plainPeakReport(spectrum, nucleus, renderSpec)
     peaks.sort(false);
 
     values = [];
+    maxIntensity = 0;
     precision = nucleus === "13C" ? 1 : 2;
     for (i = 0; i < peaks.count; i++) {
         peak = peaks.at(i);
@@ -379,6 +521,24 @@ function _plainPeakReport(spectrum, nucleus, renderSpec)
             continue;
         }
         if (delta < minDelta || delta > maxDelta || _isIgnoredByRenderSpec(delta, renderSpec || {})) {
+            continue;
+        }
+        intensity = Math.abs(peak.intensity);
+        if (intensity > maxIntensity) {
+            maxIntensity = intensity;
+        }
+    }
+    threshold = maxIntensity * _peakThresholdFraction(nucleus, renderSpec || {});
+    for (i = 0; i < peaks.count; i++) {
+        peak = peaks.at(i);
+        delta = peak.delta();
+        if (nucleus === "13C" && (Math.abs(delta - solventReference) <= solventTolerance || (delta >= 76.0 && delta <= 78.2))) {
+            continue;
+        }
+        if (delta < minDelta || delta > maxDelta || _isIgnoredByRenderSpec(delta, renderSpec || {})) {
+            continue;
+        }
+        if (threshold > 0 && Math.abs(peak.intensity) < threshold) {
             continue;
         }
         values.push(delta.toFixed(precision));
@@ -454,7 +614,7 @@ function _spectrumReport(spectrum, nucleus, renderSpec)
     if (nucleus === "13C") {
         return _plainPeakReport(spectrum, nucleus, renderSpec || {});
     }
-    return _plainMultipletReport(spectrum, nucleus);
+    return _plainMultipletReport(spectrum, nucleus, renderSpec || {});
 }
 
 function extractSpectrumReport(inputPath, outputPath, nucleus, statusPath)

@@ -20,6 +20,9 @@ def load_settings_node(state: GenerateSIState) -> dict:
             extract_nmr=not request.no_extract_nmr,
             insert_spectra_as=request.insert_spectra_as,
             mnova_executable_path=str(request.mnova_exe) if request.mnova_exe else None,
+            peak_threshold_fraction=request.peak_threshold_fraction,
+            peak_threshold_fraction_1h=request.peak_threshold_fraction_1h,
+            peak_threshold_fraction_13c=request.peak_threshold_fraction_13c,
         ),
         "generation_config": build_generation_config(
             style_config=style_config,

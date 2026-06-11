@@ -16,6 +16,8 @@ class GuiSettingsTests(unittest.TestCase):
                     "unknown": "ignored",
                     "input_kind": "WORD",
                     "insert_spectra_as": "invalid",
+                    "peak_threshold_1h_percent": "8",
+                    "peak_threshold_13c_percent": "4",
                     "check_support": "false",
                     "generate_loadings": "yes",
                 }
@@ -24,6 +26,8 @@ class GuiSettingsTests(unittest.TestCase):
 
         self.assertEqual(settings["input_path"], "input.docx")
         self.assertEqual(settings["input_kind"], "word")
+        self.assertEqual(settings["peak_threshold_1h_percent"], "8")
+        self.assertEqual(settings["peak_threshold_13c_percent"], "4")
         self.assertNotIn("unknown", settings)
         self.assertNotIn("insert_spectra_as", settings)
         self.assertFalse(settings["check_support"])
@@ -39,6 +43,8 @@ class GuiSettingsTests(unittest.TestCase):
                     "spectra_zip": "C:/data/spectra.zip",
                     "input_kind": "csv",
                     "insert_spectra_as": "both",
+                    "peak_threshold_1h_percent": "6",
+                    "peak_threshold_13c_percent": "4",
                     "check_support": True,
                     "generate_loadings": False,
                 },
@@ -51,6 +57,8 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(loaded["spectra_zip"], "C:/data/spectra.zip")
         self.assertEqual(loaded["input_kind"], "csv")
         self.assertEqual(loaded["insert_spectra_as"], "both")
+        self.assertEqual(loaded["peak_threshold_1h_percent"], "6")
+        self.assertEqual(loaded["peak_threshold_13c_percent"], "4")
         self.assertTrue(loaded["check_support"])
         self.assertFalse(loaded["generate_loadings"])
 

@@ -23,6 +23,9 @@ class GenerateSIRequest:
     mnova_exe: Path | None = None
     no_extract_nmr: bool = False
     insert_spectra_as: SpectrumEmbedMode = "png"
+    peak_threshold_fraction: float | None = None
+    peak_threshold_fraction_1h: float | None = None
+    peak_threshold_fraction_13c: float | None = None
     generate_loadings: bool = False
     extract_structure_metadata: bool = False
     only: tuple[str, ...] = ()
