@@ -16,6 +16,7 @@ from .domain.types import SpectrumEmbedMode
 from .external_tools import find_mnova_executable
 from .graph.state import CheckSIRequest, GenerateSIRequest, PatchSIRequest
 from .gui_settings import load_gui_settings, save_gui_settings
+from .runtime_diagnostics import format_preflight_issues, issue_has_errors, preflight_generate_request
 from .workflows.check_si import run_check_si
 from .workflows.generate_si import output_path_from_state, run_generate_si
 from .workflows.patch_si import run_patch_si
@@ -276,7 +277,14 @@ class SIGeneratorApp:
             messagebox.showerror("SI Generator", str(exc))
             return
 
-        request.output_path.parent.mkdir(parents=True, exist_ok=True)
+        preflight_issues = preflight_generate_request(request)
+        if preflight_issues:
+            self.log.write("\n> Preflight checks\n" + format_preflight_issues(preflight_issues) + "\n")
+        if issue_has_errors(preflight_issues):
+            self.status_text.set("Ready")
+            messagebox.showerror("SI Generator", "Preflight checks failed. See Run Log for details.")
+            return
+
         self._save_settings()
         self._is_running = True
         self.run_button.configure(state="disabled")

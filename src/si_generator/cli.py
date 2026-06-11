@@ -4,6 +4,7 @@ import argparse
 import sys
 
 from .domain.manifest import manifest_has_errors
+from .runtime_diagnostics import format_preflight_issues, issue_has_errors, preflight_generate_request
 from .workflows.check_si import check_request_from_args, run_check_si
 from .workflows.generate_si import output_path_from_state, request_from_args, run_generate_si
 from .workflows.patch_si import patch_request_from_args, run_patch_si
@@ -30,7 +31,13 @@ def _main(argv: list[str] | None = None) -> int:
         return 1 if manifest_has_errors(result.get("issues", [])) else 0
     if not args.output:
         parser.error("--output is required unless --check-manifest or --patch-manifest is used.")
-    result = run_generate_si(request_from_args(args))
+    request = request_from_args(args)
+    preflight_issues = preflight_generate_request(request)
+    if preflight_issues:
+        print(format_preflight_issues(preflight_issues))
+    if issue_has_errors(preflight_issues):
+        return 1
+    result = run_generate_si(request)
     print(f"Generated {output_path_from_state(result).resolve()}")
     return 0
 
