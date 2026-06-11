@@ -4,13 +4,12 @@ from pathlib import Path
 
 from ..compound_store import ordered_compounds
 from ..state import GenerateSIState
+from ...domain.spectra_config import DEFAULT_PEAK_PICKING, DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION
 from ...domain.types import SpectrumRenderSpec
 from ...nmr_fill import fill_nmr_from_mnova
 from ...spectra_zip import assign_spectra_from_folder, prepare_spectra_zip
 
 
-DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION = 0.80
-DEFAULT_PEAK_PICKING = "normal"
 DEFAULT_X_RANGES = {
     "1H": (-1.0, 12.0),
     "13C": (-10.0, 210.0),
