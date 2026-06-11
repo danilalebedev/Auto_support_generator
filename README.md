@@ -532,6 +532,8 @@ MestReNova запускается автоматически.
 - делать ли цифры в формулах нижними индексами;
 - делать ли `J` в константах курсивным;
 - насколько опустить структуру под названием.
+- какие смысловые блоки включать в итоговый SI: IR, elemental analysis,
+  references, XRD.
 
 Начните с примера:
 
@@ -548,6 +550,21 @@ chem_formatting:
 ```
 
 Она делает символ `J` в константах спин-спинового взаимодействия курсивным.
+
+Пример настройки состава SI:
+
+```yaml
+generation:
+  include_ir: true
+  include_elemental_analysis: true
+  calculate_elemental_analysis: false
+  include_references: true
+  include_xrd: false
+```
+
+`include_elemental_analysis` показывает или скрывает блок elemental analysis,
+если он есть во входной таблице. `calculate_elemental_analysis: true` дополнительно
+считает теоретический elemental analysis для всех соединений по формуле.
 
 ### journal_profile.yml
 
