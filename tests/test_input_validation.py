@@ -38,6 +38,15 @@ class InputValidationTests(unittest.TestCase):
 
         self.assertTrue(any("2a: formula could not be parsed" in warning for warning in warnings))
 
+    def test_structured_hrms_found_text_suppresses_missing_warning(self) -> None:
+        compound = _complete_compound(state="oil", color="yellow")
+        compound.hrms_found = ""
+        compound.hrms = {"found_text": "47,0491"}
+
+        warnings = validate_compound_inputs([compound])
+
+        self.assertFalse(any("HRMS found value is missing" in warning for warning in warnings))
+
     def test_missing_relative_spectrum_path_is_reported(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             compound = _complete_compound(state="oil", color="yellow")

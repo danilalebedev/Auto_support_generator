@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .chemistry import parse_formula
+from .domain.massspec import hrms_found_text
 from .models import Compound
 
 
@@ -58,7 +59,7 @@ def validate_compound_inputs(
             except ValueError as exc:
                 warnings.append(f"{label}: formula could not be parsed ({exc}); HRMS and formula-based checks will be limited.")
 
-        if not compound.hrms_found.strip():
+        if not hrms_found_text(compound.hrms, compound.hrms_found):
             warnings.append(f"{label}: HRMS found value is missing; HRMS line/check will be skipped.")
 
         if not compound.color.strip() and not compound.state.strip():
