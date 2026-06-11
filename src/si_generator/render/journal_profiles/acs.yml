@@ -1,6 +1,6 @@
 id: acs
 name: ACS Supporting Information
-section_order: [compound_descriptions, spectra_appendix]
+section_order: [compound_descriptions, spectra_appendix, references]
 nmr_format_style: acs
 hrms_format_style: acs
 reference_style: acs

@@ -1,6 +1,6 @@
 id: wiley
 name: Wiley Supporting Information
-section_order: [compound_descriptions, spectra_appendix]
+section_order: [compound_descriptions, spectra_appendix, references]
 nmr_format_style: wiley
 hrms_format_style: wiley
 reference_style: wiley

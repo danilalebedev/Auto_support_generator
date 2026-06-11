@@ -11,12 +11,22 @@ from ...word_input import paste_word_structures
 
 
 def build_document_model_node(state: GenerateSIState) -> dict:
-    return {"document_model": build_si_document_model(ordered_compounds(state), state.get("journal_profile"))}
+    return {
+        "document_model": build_si_document_model(
+            ordered_compounds(state),
+            state.get("journal_profile"),
+            state.get("reference_store"),
+        )
+    }
 
 
 def render_docx_node(state: GenerateSIState) -> dict:
     request = state["request"]
-    document_model = state.get("document_model") or build_si_document_model(ordered_compounds(state), state.get("journal_profile"))
+    document_model = state.get("document_model") or build_si_document_model(
+        ordered_compounds(state),
+        state.get("journal_profile"),
+        state.get("reference_store"),
+    )
     output_path = build_document_from_model(
         document_model,
         request.output_path,

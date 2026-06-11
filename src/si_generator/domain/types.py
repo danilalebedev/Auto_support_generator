@@ -225,6 +225,7 @@ class ManifestCompound(TypedDict, total=False):
     source_row: int
     structure_placeholder: str
     docx_block_id: str
+    references: list[str]
     artifacts: dict[str, str]
 
 
@@ -243,6 +244,7 @@ class SIState(TypedDict, total=False):
     generation_config: GenerationConfig
     runtime_config: RuntimeConfig
     journal_profile: JournalProfile
+    reference_store: ReferenceStore
     input_paths: dict[str, str]
     output_paths: dict[str, str]
     artifacts: dict[str, Artifact]

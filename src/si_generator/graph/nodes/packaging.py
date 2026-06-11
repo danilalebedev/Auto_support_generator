@@ -31,6 +31,7 @@ def build_manifest(state: GenerateSIState) -> dict:
                 "spectra_zip": request.spectra_zip,
                 "template_docx": request.template_docx,
                 "style_config": request.style_config_path,
+                "references": request.references_path,
             }
         ),
         "output_paths": {
@@ -52,6 +53,7 @@ def build_manifest(state: GenerateSIState) -> dict:
             "source_row": compound.source_row,
             "structure_placeholder": f"STRUCTURE:{compound.number}",
             "docx_block_id": f"compound:{compound_id}",
+            "references": list(compound.references),
             "artifacts": _compound_artifacts(compound),
         }
 

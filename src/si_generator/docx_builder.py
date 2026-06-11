@@ -10,7 +10,9 @@ from docx.shared import RGBColor
 from docx.shared import Pt
 
 from .domain.massspec import calculate_hrms
+from .domain.references import format_reference
 from .domain.types import JournalProfile
+from .domain.types import ReferenceStore
 from .models import Compound
 from .render.document_model import build_si_document_model
 from .render.si_document import DocumentBlock, SIDocument
@@ -23,9 +25,10 @@ def build_document(
     style_config: dict[str, Any] | None = None,
     template_path: str | Path | None = None,
     journal_profile: JournalProfile | None = None,
+    reference_store: ReferenceStore | None = None,
 ) -> Path:
     return build_document_from_model(
-        build_si_document_model(compounds, journal_profile),
+        build_si_document_model(compounds, journal_profile, reference_store),
         output_path,
         style_config=style_config,
         template_path=template_path,
@@ -61,6 +64,8 @@ def _render_document_model(document: Document, document_model: SIDocument, style
             _render_compound_description_blocks(document, blocks, style_config)
         elif section.get("id") == "spectra_appendix" and blocks:
             _render_spectra_appendix_blocks(document, blocks, style_config)
+        elif section.get("id") == "references" and blocks:
+            _render_reference_blocks(document, blocks, style_config)
 
 
 def _render_compound_description_blocks(document: Document, blocks: list[DocumentBlock], style_config: dict[str, Any]) -> None:
@@ -76,6 +81,22 @@ def _render_spectra_appendix_blocks(document: Document, blocks: list[DocumentBlo
         if index:
             document.add_page_break()
         _add_spectrum_page(document, block["content"], block["nucleus"], block["image_path"], style_config)
+
+
+def _render_reference_blocks(document: Document, blocks: list[DocumentBlock], style_config: dict[str, Any]) -> None:
+    document.add_page_break()
+    title = document.add_paragraph()
+    title.paragraph_format.space_after = Pt(0)
+    apply_paragraph_style(title, style_config, "references.title")
+    run = title.add_run("References")
+    apply_run_style(run, style_config, "references.title")
+    for block in blocks:
+        content = block.get("content", {})
+        paragraph = document.add_paragraph()
+        paragraph.paragraph_format.space_after = Pt(0)
+        apply_paragraph_style(paragraph, style_config, "references.body")
+        text = format_reference(content["reference"], int(content["index"]))
+        paragraph.add_run(text)
 
 
 def _configure_styles(document: Document) -> None:
