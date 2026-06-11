@@ -5,7 +5,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
-from ..domain.types import GenerationConfig, JournalProfile, ReferenceStore, RuntimeConfig, SpectraProcessingConfig, SpectrumEmbedMode, SpectrumRenderSpec
+from ..domain.types import (
+    GenerationConfig,
+    Issue,
+    JournalProfile,
+    ReferenceStore,
+    RuntimeConfig,
+    SpectraProcessingConfig,
+    SpectrumEmbedMode,
+    SpectrumRenderSpec,
+)
 from ..domain.compound import Compound
 from ..render.si_document import SIDocument
 
@@ -58,14 +67,6 @@ class PatchSIRequest:
     output_docx: Path | None = None
     output_manifest: Path | None = None
     strict_artifacts: bool = True
-
-
-class Issue(TypedDict, total=False):
-    code: str
-    severity: Literal["info", "warning", "error"]
-    message: str
-    compound_id: str
-    path: str
 
 
 class GenerateSIState(TypedDict, total=False):

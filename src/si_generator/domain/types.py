@@ -15,6 +15,7 @@ class Issue(TypedDict, total=False):
     message: str
     compound_id: str
     path: str
+    detail: str
 
 
 class Artifact(TypedDict, total=False):
