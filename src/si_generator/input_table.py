@@ -13,6 +13,10 @@ FIELD_ALIASES = {
     "refs": "references",
     "reference_keys": "references",
     "referencekeys": "references",
+    "anal": "elemental_analysis",
+    "analysis": "elemental_analysis",
+    "ea": "elemental_analysis",
+    "elementalanalysis": "elemental_analysis",
 }
 
 
@@ -33,6 +37,8 @@ def read_compounds(path: str | Path) -> list[Compound]:
                 kwargs.setdefault("number", "")
                 kwargs.setdefault("name", "")
                 kwargs["references"] = parse_reference_keys(row.get("references", ""))
+                if "elemental_analysis" in row:
+                    kwargs["elemental_analysis"] = {"found": row.get("elemental_analysis", "")}
                 compound = Compound(**kwargs)
                 compound.source_row = row_number
                 compounds.append(compound)

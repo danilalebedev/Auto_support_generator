@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .domain.types import HRMSBlock, NMRSpectrumBlock, ReactionBlock
+from .domain.types import ElementalAnalysisBlock, HRMSBlock, NMRSpectrumBlock, ReactionBlock
 
 
 @dataclass(slots=True)
@@ -36,6 +36,7 @@ class Compound:
     mnova_path: str = ""
     extra_nmr: str = ""
     ir: str = ""
+    elemental_analysis: ElementalAnalysisBlock = field(default_factory=dict)
     reaction: ReactionBlock = field(default_factory=dict)
     references: list[str] = field(default_factory=list)
     structure_path: str = ""

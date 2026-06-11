@@ -10,6 +10,7 @@ from docx.shared import RGBColor
 from docx.shared import Pt
 
 from .chemistry import parse_formula
+from .domain.elemental_analysis import calculate_elemental_analysis_block, found_from_block
 from .domain.massspec import build_hrms_block
 from .domain.references import format_reference
 from .domain.types import JournalProfile
@@ -150,6 +151,8 @@ def _add_compound_block(document: Document, compound: Compound, style_config: di
         _add_sentence_paragraph(document, compound.extra_nmr, style_config)
     if compound.formula and compound.hrms_found:
         _add_hrms_line(document, compound, style_config)
+    if compound.elemental_analysis:
+        _add_elemental_analysis_line(document, compound, style_config)
     if compound.ir:
         _add_ir_line(document, compound.ir, style_config)
     if compound.nmr_check_warning:
@@ -247,6 +250,36 @@ def _add_hrms_line(document: Document, compound: Compound, style_config: dict[st
     paragraph.add_run(" calcd for ")
     _add_formula_runs(paragraph, str(hrms.get("ion_formula") or compound.hrms_ion_formula), style_config, hrms.get("isotope_labels", {}))
     paragraph.add_run(f" {float(hrms['calculated_mz']):.4f}. Found {float(compound.hrms_found):.4f}.")
+
+
+def _add_elemental_analysis_line(document: Document, compound: Compound, style_config: dict[str, Any]) -> None:
+    block = compound.elemental_analysis
+    if not block.get("calculated"):
+        block = calculate_elemental_analysis_block(compound.formula, found=found_from_block(block))
+        compound.elemental_analysis = block
+    calculated = block.get("calculated", {})
+    found = block.get("found", {})
+    if not calculated:
+        return
+
+    paragraph = document.add_paragraph()
+    paragraph.paragraph_format.space_after = Pt(0)
+    apply_paragraph_style(paragraph, style_config, "elemental_analysis")
+    label_run = paragraph.add_run("Anal.")
+    apply_run_style(label_run, style_config, "elemental_analysis.label")
+    body_run = paragraph.add_run(" Calcd for ")
+    apply_run_style(body_run, style_config, "elemental_analysis.body")
+    _add_formula_runs(paragraph, str(block.get("formula") or compound.formula), style_config)
+    paragraph.add_run(": ")
+    paragraph.add_run(_format_element_percentages(calculated))
+    if found:
+        paragraph.add_run(". Found: ")
+        paragraph.add_run(_format_element_percentages(found))
+    paragraph.add_run(".")
+
+
+def _format_element_percentages(values: dict[str, float]) -> str:
+    return "; ".join(f"{element}, {float(value):.2f}" for element, value in values.items())
 
 
 def _add_nmr_warning(document: Document, text: str) -> None:

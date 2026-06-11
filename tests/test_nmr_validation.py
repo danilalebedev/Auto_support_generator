@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from si_generator.models import Compound
-from si_generator.nmr_validation import count_c_from_13c_nmr, count_h_from_1h_nmr, validate_hrms
+from si_generator.nmr_validation import count_c_from_13c_nmr, count_h_from_1h_nmr, validate_elemental_analysis, validate_hrms, validate_support
 
 
 class NmrValidationTests(unittest.TestCase):
@@ -19,6 +19,48 @@ class NmrValidationTests(unittest.TestCase):
         compound = Compound(number="x", name="X", formula="C2H6O", hrms_found="999.0000")
         validate_hrms([compound])
         self.assertIn("HRMS calcd", compound.nmr_check_warning)
+
+    def test_support_validation_accepts_matching_nmr_hrms_and_elemental_analysis(self) -> None:
+        compound = Compound(
+            number="x",
+            name="X",
+            formula="C2H6O",
+            h1_nmr="δ = 3.70 (q, J = 7.0 Hz, 2H), 1.20 (t, J = 7.0 Hz, 3H), 2.00 (br s, 1H).",
+            c13_nmr="δ = 58.0, 18.0.",
+            hrms_found="47.0491",
+            hrms_adduct="[M+H]+",
+            elemental_analysis={"found": {"C": 52.10, "H": 13.20}},
+        )
+
+        validate_support([compound])
+
+        self.assertEqual(compound.nmr_check_warning, "")
+
+    def test_support_validation_warns_for_nmr_elemental_analysis_and_hrms_mismatch(self) -> None:
+        compound = Compound(
+            number="x",
+            name="X",
+            formula="C2H6O",
+            h1_nmr="δ = 3.70 (q, J = 7.0 Hz, 2H).",
+            c13_nmr="δ = 58.0.",
+            hrms_found="999.0000",
+            elemental_analysis={"found": {"C": 60.00, "H": 13.20}},
+        )
+
+        validate_support([compound])
+
+        self.assertIn("H expected 6, found 2", compound.nmr_check_warning)
+        self.assertIn("C expected 2, found 1", compound.nmr_check_warning)
+        self.assertIn("HRMS calcd", compound.nmr_check_warning)
+        self.assertIn("EA C calcd 52.14, found 60.00", compound.nmr_check_warning)
+
+    def test_elemental_analysis_validation_updates_block(self) -> None:
+        compound = Compound(number="x", name="X", formula="C17H11FN2O3", elemental_analysis={"found": "C, 66.03; H, 3.55; N, 8.92"})
+
+        validate_elemental_analysis([compound])
+
+        self.assertEqual(compound.elemental_analysis["calculated"]["C"], 65.81)
+        self.assertEqual(compound.elemental_analysis["found"]["N"], 8.92)
 
 
 if __name__ == "__main__":

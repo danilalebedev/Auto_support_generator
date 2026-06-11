@@ -104,6 +104,7 @@ class IRBlock(TypedDict, total=False):
 
 
 class ElementalAnalysisBlock(TypedDict, total=False):
+    formula: str
     calculated: dict[str, float]
     found: dict[str, float]
     formatted_text: str

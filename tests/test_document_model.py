@@ -72,6 +72,24 @@ class DocumentModelTests(unittest.TestCase):
         self.assertIn("79Br", text)
         self.assertIn("272.9921", text)
 
+    def test_renders_elemental_analysis_in_journal_format(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "support_information.docx"
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="Analysis example",
+                formula="C17H11FN2O3",
+                elemental_analysis={"found": "C, 66.03; H, 3.55; N, 8.92"},
+            )
+            model = build_si_document_model([compound])
+
+            build_document_from_model(model, output_path)
+
+            text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
+
+        self.assertIn("Anal. Calcd for C17H11FN2O3: C, 65.81; H, 3.57; N, 9.03. Found: C, 66.03; H, 3.55; N, 8.92.", text)
+
 
 if __name__ == "__main__":
     unittest.main()
