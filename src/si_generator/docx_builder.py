@@ -14,6 +14,7 @@ from docx.shared import Pt
 
 from .chemistry import parse_formula
 from .domain.elemental_analysis import calculate_elemental_analysis_block, found_from_block
+from .domain.ir import parse_ir_block
 from .domain.massspec import build_hrms_block, hrms_adduct_text, hrms_found_text, hrms_label_text
 from .domain.references import format_reference
 from .domain.reactions import calculate_reaction_loadings
@@ -224,18 +225,23 @@ def _add_nmr_line(document: Document, label: str, text: str, conditions: str, st
     _add_chem_text_runs(paragraph, text.strip(), style_config, "nmr.body")
 
 
-def _add_ir_line(document: Document, text: str, style_config: dict[str, Any]) -> None:
+def _add_ir_line(document: Document, value: Any, style_config: dict[str, Any]) -> None:
+    block = parse_ir_block(value)
+    peaks = block.get("peaks_cm1", [])
+    if not peaks:
+        return
     paragraph = document.add_paragraph()
     paragraph.paragraph_format.space_after = Pt(0)
     apply_paragraph_style(paragraph, style_config, "ir")
-    run = paragraph.add_run("IR (KBr, cm")
+    method = str(block.get("method") or "KBr")
+    run = paragraph.add_run(f"IR ({method}, cm")
     apply_run_style(run, style_config, "ir.label")
     run = paragraph.add_run("-1")
     run.font.superscript = bool(config_get(style_config, "ir.unit.superscript_minus_one", True))
     apply_run_style(run, style_config, "ir.label")
     run = paragraph.add_run("): ")
     apply_run_style(run, style_config, "ir.label")
-    paragraph.add_run(text.strip())
+    paragraph.add_run(", ".join(str(peak) for peak in peaks) + ".")
 
 
 def _add_reaction_loadings_line(document: Document, compound: Compound, style_config: dict[str, Any]) -> None:
