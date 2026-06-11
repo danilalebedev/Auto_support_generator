@@ -4,6 +4,7 @@ from ..state import GenerateSIState
 from ...domain.generation_config import build_generation_config
 from ...domain.journal_profile import load_journal_profile
 from ...domain.references import load_reference_store
+from ...domain.runtime_config import build_runtime_config
 from ...domain.spectra_config import build_spectra_config
 from ...style_config import load_style_config
 
@@ -26,10 +27,6 @@ def load_settings_node(state: GenerateSIState) -> dict:
             has_references=bool(request.references_path),
             check_support=not request.no_check_support,
         ),
-        "runtime_config": {
-            "gui": False,
-            "debug": False,
-            "dry_run": False,
-        },
+        "runtime_config": build_runtime_config(),
     }
 
