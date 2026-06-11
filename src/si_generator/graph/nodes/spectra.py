@@ -4,16 +4,10 @@ from pathlib import Path
 
 from ..compound_store import ordered_compounds
 from ..state import GenerateSIState
-from ...domain.spectra_config import DEFAULT_PEAK_PICKING, DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION
+from ...domain.spectra_config import build_spectrum_render_spec
 from ...domain.types import SpectrumRenderSpec
 from ...nmr_fill import fill_nmr_from_mnova
 from ...spectra_zip import assign_spectra_from_folder, prepare_spectra_zip
-
-
-DEFAULT_X_RANGES = {
-    "1H": (-1.0, 12.0),
-    "13C": (-10.0, 210.0),
-}
 
 
 def prepare_spectra_zip_node(state: GenerateSIState) -> dict:
@@ -34,9 +28,9 @@ def plan_nmr_processing_node(state: GenerateSIState) -> dict:
     for compound in ordered_compounds(state):
         compound_plan: dict[str, SpectrumRenderSpec] = {}
         if compound.h1_spectrum_path:
-            compound_plan["1H"] = _default_render_spec("1H", spectra_config)
+            compound_plan["1H"] = build_spectrum_render_spec("1H", spectra_config)
         if compound.c13_spectrum_path:
-            compound_plan["13C"] = _default_render_spec("13C", spectra_config)
+            compound_plan["13C"] = build_spectrum_render_spec("13C", spectra_config)
         if compound_plan:
             compound_id = compound.id or compound.number
             spectra_plan[compound_id] = compound_plan
@@ -72,17 +66,4 @@ def mnova_batch_node(state: GenerateSIState) -> dict:
         render_specs_by_compound=state.get("spectra_plan"),
     )
     return {"compounds": state.get("compounds", {})}
-
-
-def _default_render_spec(nucleus: str, spectra_config: dict) -> SpectrumRenderSpec:
-    spec: SpectrumRenderSpec = {
-        "nucleus": nucleus,
-        "x_range_ppm": DEFAULT_X_RANGES[nucleus],
-        "target_signal_height_fraction": float(spectra_config.get("target_signal_height_fraction", DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION)),
-        "peak_picking": spectra_config.get("peak_picking", DEFAULT_PEAK_PICKING),
-    }
-    ignore_regions = spectra_config.get("ignore_regions_ppm", {})
-    if isinstance(ignore_regions, dict) and nucleus in ignore_regions:
-        spec["ignore_regions_ppm"] = ignore_regions[nucleus]
-    return spec
 
