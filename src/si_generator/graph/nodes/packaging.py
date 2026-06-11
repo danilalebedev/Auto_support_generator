@@ -38,6 +38,12 @@ def build_manifest(state: GenerateSIState) -> dict:
             "support_docx": str(output_path),
             "manifest": str(output_path.with_suffix(".manifest.json")),
         },
+        "configs": {
+            "spectra": state.get("spectra_config", {}),
+            "generation": state.get("generation_config", {}),
+            "runtime": state.get("runtime_config", {}),
+            "journal_profile": state.get("journal_profile", {}).get("id", "default"),
+        },
         "artifacts": {key: str(path) for key, path in state.get("artifacts", {}).items()},
         "order": order,
         "compounds": {},

@@ -6,6 +6,7 @@ import unittest
 from si_generator.graph.compound_store import make_compound_store, ordered_compounds
 from si_generator.graph.nodes.hrms import calculate_hrms_node
 from si_generator.graph.nodes.nmr import apply_peak_picking_policy_node, parse_nmr_reports_node
+from si_generator.graph.nodes.settings import load_settings_node
 from si_generator.graph.nodes.spectra import plan_nmr_processing_node, route_nmr_processing
 from si_generator.graph.state import GenerateSIRequest
 from si_generator.models import Compound
@@ -38,6 +39,25 @@ class GraphStateTests(unittest.TestCase):
         self.assertEqual(compounds["cmp_001"].source_row, 1)
         self.assertEqual([compound.number for compound in ordered_compounds({"compounds": compounds, "order": order})], ["2a", "2b"])
 
+    def test_settings_node_builds_generation_and_runtime_configs(self) -> None:
+        request = GenerateSIRequest(
+            input_path=Path("examples/test_input.docx"),
+            input_kind="word",
+            output_path=Path("output/support_information.docx"),
+            mnova_exe=Path("C:/Tools/MestReNova.exe"),
+            no_extract_nmr=True,
+            no_check_support=True,
+        )
+
+        result = load_settings_node({"request": request})
+
+        self.assertFalse(result["spectra_config"]["extract_nmr"])
+        self.assertEqual(result["spectra_config"]["insert_spectra_as"], "png")
+        self.assertEqual(result["spectra_config"]["target_signal_height_fraction"], 0.80)
+        self.assertEqual(result["spectra_config"]["mnova_executable_path"], "C:\\Tools\\MestReNova.exe")
+        self.assertFalse(result["generation_config"]["check_support"])
+        self.assertFalse(result["runtime_config"]["dry_run"])
+
     def test_nmr_route_skips_when_disabled(self) -> None:
         request = GenerateSIRequest(
             input_path=Path("examples/test_input.docx"),
@@ -46,7 +66,10 @@ class GraphStateTests(unittest.TestCase):
             no_extract_nmr=True,
         )
 
-        self.assertEqual(route_nmr_processing({"request": request, "compounds": {}, "order": []}), "skip_mnova")
+        self.assertEqual(
+            route_nmr_processing({"request": request, "compounds": {}, "order": [], "spectra_config": {"extract_nmr": False}}),
+            "skip_mnova",
+        )
 
     def test_nmr_route_runs_when_spectra_are_assigned(self) -> None:
         request = GenerateSIRequest(
@@ -68,13 +91,24 @@ class GraphStateTests(unittest.TestCase):
         )
         compounds, order = make_compound_store([compound])
 
-        result = plan_nmr_processing_node({"compounds": compounds, "order": order})
+        result = plan_nmr_processing_node(
+            {
+                "compounds": compounds,
+                "order": order,
+                "spectra_config": {
+                    "target_signal_height_fraction": 0.65,
+                    "peak_picking": "minimal",
+                    "ignore_regions_ppm": {"1H": [(7.20, 7.30)]},
+                },
+            }
+        )
         plan = result["spectra_plan"]["cmp_001"]
 
         self.assertEqual(plan["1H"]["x_range_ppm"], (-1.0, 12.0))
         self.assertEqual(plan["13C"]["x_range_ppm"], (-10.0, 210.0))
-        self.assertEqual(plan["1H"]["target_signal_height_fraction"], 0.80)
-        self.assertEqual(plan["13C"]["peak_picking"], "normal")
+        self.assertEqual(plan["1H"]["target_signal_height_fraction"], 0.65)
+        self.assertEqual(plan["13C"]["peak_picking"], "minimal")
+        self.assertEqual(plan["1H"]["ignore_regions_ppm"], [(7.20, 7.30)])
 
     def test_hrms_node_calculates_before_rendering(self) -> None:
         request = GenerateSIRequest(

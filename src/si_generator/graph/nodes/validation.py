@@ -35,7 +35,9 @@ def _reference_warnings(compounds, state: GenerateSIState) -> list[str]:
 def validate_support_node(state: GenerateSIState) -> dict:
     request = state["request"]
     compounds = ordered_compounds(state)
-    if not request.no_check_support:
+    generation_config = state.get("generation_config", {})
+    check_support = bool(generation_config.get("check_support", not request.no_check_support))
+    if check_support:
         validate_support(compounds)
     return {"compounds": state.get("compounds", {})}
 
