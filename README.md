@@ -520,6 +520,25 @@ py -m si_generator ^
 py -m si_generator.gui
 ```
 
+## Автотесты для разработки
+
+Перед изменениями в ядре генератора удобно запускать smoke/regression tests:
+
+```powershell
+$env:PYTHONPATH='src'
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+Тесты покрывают расчет HRMS, проверку ЯМР, чтение текущего Word-примера,
+smoke-генерацию `.docx` без запуска MestReNova и конвертеры между старой
+`Compound` dataclass и новой domain-моделью. Новая архитектурная основа лежит в:
+
+```text
+src/si_generator/domain/
+src/si_generator/adapters/
+src/si_generator/graph/
+```
+
 ## Как собрать установщик
 
 Сборка установщика нужна разработчику, который хочет получить один файл
