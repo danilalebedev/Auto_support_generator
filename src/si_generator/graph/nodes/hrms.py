@@ -2,21 +2,21 @@ from __future__ import annotations
 
 from ..compound_store import ordered_compounds
 from ..state import GenerateSIState, Issue
-from ...domain.massspec import build_hrms_block
+from ...domain.massspec import build_hrms_block, hrms_adduct_text, hrms_found_text, hrms_label_text
 
 
 def calculate_hrms_node(state: GenerateSIState) -> dict:
     issues: list[Issue] = list(state.get("issues", []))
 
     for compound in ordered_compounds(state):
-        found_text = _hrms_found_text(compound)
+        found_text = hrms_found_text(compound.hrms, compound.hrms_found)
         if not compound.formula or not found_text:
             continue
         try:
             result = build_hrms_block(
                 formula=compound.formula,
-                label=str(compound.hrms.get("label") or compound.hrms_label),
-                adduct=str(compound.hrms.get("adduct") or compound.hrms_adduct),
+                label=hrms_label_text(compound.hrms, compound.hrms_label),
+                adduct=hrms_adduct_text(compound.hrms, compound.hrms_adduct),
                 found_text=found_text,
                 isotope_policy=str(compound.hrms.get("isotope_policy", "auto_halogen")),
                 isotope_labels=compound.hrms.get("isotope_labels"),
@@ -38,8 +38,3 @@ def calculate_hrms_node(state: GenerateSIState) -> dict:
         compound.hrms_ion_formula = str(result["ion_formula"])
 
     return {"compounds": state.get("compounds", {}), "issues": issues}
-
-
-def _hrms_found_text(compound) -> str:
-    value = compound.hrms_found or compound.hrms.get("found_text") or compound.hrms.get("found_mz") or ""
-    return str(value).strip()

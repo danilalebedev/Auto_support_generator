@@ -14,7 +14,7 @@ from docx.shared import Pt
 
 from .chemistry import parse_formula
 from .domain.elemental_analysis import calculate_elemental_analysis_block, found_from_block
-from .domain.massspec import build_hrms_block
+from .domain.massspec import build_hrms_block, hrms_adduct_text, hrms_found_text, hrms_label_text
 from .domain.references import format_reference
 from .domain.reactions import calculate_reaction_loadings
 from .domain.types import JournalProfile
@@ -161,7 +161,7 @@ def _add_compound_block(document: Document, compound: Compound, style_config: di
         _add_nmr_line(document, "13C{1H} NMR", compound.c13_nmr, compound.c13_conditions, style_config)
     if compound.extra_nmr:
         _add_sentence_paragraph(document, compound.extra_nmr, style_config)
-    if compound.formula and _hrms_found_text(compound):
+    if compound.formula and hrms_found_text(compound.hrms, compound.hrms_found):
         _add_hrms_line(document, compound, style_config)
     if compound.elemental_analysis:
         _add_elemental_analysis_line(document, compound, style_config)
@@ -256,12 +256,12 @@ def _add_reaction_loadings_line(document: Document, compound: Compound, style_co
 
 def _add_hrms_line(document: Document, compound: Compound, style_config: dict[str, Any]) -> None:
     hrms = compound.hrms or {}
-    found_text = _hrms_found_text(compound)
+    found_text = hrms_found_text(hrms, compound.hrms_found)
     if not hrms.get("calculated_mz") or not hrms.get("ion_formula"):
         hrms = build_hrms_block(
             formula=compound.formula,
-            label=str(hrms.get("label") or compound.hrms_label),
-            adduct=str(hrms.get("adduct") or compound.hrms_adduct),
+            label=hrms_label_text(hrms, compound.hrms_label),
+            adduct=hrms_adduct_text(hrms, compound.hrms_adduct),
             found_text=found_text,
             isotope_policy=str(hrms.get("isotope_policy", "auto_halogen")),
             isotope_labels=hrms.get("isotope_labels"),
@@ -281,11 +281,6 @@ def _add_hrms_line(document: Document, compound: Compound, style_config: dict[st
     paragraph.add_run(" calcd for ")
     _add_formula_runs(paragraph, str(hrms.get("ion_formula") or compound.hrms_ion_formula), style_config, hrms.get("isotope_labels", {}))
     paragraph.add_run(f" {float(hrms['calculated_mz']):.4f}. Found {float(found_text):.4f}.")
-
-
-def _hrms_found_text(compound: Compound) -> str:
-    value = compound.hrms_found or compound.hrms.get("found_text") or compound.hrms.get("found_mz") or ""
-    return str(value).strip()
 
 
 def _add_elemental_analysis_line(document: Document, compound: Compound, style_config: dict[str, Any]) -> None:

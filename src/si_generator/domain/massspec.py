@@ -68,6 +68,22 @@ def build_hrms_block(
     return block
 
 
+def hrms_found_text(block: HRMSBlock | None, legacy_found: str = "") -> str:
+    block = block or {}
+    value = legacy_found or block.get("found_text") or block.get("found_mz") or ""
+    return str(value).strip()
+
+
+def hrms_adduct_text(block: HRMSBlock | None, legacy_adduct: str) -> str:
+    block = block or {}
+    return str(block.get("adduct") or legacy_adduct)
+
+
+def hrms_label_text(block: HRMSBlock | None, legacy_label: str) -> str:
+    block = block or {}
+    return str(block.get("label") or legacy_label)
+
+
 def _isotope_labels_for_policy(formula: str, isotope_policy: str) -> dict[str, int]:
     if isotope_policy != "auto_halogen":
         return {}
