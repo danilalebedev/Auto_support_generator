@@ -38,7 +38,7 @@ def build_manifest(state: GenerateSIState) -> dict:
             }
         ),
         "output_paths": output_paths,
-        "relative_paths": _relative_paths(output_path.parent, output_paths),
+        "relative_paths": _relative_paths(output_path.parent, artifacts),
         "configs": {
             "spectra": state.get("spectra_config", {}),
             "generation": state.get("generation_config", {}),

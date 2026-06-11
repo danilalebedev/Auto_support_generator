@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 import unittest
 
@@ -8,6 +9,7 @@ from si_generator.graph.nodes.hrms import calculate_hrms_node
 from si_generator.graph.nodes.nmr import apply_peak_picking_policy_node, parse_nmr_reports_node
 from si_generator.graph.nodes.settings import load_settings_node
 from si_generator.graph.nodes.spectra import plan_nmr_processing_node, route_nmr_processing
+from si_generator.graph.nodes.validation import validate_input_node
 from si_generator.graph.state import GenerateSIRequest
 from si_generator.models import Compound
 from si_generator.workflows.generate_si import make_initial_generate_state
@@ -155,6 +157,24 @@ class GraphStateTests(unittest.TestCase):
         self.assertEqual(spectrum["conditions"], "CDCl3, 600 MHz")
         self.assertEqual(spectrum["signals"][0]["shift"], 8.07)
         self.assertEqual(spectrum["peak_picking"], "minimal")
+
+    def test_input_validation_writes_warning_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            request = GenerateSIRequest(
+                input_path=Path("examples/test_input.docx"),
+                input_kind="csv",
+                output_path=Path(tmp) / "support_information.docx",
+            )
+            compound = Compound(number="2a", name="Compound 2a")
+            compounds, order = make_compound_store([compound])
+
+            result = validate_input_node({"request": request, "compounds": compounds, "order": order, "issues": [], "artifacts": {}})
+
+            warning_path = Path(result["artifacts"]["input_warnings"])
+            text = warning_path.read_text(encoding="utf-8")
+
+        self.assertTrue(any(issue["code"] == "INPUT_WARNING" for issue in result["issues"]))
+        self.assertIn("2a: missing generated/name field", text)
 
 
 if __name__ == "__main__":

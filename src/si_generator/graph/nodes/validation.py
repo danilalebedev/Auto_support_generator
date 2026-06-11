@@ -15,7 +15,13 @@ def validate_input_node(state: GenerateSIState) -> dict:
     for warning in warnings:
         print(f"[Input warning] {warning}", flush=True)
         issues.append({"code": "INPUT_WARNING", "severity": "warning", "message": warning})
-    return {"issues": issues}
+    result = {"issues": issues}
+    if warnings:
+        log_path = request.output_dir / "logs" / "input_warnings.txt"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("\n".join(warnings) + "\n", encoding="utf-8")
+        result["artifacts"] = {**state.get("artifacts", {}), "input_warnings": str(log_path)}
+    return result
 
 
 def _reference_warnings(compounds, state: GenerateSIState) -> list[str]:
