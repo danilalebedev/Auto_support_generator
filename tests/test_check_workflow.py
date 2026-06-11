@@ -221,6 +221,35 @@ class CheckWorkflowTests(unittest.TestCase):
         self.assertIn("MANIFEST_MISSING_SUPPORT_DOCX", stdout.getvalue())
         self.assertIn("Check report:", stdout.getvalue())
 
+    def test_check_manifest_writes_report_for_malformed_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "support_information.manifest.json"
+            manifest_path.write_text("{", encoding="utf-8")
+
+            state = run_check_si(CheckSIRequest(manifest_path=manifest_path))
+            report_path = root / "support_information.check_report.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(state["status"], "fail")
+        self.assertEqual(Path(state["artifacts"]["check_report"]), report_path)
+        self.assertIn("MANIFEST_LOAD_FAILED", {issue["code"] for issue in state["issues"]})
+        self.assertIn("MANIFEST_LOAD_FAILED", {issue["code"] for issue in report["issues"]})
+
+    def test_cli_check_manifest_mode_returns_report_for_malformed_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest_path = root / "support_information.manifest.json"
+            manifest_path.write_text("{", encoding="utf-8")
+            stdout = StringIO()
+
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                exit_code = cli_main(["--check-manifest", str(manifest_path)])
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("MANIFEST_LOAD_FAILED", stdout.getvalue())
+        self.assertIn("Check report:", stdout.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

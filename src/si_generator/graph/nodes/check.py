@@ -11,8 +11,20 @@ from ..state import CheckSIState
 def load_manifest_node(state: CheckSIState) -> dict:
     request = state["request"]
     manifest_path = Path(request.manifest_path)
-    manifest = load_manifest(manifest_path)
     artifacts = {**state.get("artifacts", {}), "manifest": str(manifest_path)}
+    try:
+        manifest = load_manifest(manifest_path)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        issues = [
+            *state.get("issues", []),
+            {
+                "code": "MANIFEST_LOAD_FAILED",
+                "severity": "error",
+                "message": f"could not load manifest: {exc}",
+                "path": str(manifest_path),
+            },
+        ]
+        return {"manifest": {}, "artifacts": artifacts, "issues": issues}
     return {"manifest": manifest, "artifacts": artifacts}
 
 
