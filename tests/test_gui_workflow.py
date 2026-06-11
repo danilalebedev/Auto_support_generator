@@ -10,6 +10,7 @@ from si_generator.gui import (
     _build_patch_request,
     _build_patch_summary,
     _build_result_summary,
+    _existing_result_path,
 )
 
 
@@ -142,6 +143,21 @@ class GuiWorkflowTests(unittest.TestCase):
 
         self.assertEqual(summary["support_docx"], str(support.resolve()))
         self.assertEqual(summary["manifest"], str(manifest.resolve()))
+
+    def test_existing_result_path_returns_resolved_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "support_information.docx"
+            path.write_text("placeholder", encoding="utf-8")
+
+            result = _existing_result_path(str(path), "Support .docx")
+
+        self.assertEqual(result, path.resolve())
+
+    def test_existing_result_path_rejects_empty_or_missing_path(self) -> None:
+        with self.assertRaisesRegex(ValueError, "not been generated"):
+            _existing_result_path("", "Manifest")
+        with self.assertRaisesRegex(ValueError, "does not exist"):
+            _existing_result_path("missing.manifest.json", "Manifest")
 
 
 if __name__ == "__main__":

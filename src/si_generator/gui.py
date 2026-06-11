@@ -145,11 +145,17 @@ class SIGeneratorApp:
         results = ttk.LabelFrame(outer, text="Results", padding=12)
         results.grid(row=3, column=0, sticky="ew", pady=(0, 12))
         results.columnconfigure(1, weight=1)
-        self._result_row(results, 0, "Support .docx", self.result_support)
-        self._result_row(results, 1, "Spectra package", self.result_spectra)
-        self._result_row(results, 2, "Manifest", self.result_manifest)
-        self._result_row(results, 3, "Input warnings", self.result_warnings)
-        self._result_row(results, 4, "Support warnings", self.result_support_warnings)
+        self._result_row(results, 0, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"))
+        self._result_row(results, 1, "Spectra package", self.result_spectra, lambda: self._open_result_path(self.result_spectra, "Spectra package"))
+        self._result_row(results, 2, "Manifest", self.result_manifest, lambda: self._open_result_path(self.result_manifest, "Manifest"))
+        self._result_row(results, 3, "Input warnings", self.result_warnings, lambda: self._open_result_path(self.result_warnings, "Input warnings"))
+        self._result_row(
+            results,
+            4,
+            "Support warnings",
+            self.result_support_warnings,
+            lambda: self._open_result_path(self.result_support_warnings, "Support warnings"),
+        )
 
         tools = ttk.LabelFrame(outer, text="Existing SI Tools", padding=12)
         tools.grid(row=4, column=0, sticky="ew", pady=(0, 12))
@@ -203,10 +209,12 @@ class SIGeneratorApp:
             ttk.Button(button_box, text=text, command=extra_command).pack(side="left", padx=(0, 6))
         ttk.Button(button_box, text="Browse...", command=command).pack(side="left")
 
-    def _result_row(self, parent, row: int, label: str, variable: StringVar) -> None:
+    def _result_row(self, parent, row: int, label: str, variable: StringVar, open_command=None) -> None:
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=3)
         entry = ttk.Entry(parent, textvariable=variable, state="readonly")
         entry.grid(row=row, column=1, sticky="ew", pady=3)
+        if open_command:
+            ttk.Button(parent, text="Open", command=open_command, width=8).grid(row=row, column=2, sticky="e", padx=(8, 0), pady=3)
 
     def _browse_input(self) -> None:
         if self.input_kind.get() == "csv":
@@ -458,6 +466,14 @@ class SIGeneratorApp:
         folder.mkdir(parents=True, exist_ok=True)
         os.startfile(str(folder))
 
+    def _open_result_path(self, variable: StringVar, label: str) -> None:
+        try:
+            path = _existing_result_path(variable.get(), label)
+        except ValueError as exc:
+            messagebox.showinfo("Auto Support Generator", str(exc))
+            return
+        os.startfile(str(path))
+
     def _clear_results(self) -> None:
         self.result_support.set("")
         self.result_spectra.set("")
@@ -657,6 +673,16 @@ def _build_result_summary(state: dict[str, Any]) -> dict[str, str]:
 def _resolved_artifact(artifacts: dict[str, str], key: str) -> str:
     value = artifacts.get(key, "")
     return str(Path(value).resolve()) if value else ""
+
+
+def _existing_result_path(raw_path: str, label: str) -> Path:
+    raw_path = raw_path.strip().strip('"')
+    if not raw_path:
+        raise ValueError(f"{label} has not been generated yet.")
+    path = Path(raw_path).expanduser()
+    if not path.exists():
+        raise ValueError(f"{label} does not exist: {path}")
+    return path.resolve()
 
 
 def _required_existing_file(raw_path: str, message: str) -> Path:
