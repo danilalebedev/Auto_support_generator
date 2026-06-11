@@ -11,6 +11,7 @@ from .types import Issue
 
 REQUIRED_TOP_LEVEL_KEYS = ("run_id", "order", "compounds")
 REQUIRED_COMPOUND_KEYS = ("number", "docx_block_id")
+UNRESOLVED_DOCX_PLACEHOLDERS = ("[[STRUCTURE:", "[[SPECTRUM_STRUCTURE:", "[[MNOVA:")
 
 
 def load_manifest(path: str | Path) -> dict[str, Any]:
@@ -49,6 +50,7 @@ def check_manifest(
     support_docx_path = _support_docx_path(manifest, base_dir, support_docx)
     issues.extend(_check_support_docx(support_docx_path))
     if support_docx_path and support_docx_path.exists():
+        issues.extend(_check_unresolved_docx_placeholders(support_docx_path))
         issues.extend(_check_docx_bookmarks(manifest, support_docx_path))
     if strict_artifacts:
         issues.extend(_check_artifact_paths(manifest, base_dir))
@@ -193,6 +195,31 @@ def _check_docx_bookmarks(manifest: dict[str, Any], support_docx: Path) -> list[
     return issues
 
 
+def _check_unresolved_docx_placeholders(support_docx: Path) -> list[Issue]:
+    try:
+        xml = _read_docx_document_xml(support_docx).decode("utf-8", errors="ignore")
+    except (OSError, KeyError, zipfile.BadZipFile) as exc:
+        return [
+            _issue(
+                "DOCX_READ_ERROR",
+                "error",
+                f"could not read support DOCX {support_docx}: {exc}",
+                path=str(support_docx),
+            )
+        ]
+    placeholders = [token for token in UNRESOLVED_DOCX_PLACEHOLDERS if token in xml]
+    if not placeholders:
+        return []
+    return [
+        _issue(
+            "DOCX_UNRESOLVED_PLACEHOLDER",
+            "error",
+            "support DOCX still contains unresolved placeholders: " + ", ".join(placeholders),
+            path=str(support_docx),
+        )
+    ]
+
+
 def _expected_docx_bookmarks(manifest: dict[str, Any]) -> dict[str, str]:
     expected: dict[str, str] = {}
     for compound_id, compound in (manifest.get("compounds", {}) or {}).items():
@@ -203,14 +230,18 @@ def _expected_docx_bookmarks(manifest: dict[str, Any]) -> dict[str, str]:
 
 def _read_docx_bookmarks(path: Path) -> set[str]:
     namespace = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-    with zipfile.ZipFile(path) as archive:
-        xml = archive.read("word/document.xml")
+    xml = _read_docx_document_xml(path)
     root = ElementTree.fromstring(xml)
     return {
         str(element.attrib.get(namespace + "name"))
         for element in root.iter(namespace + "bookmarkStart")
         if element.attrib.get(namespace + "name")
     }
+
+
+def _read_docx_document_xml(path: Path) -> bytes:
+    with zipfile.ZipFile(path) as archive:
+        return archive.read("word/document.xml")
 
 
 def _unexpected_compound_bookmarks(actual: set[str], expected: dict[str, str]) -> set[str]:

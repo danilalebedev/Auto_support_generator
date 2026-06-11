@@ -24,7 +24,7 @@ class CheckWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             support_docx = root / "support_information.docx"
-            support_docx.write_bytes(b"docx placeholder")
+            Document().save(support_docx)
             manifest_path = root / "support_information.manifest.json"
             manifest = {
                 "run_id": "run",
@@ -70,7 +70,7 @@ class CheckWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             support_docx = root / "support_information.docx"
-            support_docx.write_bytes(b"docx placeholder")
+            Document().save(support_docx)
             manifest_path = root / "support_information.manifest.json"
             manifest = {
                 "run_id": "run",
@@ -163,11 +163,30 @@ class CheckWorkflowTests(unittest.TestCase):
         self.assertFalse(manifest_has_errors(issues))
         self.assertIn("DOCX_UNEXPECTED_COMPOUND_BOOKMARK", {issue["code"] for issue in issues})
 
+    def test_manifest_check_reports_unresolved_docx_placeholders(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            support_docx = root / "support_information.docx"
+            document = Document()
+            document.add_paragraph("[[STRUCTURE:2a]]")
+            document.save(support_docx)
+            manifest = {
+                "run_id": "run",
+                "artifacts": {"support_docx": str(support_docx)},
+                "order": [],
+                "compounds": {},
+            }
+
+            issues = check_manifest(manifest, manifest_path=root / "support_information.manifest.json")
+
+        self.assertTrue(manifest_has_errors(issues))
+        self.assertIn("DOCX_UNRESOLVED_PLACEHOLDER", {issue["code"] for issue in issues})
+
     def test_cli_check_manifest_mode_returns_zero_on_valid_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             support_docx = root / "support_information.docx"
-            support_docx.write_bytes(b"docx placeholder")
+            Document().save(support_docx)
             manifest_path = root / "support_information.manifest.json"
             manifest_path.write_text(
                 json.dumps(
