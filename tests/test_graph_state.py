@@ -5,7 +5,7 @@ import unittest
 
 from si_generator.graph.compound_store import make_compound_store, ordered_compounds
 from si_generator.graph.nodes.hrms import calculate_hrms_node
-from si_generator.graph.nodes.spectra import route_nmr_processing
+from si_generator.graph.nodes.spectra import plan_nmr_processing_node, route_nmr_processing
 from si_generator.graph.state import GenerateSIRequest
 from si_generator.models import Compound
 from si_generator.workflows.generate_si import make_initial_generate_state
@@ -57,6 +57,23 @@ class GraphStateTests(unittest.TestCase):
         compounds, order = make_compound_store([compound])
 
         self.assertEqual(route_nmr_processing({"request": request, "compounds": compounds, "order": order}), "run_mnova")
+
+    def test_nmr_plan_adds_default_render_specs(self) -> None:
+        compound = Compound(
+            number="2a",
+            name="Test compound",
+            h1_spectrum_path="2a/1H/fid",
+            c13_spectrum_path="2a/13C/fid",
+        )
+        compounds, order = make_compound_store([compound])
+
+        result = plan_nmr_processing_node({"compounds": compounds, "order": order})
+        plan = result["spectra_plan"]["cmp_001"]
+
+        self.assertEqual(plan["1H"]["x_range_ppm"], (-1.0, 12.0))
+        self.assertEqual(plan["13C"]["x_range_ppm"], (-10.0, 210.0))
+        self.assertEqual(plan["1H"]["target_signal_height_fraction"], 0.80)
+        self.assertEqual(plan["13C"]["peak_picking"], "normal")
 
     def test_hrms_node_calculates_before_rendering(self) -> None:
         request = GenerateSIRequest(
