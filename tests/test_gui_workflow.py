@@ -54,10 +54,52 @@ class GuiWorkflowTests(unittest.TestCase):
                 output_docx_text="support_information.docx",
             )
 
+    def test_rejects_directory_input_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            with self.assertRaisesRegex(ValueError, "must be a file"):
+                _build_generate_request(
+                    input_kind="word",
+                    input_path_text=str(root),
+                    output_docx_text=str(root / "support_information.docx"),
+                )
+
+    def test_rejects_wrong_optional_file_extensions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            table = root / "input.docx"
+            spectra = root / "spectra.txt"
+            table.write_text("placeholder", encoding="utf-8")
+            spectra.write_text("placeholder", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "Spectra zip must have one of these extensions"):
+                _build_generate_request(
+                    input_kind="word",
+                    input_path_text=str(table),
+                    output_docx_text=str(root / "support_information.docx"),
+                    spectra_zip_text=str(spectra),
+                )
+
+    def test_rejects_directory_mnova_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            table = root / "input.docx"
+            table.write_text("placeholder", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "MestReNova .exe must be a file"):
+                _build_generate_request(
+                    input_kind="word",
+                    input_path_text=str(table),
+                    output_docx_text=str(root / "support_information.docx"),
+                    mnova_exe_text=str(root),
+                )
+
     def test_builds_result_summary_from_graph_state_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             output = root / "support_information.docx"
+            input_docx = root / "input.docx"
             package = root / "processed_spectra.zip"
             processed_mnova = root / "processed_mnova"
             mnova_reports = root / "mnova_reports"
@@ -69,6 +111,7 @@ class GuiWorkflowTests(unittest.TestCase):
             processed_mnova.mkdir()
             mnova_reports.mkdir()
             logs.mkdir()
+            input_docx.write_text("placeholder", encoding="utf-8")
             run_summary.write_text(
                 '{"status":"completed_with_warnings","compound_count":2,"issue_counts":{"warning":3}}',
                 encoding="utf-8",
@@ -76,7 +119,7 @@ class GuiWorkflowTests(unittest.TestCase):
             state = {
                 "request": _build_generate_request(
                     input_kind="word",
-                    input_path_text=__file__,
+                    input_path_text=str(input_docx),
                     output_docx_text=str(output),
                 ),
                 "output_path": output,

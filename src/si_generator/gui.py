@@ -629,7 +629,8 @@ def _build_generate_request(
     generate_loadings: bool = False,
     check_support: bool = True,
 ) -> GenerateSIRequest:
-    input_path = _required_existing_file(input_path_text, "Choose an existing compound table.")
+    input_suffixes = (".csv",) if input_kind == "csv" else (".docx",)
+    input_path = _required_existing_file(input_path_text, "Choose an existing compound table.", suffixes=input_suffixes)
     output_docx = Path(output_docx_text.strip().strip('"')).expanduser()
     if not output_docx.name.lower().endswith(".docx"):
         raise ValueError("Output file must be a .docx file.")
@@ -638,12 +639,12 @@ def _build_generate_request(
         input_path=input_path,
         input_kind="csv" if input_kind == "csv" else "word",
         output_path=output_docx,
-        spectra_zip=_optional_existing_file(spectra_zip_text, "Spectra zip"),
-        template_docx=_optional_existing_file(template_docx_text, "Template .docx"),
-        style_config_path=_optional_existing_file(style_config_text, "Style config"),
+        spectra_zip=_optional_existing_file(spectra_zip_text, "Spectra zip", suffixes=(".zip",)),
+        template_docx=_optional_existing_file(template_docx_text, "Template .docx", suffixes=(".docx",)),
+        style_config_path=_optional_existing_file(style_config_text, "Style config", suffixes=(".yml", ".yaml")),
         journal_profile=_optional_profile(journal_profile_text),
-        references_path=_optional_existing_file(references_text, "References .yml"),
-        mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe"),
+        references_path=_optional_existing_file(references_text, "References .yml", suffixes=(".yml", ".yaml")),
+        mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe", suffixes=(".exe",)),
         insert_spectra_as=_validated_spectrum_mode(insert_spectra_as),
         generate_loadings=generate_loadings,
         no_check_support=not check_support,
@@ -651,7 +652,7 @@ def _build_generate_request(
 
 
 def _build_check_request(manifest_text: str) -> CheckSIRequest:
-    manifest_path = _required_existing_file(manifest_text, "Choose an existing manifest JSON.")
+    manifest_path = _required_existing_file(manifest_text, "Choose an existing manifest JSON.", suffixes=(".json",))
     return CheckSIRequest(manifest_path=manifest_path)
 
 
@@ -663,7 +664,7 @@ def _build_patch_request(
     reorder_text: str = "",
     output_docx_text: str = "",
 ) -> PatchSIRequest:
-    manifest_path = _required_existing_file(manifest_text, "Choose an existing manifest JSON.")
+    manifest_path = _required_existing_file(manifest_text, "Choose an existing manifest JSON.", suffixes=(".json",))
     renumber = parse_renumber_map(renumber_text) if renumber_text.strip() else {}
     remove = parse_remove_list(remove_text)
     reorder = parse_reorder_list(reorder_text)
@@ -768,21 +769,31 @@ def _existing_result_path(raw_path: str, label: str) -> Path:
     return path.resolve()
 
 
-def _required_existing_file(raw_path: str, message: str) -> Path:
+def _required_existing_file(raw_path: str, message: str, *, suffixes: tuple[str, ...] = ()) -> Path:
     path = Path(raw_path.strip().strip('"')).expanduser()
     if not path.exists():
         raise ValueError(message)
+    _validate_existing_file(path, suffixes=suffixes)
     return path
 
 
-def _optional_existing_file(raw_path: str, label: str) -> Path | None:
+def _optional_existing_file(raw_path: str, label: str, *, suffixes: tuple[str, ...] = ()) -> Path | None:
     raw_path = raw_path.strip().strip('"')
     if not raw_path:
         return None
     path = Path(raw_path).expanduser()
     if not path.exists():
         raise ValueError(f"{label} does not exist: {path}")
+    _validate_existing_file(path, label=label, suffixes=suffixes)
     return path
+
+
+def _validate_existing_file(path: Path, *, label: str = "Selected path", suffixes: tuple[str, ...] = ()) -> None:
+    if not path.is_file():
+        raise ValueError(f"{label} must be a file: {path}")
+    if suffixes and path.suffix.lower() not in suffixes:
+        expected = ", ".join(suffixes)
+        raise ValueError(f"{label} must have one of these extensions: {expected}. Got: {path}")
 
 
 def _optional_output_docx(raw_path: str) -> Path | None:
