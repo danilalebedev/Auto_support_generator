@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from si_generator.chemistry import calc_hrms_mz
 from si_generator.models import Compound
 from si_generator.nmr_validation import count_c_from_13c_nmr, count_h_from_1h_nmr, validate_elemental_analysis, validate_hrms, validate_support
 
@@ -20,6 +21,15 @@ class NmrValidationTests(unittest.TestCase):
         validate_hrms([compound])
         self.assertIn("HRMS calcd", compound.nmr_check_warning)
         self.assertEqual(compound.validation_issues[0]["code"], "HRMS_MISMATCH")
+
+    def test_hrms_validation_uses_structured_block_adduct(self) -> None:
+        found = f"{calc_hrms_mz('C2H4O2', '[M+Na]+'):.4f}"
+        compound = Compound(number="x", name="X", formula="C2H4O2", hrms={"adduct": "[M+Na]+", "found_text": found})
+
+        validate_hrms([compound])
+
+        self.assertEqual(compound.nmr_check_warning, "")
+        self.assertEqual(compound.validation_issues, [])
 
     def test_support_validation_accepts_matching_nmr_hrms_and_elemental_analysis(self) -> None:
         compound = Compound(

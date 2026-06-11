@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 import unittest
 
+from si_generator.chemistry import calc_hrms_mz
 from si_generator.graph.compound_store import make_compound_store, ordered_compounds
 from si_generator.graph.nodes.hrms import calculate_hrms_node
 from si_generator.graph.nodes.nmr import apply_peak_picking_policy_node, parse_nmr_reports_node
@@ -135,6 +136,24 @@ class GraphStateTests(unittest.TestCase):
         self.assertEqual(updated.hrms["calculated_mz"], 272.9921)
         self.assertEqual(updated.hrms["isotope_labels"], {"Br": 79})
         self.assertEqual(result["issues"], [])
+
+    def test_hrms_node_accepts_structured_block_found_text_and_adduct(self) -> None:
+        found = f"{calc_hrms_mz('C2H4O2', '[M+Na]+'):.4f}"
+        compound = Compound(
+            number="2a",
+            name="Test compound",
+            formula="C2H4O2",
+            hrms={"adduct": "[M+Na]+", "found_text": found},
+        )
+        compounds, order = make_compound_store([compound])
+
+        result = calculate_hrms_node({"compounds": compounds, "order": order, "issues": []})
+
+        updated = result["compounds"]["cmp_001"]
+        self.assertEqual(updated.hrms["adduct"], "[M+Na]+")
+        self.assertEqual(updated.hrms["found_text"], found)
+        self.assertEqual(updated.hrms_found, found)
+        self.assertEqual(updated.hrms["ion_formula"], "C2H4O2Na+")
 
     def test_nmr_nodes_parse_text_and_apply_policy(self) -> None:
         compound = Compound(

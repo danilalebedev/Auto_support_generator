@@ -7,6 +7,7 @@ from pathlib import Path
 
 from docx import Document
 
+from si_generator.chemistry import calc_hrms_mz
 from si_generator.docx_builder import build_document_from_model
 from si_generator.domain.bookmarks import bookmark_name_for_block_id
 from si_generator.models import Compound
@@ -93,6 +94,27 @@ class DocumentModelTests(unittest.TestCase):
 
         self.assertIn("79Br", text)
         self.assertIn("272.9921", text)
+
+    def test_renders_hrms_from_structured_block(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "support_information.docx"
+            found = f"{calc_hrms_mz('C2H4O2', '[M+Na]+'):.4f}"
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="Sodium adduct example",
+                formula="C2H4O2",
+                hrms={"adduct": "[M+Na]+", "found_text": found},
+            )
+            model = build_si_document_model([compound])
+
+            build_document_from_model(model, output_path)
+
+            text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
+
+        self.assertIn("[M+Na]+", text)
+        self.assertIn("C2H4O2Na+", text)
+        self.assertIn(found, text)
 
     def test_renders_elemental_analysis_in_journal_format(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

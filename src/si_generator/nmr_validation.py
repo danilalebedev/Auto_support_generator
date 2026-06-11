@@ -45,11 +45,11 @@ def validate_nmr_counts(compounds: list[Compound]) -> None:
 
 def validate_hrms(compounds: list[Compound], tolerance_da: float = 0.005) -> None:
     for compound in compounds:
-        found_text = compound.hrms_found or str(compound.hrms.get("found_text", "") or "")
+        found_text = _hrms_found_text(compound)
         if not compound.formula or not found_text:
             continue
         try:
-            calcd = compound.hrms_calculated or float(compound.hrms.get("calculated_mz") or 0) or calculate_hrms(compound.formula, compound.hrms_adduct).calculated_mz
+            calcd = compound.hrms_calculated or float(compound.hrms.get("calculated_mz") or 0) or calculate_hrms(compound.formula, _hrms_adduct(compound)).calculated_mz
             found = float(found_text)
         except (ValueError, TypeError):
             _append_validation_issue(compound, "HRMS_CHECK_FAILED", "HRMS could not be checked")
@@ -101,6 +101,15 @@ def _append_warning(compound: Compound, text: str) -> None:
         compound.nmr_check_warning += "; " + text
     else:
         compound.nmr_check_warning = text
+
+
+def _hrms_found_text(compound: Compound) -> str:
+    value = compound.hrms_found or compound.hrms.get("found_text") or compound.hrms.get("found_mz") or ""
+    return str(value).strip()
+
+
+def _hrms_adduct(compound: Compound) -> str:
+    return str(compound.hrms.get("adduct") or compound.hrms_adduct)
 
 
 def count_h_from_1h_nmr(text: str) -> int:
