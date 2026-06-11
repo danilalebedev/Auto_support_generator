@@ -24,6 +24,7 @@ def build_manifest(state: GenerateSIState) -> dict:
     order = list(state.get("order", []))
     output_path = Path(state["output_path"])
     artifacts = collect_output_artifacts(state)
+    output_paths = _output_paths(output_path, artifacts)
 
     manifest = {
         "run_id": state.get("run_id", ""),
@@ -36,7 +37,8 @@ def build_manifest(state: GenerateSIState) -> dict:
                 "references": request.references_path,
             }
         ),
-        "output_paths": _output_paths(output_path, artifacts),
+        "output_paths": output_paths,
+        "relative_paths": _relative_paths(output_path.parent, output_paths),
         "configs": {
             "spectra": state.get("spectra_config", {}),
             "generation": state.get("generation_config", {}),
@@ -52,6 +54,7 @@ def build_manifest(state: GenerateSIState) -> dict:
         compound = compounds.get(compound_id)
         if not compound:
             continue
+        compound_artifacts = _compound_artifacts(compound)
         manifest["compounds"][compound_id] = {
             "id": compound_id,
             "number": compound.number,
@@ -60,7 +63,8 @@ def build_manifest(state: GenerateSIState) -> dict:
             "docx_block_id": f"compound:{compound_id}",
             "docx_bookmark": bookmark_name_for_block_id(f"compound:{compound_id}"),
             "references": list(compound.references),
-            "artifacts": _compound_artifacts(compound),
+            "artifacts": compound_artifacts,
+            "relative_artifacts": _relative_paths(output_path.parent, compound_artifacts),
         }
 
     return manifest
@@ -127,3 +131,21 @@ def _compound_artifacts(compound) -> dict[str, str]:
     if compound.mnova_path:
         artifacts["mnova"] = compound.mnova_path
     return artifacts
+
+
+def _relative_paths(base_dir: Path, paths: dict[str, str]) -> dict[str, str]:
+    base_dir = base_dir.resolve()
+    result: dict[str, str] = {}
+    for key, value in paths.items():
+        result[key] = _relative_path(base_dir, value)
+    return result
+
+
+def _relative_path(base_dir: Path, value: str) -> str:
+    path = Path(value)
+    if not path.is_absolute():
+        return str(path)
+    try:
+        return str(path.resolve().relative_to(base_dir))
+    except ValueError:
+        return str(path)

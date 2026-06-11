@@ -60,6 +60,24 @@ class CheckWorkflowTests(unittest.TestCase):
         self.assertIn("MANIFEST_MISSING_SUPPORT_DOCX", {issue["code"] for issue in issues})
         self.assertIn("MANIFEST_MISSING_COMPOUND_FIELD", {issue["code"] for issue in issues})
 
+    def test_manifest_check_prefers_relative_paths_for_moved_output_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            support_docx = root / "support_information.docx"
+            support_docx.write_bytes(b"docx placeholder")
+            manifest_path = root / "support_information.manifest.json"
+            manifest = {
+                "run_id": "run",
+                "artifacts": {"support_docx": "C:/old/missing/support_information.docx"},
+                "relative_paths": {"support_docx": "support_information.docx"},
+                "order": [],
+                "compounds": {},
+            }
+
+            issues = check_manifest(manifest, manifest_path=manifest_path, strict_artifacts=False)
+
+        self.assertFalse(manifest_has_errors(issues))
+
     def test_manifest_check_validates_docx_bookmarks_when_present(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

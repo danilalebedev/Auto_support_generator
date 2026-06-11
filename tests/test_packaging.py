@@ -23,8 +23,11 @@ class PackagingTests(unittest.TestCase):
             (output_path.parent / "processed_spectra.zip").write_bytes(b"zip")
             for folder in ["processed_spectra", "processed_mnova", "mnova_reports", "logs"]:
                 (output_path.parent / folder).mkdir()
+            h1_image = output_path.parent / "processed_spectra" / "2a" / "2a_1H.png"
+            h1_image.parent.mkdir(parents=True)
 
             compound = Compound(number="2a", name="Example")
+            compound.h1_image_path = str(h1_image)
             compounds, order = make_compound_store([compound])
             state = {
                 "run_id": "run",
@@ -50,6 +53,9 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(manifest["output_paths"]["processed_spectra_zip"], artifacts["processed_spectra_zip"])
         self.assertEqual(manifest["output_paths"]["logs_dir"], artifacts["logs_dir"])
         self.assertEqual(manifest["artifacts"]["support_docx"], str(output_path))
+        self.assertEqual(manifest["relative_paths"]["support_docx"], "support_information.docx")
+        self.assertEqual(manifest["relative_paths"]["processed_spectra_zip"], "processed_spectra.zip")
+        self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_png"], str(Path("processed_spectra") / "2a" / "2a_1H.png"))
         self.assertEqual(manifest["configs"]["spectra"]["extract_nmr"], False)
         self.assertEqual(
             manifest["compounds"]["cmp_001"]["docx_bookmark"],

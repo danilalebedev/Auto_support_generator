@@ -132,7 +132,7 @@ def _check_compound_entries(order: list[Any], compounds: dict[str, Any]) -> list
 
 
 def _support_docx_path(manifest: dict[str, Any], base_dir: Path, support_docx: str | Path | None) -> Path | None:
-    path = Path(support_docx) if support_docx else _manifest_path(manifest, "support_docx")
+    path = Path(support_docx) if support_docx else _manifest_path(manifest, "support_docx", base_dir)
     if not path:
         return None
     return _resolve_manifest_path(path, base_dir)
@@ -206,10 +206,12 @@ def _read_docx_bookmarks(path: Path) -> set[str]:
 
 def _check_artifact_paths(manifest: dict[str, Any], base_dir: Path) -> list[Issue]:
     issues: list[Issue] = []
-    artifact_paths = dict(manifest.get("artifacts", {}) or {})
+    artifact_paths = _combined_artifact_paths(manifest)
     for compound_id, compound in (manifest.get("compounds", {}) or {}).items():
         if isinstance(compound, dict):
-            for key, path in (compound.get("artifacts", {}) or {}).items():
+            compound_artifacts = dict(compound.get("artifacts", {}) or {})
+            compound_artifacts.update(compound.get("relative_artifacts", {}) or {})
+            for key, path in compound_artifacts.items():
                 artifact_paths[f"{compound_id}.{key}"] = path
 
     for key, path in artifact_paths.items():
@@ -229,11 +231,42 @@ def _check_artifact_paths(manifest: dict[str, Any], base_dir: Path) -> list[Issu
     return issues
 
 
-def _manifest_path(manifest: dict[str, Any], key: str) -> Path | None:
-    artifacts = manifest.get("artifacts", {}) or {}
-    output_paths = manifest.get("output_paths", {}) or {}
-    value = artifacts.get(key) or output_paths.get(key)
-    return Path(value) if value else None
+def _manifest_path(manifest: dict[str, Any], key: str, base_dir: Path) -> Path | None:
+    candidates = _path_candidates(
+        manifest.get("relative_paths", {}),
+        manifest.get("artifacts", {}),
+        manifest.get("output_paths", {}),
+        key=key,
+    )
+    return _first_existing_or_first(candidates, base_dir)
+
+
+def _combined_artifact_paths(manifest: dict[str, Any]) -> dict[str, Any]:
+    artifact_paths = dict(manifest.get("artifacts", {}) or {})
+    artifact_paths.update(manifest.get("output_paths", {}) or {})
+    artifact_paths.update(manifest.get("relative_paths", {}) or {})
+    return artifact_paths
+
+
+def _path_candidates(*sources: Any, key: str) -> list[Path]:
+    candidates: list[Path] = []
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        value = source.get(key)
+        if value:
+            candidates.append(Path(value))
+    return candidates
+
+
+def _first_existing_or_first(candidates: list[Path], base_dir: Path) -> Path | None:
+    if not candidates:
+        return None
+    for candidate in candidates:
+        resolved = _resolve_manifest_path(candidate, base_dir)
+        if resolved.exists():
+            return candidate
+    return candidates[0]
 
 
 def _resolve_manifest_path(path: str | Path, base_dir: Path) -> Path:
