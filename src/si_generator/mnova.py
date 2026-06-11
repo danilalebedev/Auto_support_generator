@@ -88,8 +88,16 @@ def extract_reports_batch(
                 output_map[key]["mnova"] = task.mnova_path
             image_path = _mnova_arg(staged_image) if staged_image else ""
             mnova_path = _mnova_arg(staged_mnova) if staged_mnova else ""
-            render_spec = _render_spec_arg(task.render_spec)
-            lines.append(f"{task.compound}\t{task.nucleus}\t{_mnova_arg(staged_input)}\t{image_path}\t{mnova_path}\t{render_spec}")
+            lines.append(
+                _format_task_line(
+                    task.compound,
+                    task.nucleus,
+                    _mnova_arg(staged_input),
+                    image_path=image_path,
+                    mnova_path=mnova_path,
+                    render_spec=task.render_spec,
+                )
+            )
         run_tasks_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
         sf_arg = ",".join(
@@ -204,6 +212,27 @@ def _render_spec_arg(render_spec: dict[str, object] | None) -> str:
     if not render_spec:
         return "{}"
     return json.dumps(render_spec, ensure_ascii=True, separators=(",", ":"))
+
+
+def _format_task_line(
+    compound: str,
+    nucleus: str,
+    input_path: str,
+    *,
+    image_path: str = "",
+    mnova_path: str = "",
+    render_spec: dict[str, object] | None = None,
+) -> str:
+    return "\t".join(
+        [
+            compound,
+            nucleus,
+            input_path,
+            image_path,
+            mnova_path,
+            _render_spec_arg(render_spec),
+        ]
+    )
 
 
 def _safe_token(value: str) -> str:

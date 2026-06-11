@@ -37,6 +37,87 @@ function _jsonEscape(text)
         .replace(/\t/g, "\\t");
 }
 
+function _parseRenderSpec(text)
+{
+    if (!text || String(text).replace(/\s/g, "") === "") {
+        return {};
+    }
+    try {
+        if (typeof JSON !== "undefined" && JSON.parse) {
+            return JSON.parse(text);
+        }
+    } catch (e) {
+    }
+    try {
+        return eval("(" + text + ")");
+    } catch (fallbackError) {
+        return {};
+    }
+}
+
+function _numberOrDefault(value, fallback)
+{
+    var parsed = Number(value);
+    return isNaN(parsed) ? fallback : parsed;
+}
+
+function _xRange(nucleus, renderSpec)
+{
+    var range = renderSpec && renderSpec.x_range_ppm ? renderSpec.x_range_ppm : undefined;
+    var fallback = nucleus === "13C" ? [-10.0, 210.0] : [-1.0, 12.0];
+    if (range && range.length >= 2) {
+        return [_numberOrDefault(range[0], fallback[0]), _numberOrDefault(range[1], fallback[1])];
+    }
+    return fallback;
+}
+
+function _targetSignalHeightFraction(renderSpec)
+{
+    var value = renderSpec ? _numberOrDefault(renderSpec.target_signal_height_fraction, 0.80) : 0.80;
+    if (value < 0.20) {
+        return 0.20;
+    }
+    if (value > 0.95) {
+        return 0.95;
+    }
+    return value;
+}
+
+function _peakThresholdFraction(nucleus, renderSpec)
+{
+    var policy = renderSpec && renderSpec.peak_picking ? String(renderSpec.peak_picking) : "normal";
+    if (policy === "manual") {
+        return 0;
+    }
+    if (policy === "minimal") {
+        return nucleus === "1H" ? 0.08 : 0.03;
+    }
+    if (policy === "dense") {
+        return nucleus === "1H" ? 0.025 : 0.01;
+    }
+    return nucleus === "1H" ? 0.05 : 0.018;
+}
+
+function _isIgnoredByRenderSpec(delta, renderSpec)
+{
+    var regions = renderSpec && renderSpec.ignore_regions_ppm ? renderSpec.ignore_regions_ppm : [];
+    var i, region, left, right, minValue, maxValue;
+    for (i = 0; i < regions.length; i++) {
+        region = regions[i];
+        if (!region || region.length < 2) {
+            continue;
+        }
+        left = _numberOrDefault(region[0], delta);
+        right = _numberOrDefault(region[1], delta);
+        minValue = Math.min(left, right);
+        maxValue = Math.max(left, right);
+        if (delta >= minValue && delta <= maxValue) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function _plainMultipletReport(spectrum, nucleus)
 {
     var reporter = MultipletReporter.getReporterByName("J. Am. Chem. Soc.");
@@ -160,12 +241,10 @@ function _hideProtonImageClutter(spectrum)
     }
 }
 
-function _visibleRegion(nucleus)
+function _visibleRegion(nucleus, renderSpec)
 {
-    if (nucleus === "13C") {
-        return new SpectrumRegion(-10.0, 210.0);
-    }
-    return new SpectrumRegion(-1.0, 12.0);
+    var range = _xRange(nucleus, renderSpec || {});
+    return new SpectrumRegion(range[0], range[1]);
 }
 
 function _isReferencePeak(spectrum, nucleus, delta)
@@ -178,8 +257,11 @@ function _isReferencePeak(spectrum, nucleus, delta)
     return nucleus === "1H" && Math.abs(delta) <= 0.05;
 }
 
-function _isIgnoredImagePeak(spectrum, nucleus, delta)
+function _isIgnoredImagePeak(spectrum, nucleus, delta, renderSpec)
 {
+    if (_isIgnoredByRenderSpec(delta, renderSpec || {})) {
+        return true;
+    }
     if (_isReferencePeak(spectrum, nucleus, delta)) {
         return true;
     }
@@ -194,19 +276,19 @@ function _isIgnoredImagePeak(spectrum, nucleus, delta)
     return Math.abs(delta - 1.56) <= 0.08 || Math.abs(delta - 1.77) <= 0.08;
 }
 
-function _filterPeaksForImage(spectrum, nucleus)
+function _filterPeaksForImage(spectrum, nucleus, renderSpec)
 {
     var allPeaks, keptPeaks, peak, i, intensity, maxIntensity, threshold;
 
     try {
         allPeaks = new Peaks(spectrum.peaks());
         if (!allPeaks || !allPeaks.count) {
-            allPeaks = new Peaks(spectrum, _visibleRegion(nucleus));
+            allPeaks = new Peaks(spectrum, _visibleRegion(nucleus, renderSpec));
         }
         maxIntensity = 0;
         for (i = 0; i < allPeaks.count; i++) {
             peak = allPeaks.at(i);
-            if (_isIgnoredImagePeak(spectrum, nucleus, peak.delta())) {
+            if (_isIgnoredImagePeak(spectrum, nucleus, peak.delta(), renderSpec)) {
                 continue;
             }
             intensity = Math.abs(peak.intensity);
@@ -217,7 +299,7 @@ function _filterPeaksForImage(spectrum, nucleus)
         if (maxIntensity <= 0) {
             for (i = 0; i < allPeaks.count; i++) {
                 peak = allPeaks.at(i);
-                if (_isIgnoredImagePeak(spectrum, nucleus, peak.delta())) {
+                if (_isIgnoredImagePeak(spectrum, nucleus, peak.delta(), renderSpec)) {
                     continue;
                 }
                 intensity = Math.abs(peak.intensity);
@@ -226,11 +308,11 @@ function _filterPeaksForImage(spectrum, nucleus)
                 }
             }
         }
-        threshold = maxIntensity * (nucleus === "1H" ? 0.05 : 0.018);
+        threshold = maxIntensity * _peakThresholdFraction(nucleus, renderSpec || {});
         keptPeaks = new Peaks();
         for (i = 0; i < allPeaks.count; i++) {
             peak = allPeaks.at(i);
-            if (!_isIgnoredImagePeak(spectrum, nucleus, peak.delta()) && Math.abs(peak.intensity) >= threshold) {
+            if (!_isIgnoredImagePeak(spectrum, nucleus, peak.delta(), renderSpec) && Math.abs(peak.intensity) >= threshold) {
                 if (nucleus === "1H") {
                     peak.annotation = "";
                 }
@@ -242,12 +324,12 @@ function _filterPeaksForImage(spectrum, nucleus)
     }
 }
 
-function _fitVerticalScaleForImage(spectrum, nucleus)
+function _fitVerticalScaleForImage(spectrum, nucleus, renderSpec)
 {
-    var peaks, peak, i, intensity, maxIntensity, minIntensity, top, bottom;
+    var peaks, peak, i, intensity, maxIntensity, minIntensity, top, bottom, targetHeight;
 
     try {
-        peaks = new Peaks(spectrum, _visibleRegion(nucleus));
+        peaks = new Peaks(spectrum, _visibleRegion(nucleus, renderSpec));
         if (!peaks || !peaks.count) {
             peaks = new Peaks(spectrum.peaks());
         }
@@ -264,7 +346,8 @@ function _fitVerticalScaleForImage(spectrum, nucleus)
             }
         }
         if (maxIntensity > 0) {
-            top = maxIntensity * 1.25;
+            targetHeight = _targetSignalHeightFraction(renderSpec || {});
+            top = maxIntensity / targetHeight;
             bottom = nucleus === "1H" ? -maxIntensity * 0.14 : (minIntensity < 0 ? minIntensity * 1.15 : -maxIntensity * 0.03);
             spectrum.vertZoom(bottom, top);
         }
@@ -272,11 +355,12 @@ function _fitVerticalScaleForImage(spectrum, nucleus)
     }
 }
 
-function _plainPeakReport(spectrum, nucleus)
+function _plainPeakReport(spectrum, nucleus, renderSpec)
 {
-    var peaks, peak, i, delta, values, solvent, frequency, header, precision;
-    var minDelta = nucleus === "13C" ? -10 : -1;
-    var maxDelta = nucleus === "13C" ? 230 : 15;
+    var peaks, peak, i, delta, values, solvent, frequency, header, precision, range;
+    range = _xRange(nucleus, renderSpec || {});
+    var minDelta = range[0];
+    var maxDelta = range[1];
     var solventReference = _referenceValue(spectrum, nucleus);
     var solventTolerance = nucleus === "13C" ? 0.35 : 0.04;
 
@@ -294,7 +378,7 @@ function _plainPeakReport(spectrum, nucleus)
         if (nucleus === "13C" && (Math.abs(delta - solventReference) <= solventTolerance || (delta >= 76.0 && delta <= 78.2))) {
             continue;
         }
-        if (delta < minDelta || delta > maxDelta) {
+        if (delta < minDelta || delta > maxDelta || _isIgnoredByRenderSpec(delta, renderSpec || {})) {
             continue;
         }
         values.push(delta.toFixed(precision));
@@ -332,14 +416,14 @@ function _referenceOffsetFromPeaks(spectrum, nucleus)
     return 0;
 }
 
-function _exportSpectrumImage(spectrum, nucleus, imagePath)
+function _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec)
 {
     if (!imagePath) {
         return "";
     }
 
     try {
-        _prepareSpectrumForExport(spectrum, nucleus);
+        _prepareSpectrumForExport(spectrum, nucleus, renderSpec || {});
         mainWindow.activeWindow().update();
 
         var page = mainWindow.activeDocument.curPage();
@@ -351,27 +435,24 @@ function _exportSpectrumImage(spectrum, nucleus, imagePath)
     }
 }
 
-function _prepareSpectrumForExport(spectrum, nucleus)
+function _prepareSpectrumForExport(spectrum, nucleus, renderSpec)
 {
+    var range = _xRange(nucleus, renderSpec || {});
     if (nucleus === "13C") {
         _clearNonPeakAnnotations(spectrum);
     } else {
         _hideProtonImageClutter(spectrum);
     }
-    _filterPeaksForImage(spectrum, nucleus);
-    if (nucleus === "13C") {
-        spectrum.horzZoom(-10.0, 210.0);
-    } else {
-        spectrum.horzZoom(-1.0, 12.0);
-    }
-    _fitVerticalScaleForImage(spectrum, nucleus);
+    _filterPeaksForImage(spectrum, nucleus, renderSpec || {});
+    spectrum.horzZoom(range[0], range[1]);
+    _fitVerticalScaleForImage(spectrum, nucleus, renderSpec || {});
     spectrum.update();
 }
 
-function _spectrumReport(spectrum, nucleus)
+function _spectrumReport(spectrum, nucleus, renderSpec)
 {
     if (nucleus === "13C") {
-        return _plainPeakReport(spectrum, nucleus);
+        return _plainPeakReport(spectrum, nucleus, renderSpec || {});
     }
     return _plainMultipletReport(spectrum, nucleus);
 }
@@ -445,7 +526,8 @@ function extractSpectrumReportsBatch(tasksPath, outputJsonPath, statusPath)
             inputPath = parts[2];
             var imagePath = parts.length >= 4 ? parts[3] : "";
             var mnovaPath = parts.length >= 5 ? parts[4] : "";
-            tasks.push({compound: compound, nucleus: nucleus, inputPath: inputPath, imagePath: imagePath, mnovaPath: mnovaPath});
+            var renderSpec = parts.length >= 6 ? _parseRenderSpec(parts[5]) : {};
+            tasks.push({compound: compound, nucleus: nucleus, inputPath: inputPath, imagePath: imagePath, mnovaPath: mnovaPath, renderSpec: renderSpec});
             _appendText(statusPath, "TASK " + compound + " " + nucleus + " " + inputPath + "\n");
 
             var dw = mainWindow.newWindow();
@@ -468,13 +550,13 @@ function extractSpectrumReportsBatch(tasksPath, outputJsonPath, statusPath)
                         error = "No active NMR spectrum after opening " + inputPath;
                     } else {
                         _processForReport(spectrum, nucleus, undefined, true, false);
-                        report = nucleus === "13C" ? _plainMultipletReport(spectrum, nucleus) : _plainMultipletReport(spectrum, nucleus);
+                        report = _spectrumReport(spectrum, nucleus, renderSpec);
                         referenceOffset = _referenceOffsetFromPeaks(spectrum, nucleus);
                         if (nucleus === "13C") {
                             _processForReport(spectrum, nucleus, 1, false, true);
-                            peakReport = _plainPeakReport(spectrum, nucleus);
+                            peakReport = _plainPeakReport(spectrum, nucleus, renderSpec);
                         }
-                        image = _exportSpectrumImage(spectrum, nucleus, imagePath);
+                        image = _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec);
                     }
                 }
             } catch (taskError) {
@@ -580,7 +662,7 @@ function _saveProcessedMnovaFile(compound, tasks, statusPath)
             if (nucleus === "13C") {
                 _processForReport(spectrum, nucleus, 1, false, true);
             }
-            _prepareSpectrumForExport(spectrum, nucleus);
+            _prepareSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {});
         }
 
         serialization.save(mnovaPath, "mnova");
