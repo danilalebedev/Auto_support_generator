@@ -138,6 +138,35 @@ class PatchWorkflowTests(unittest.TestCase):
         self.assertNotIn("Example A (2a)", text)
         self.assertIn("Example B (2b)", text)
 
+    def test_patch_workflow_writes_report_for_malformed_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = root / "support_information.manifest.json"
+            manifest.write_text("{", encoding="utf-8")
+
+            state = run_patch_si(PatchSIRequest(manifest_path=manifest, renumber={"2a": "3a"}))
+            report_path = root / "support_information.patch_report.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(state["status"], "fail")
+        self.assertEqual(Path(state["artifacts"]["patch_report"]), report_path)
+        self.assertIn("MANIFEST_LOAD_FAILED", {issue["code"] for issue in state["issues"]})
+        self.assertEqual(report["patch_result"]["renumbered"], {})
+
+    def test_cli_patch_manifest_mode_returns_report_for_malformed_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = root / "support_information.manifest.json"
+            manifest.write_text("{", encoding="utf-8")
+            stdout = StringIO()
+
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                exit_code = cli_main(["--patch-manifest", str(manifest), "--renumber", "2a=3a"])
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("MANIFEST_LOAD_FAILED", stdout.getvalue())
+        self.assertIn("Patch report:", stdout.getvalue())
+
     def test_patch_workflow_reorders_docx_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

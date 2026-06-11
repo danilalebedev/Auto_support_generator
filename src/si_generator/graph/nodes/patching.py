@@ -23,13 +23,28 @@ from ..state import PatchSIState
 
 def load_patch_manifest_node(state: PatchSIState) -> dict:
     request = state["request"]
-    manifest = load_manifest(request.manifest_path)
-    return {"manifest": manifest, "artifacts": {**state.get("artifacts", {}), "manifest": str(request.manifest_path)}}
+    artifacts = {**state.get("artifacts", {}), "manifest": str(request.manifest_path)}
+    try:
+        manifest = load_manifest(request.manifest_path)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        issues = [
+            *state.get("issues", []),
+            {
+                "code": "MANIFEST_LOAD_FAILED",
+                "severity": "error",
+                "message": f"could not load manifest: {exc}",
+                "path": str(request.manifest_path),
+            },
+        ]
+        return {"manifest": {}, "artifacts": artifacts, "issues": issues}
+    return {"manifest": manifest, "artifacts": artifacts}
 
 
 def apply_renumber_patch_node(state: PatchSIState) -> dict:
     request = state["request"]
     source_manifest = state.get("manifest", {})
+    if manifest_has_errors(state.get("issues", [])):
+        return {"manifest": source_manifest, "artifacts": state.get("artifacts", {}), "patch_result": _empty_patch_result()}
     source_docx = support_docx_from_manifest(source_manifest, request.manifest_path, request.support_docx)
     output_docx = request.output_docx or default_patched_docx_path(source_docx)
     output_manifest = request.output_manifest or output_docx.with_suffix(".manifest.json")
@@ -112,12 +127,7 @@ def build_patch_report(state: PatchSIState, status: str, issues: list[dict], rep
         "operations": _patch_operations(request),
         "patch_result": state.get(
             "patch_result",
-            {
-                "renumbered": {},
-                "removed_ids": [],
-                "removed_bookmarks": [],
-                "reordered_ids": [],
-            },
+            _empty_patch_result(),
         ),
         "strict_artifacts": request.strict_artifacts,
         "issue_counts": count_issues(issues),
@@ -141,6 +151,15 @@ def _patch_operations(request) -> dict[str, object]:
         "renumber": dict(request.renumber),
         "remove": list(request.remove),
         "reorder": list(request.reorder),
+    }
+
+
+def _empty_patch_result() -> dict[str, object]:
+    return {
+        "renumbered": {},
+        "removed_ids": [],
+        "removed_bookmarks": [],
+        "reordered_ids": [],
     }
 
 
