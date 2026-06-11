@@ -4,7 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from ..style_config import parse_simple_yaml
+from ..config_yaml import parse_simple_yaml
 from .types import JournalProfile
 
 
