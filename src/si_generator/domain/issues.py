@@ -14,6 +14,14 @@ def count_issues(issues: Iterable[Mapping[str, Any]]) -> dict[str, int]:
     return counts
 
 
+def issue_code_counts(issues: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for issue in issues:
+        code = str(issue.get("code") or "UNKNOWN").strip() or "UNKNOWN"
+        counts[code] = counts.get(code, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
 def generation_status(issue_counts: Mapping[str, int]) -> str:
     if issue_counts.get("error", 0):
         return "failed"

@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from ...domain.bookmarks import bookmark_name_for_block_id
-from ...domain.issues import compound_issue_counts, count_issues, generation_status, issues_by_compound
+from ...domain.issues import compound_issue_counts, count_issues, generation_status, issue_code_counts, issues_by_compound
 from ..state import GenerateSIState
 
 
@@ -101,6 +101,7 @@ def build_run_summary(state: GenerateSIState, manifest: dict | None = None) -> d
         "status": generation_status(issue_counts),
         "compound_count": len(order),
         "issue_counts": issue_counts,
+        "issue_code_counts": issue_code_counts(issues),
         "compound_issue_counts": compound_issue_counts(issues),
         "issues": issues,
         "output_paths": manifest.get("output_paths", {}),

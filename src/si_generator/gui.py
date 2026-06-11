@@ -754,9 +754,26 @@ def _report_overview(report_path: str) -> str:
         total_issues += count
         if count:
             parts.append(f"{label}: {count}")
+    issue_code_counts = data.get("issue_code_counts", {}) or {}
+    top_issue_codes = _top_issue_codes(issue_code_counts)
+    if top_issue_codes:
+        parts.append("Top issues: " + top_issue_codes)
     if status and not total_issues:
         parts.append("Issues: 0")
     return " | ".join(parts)
+
+
+def _top_issue_codes(issue_code_counts: dict[str, Any], limit: int = 3) -> str:
+    items: list[tuple[str, int]] = []
+    for code, raw_count in issue_code_counts.items():
+        try:
+            count = int(raw_count)
+        except (TypeError, ValueError):
+            continue
+        if code and count > 0:
+            items.append((str(code), count))
+    items.sort(key=lambda item: (-item[1], item[0]))
+    return ", ".join(f"{code} x{count}" for code, count in items[:limit])
 
 
 def _existing_result_path(raw_path: str, label: str) -> Path:

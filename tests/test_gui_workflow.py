@@ -113,7 +113,9 @@ class GuiWorkflowTests(unittest.TestCase):
             logs.mkdir()
             input_docx.write_text("placeholder", encoding="utf-8")
             run_summary.write_text(
-                '{"status":"completed_with_warnings","compound_count":2,"issue_counts":{"warning":3}}',
+                '{"status":"completed_with_warnings","compound_count":2,'
+                '"issue_counts":{"warning":3},'
+                '"issue_code_counts":{"HRMS_MISMATCH":2,"NMR_H_COUNT_MISMATCH":1}}',
                 encoding="utf-8",
             )
             state = {
@@ -147,7 +149,10 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(summary["run_summary"], str(run_summary.resolve()))
         self.assertEqual(summary["input_warnings"], str(warnings.resolve()))
         self.assertEqual(summary["support_warnings"], str(support_warnings.resolve()))
-        self.assertEqual(summary["overview"], "Status: completed with warnings | Compounds: 2 | Warnings: 3")
+        self.assertEqual(
+            summary["overview"],
+            "Status: completed with warnings | Compounds: 2 | Warnings: 3 | Top issues: HRMS_MISMATCH x2, NMR_H_COUNT_MISMATCH x1",
+        )
 
     def test_builds_check_request_from_manifest_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
