@@ -136,6 +136,8 @@ def _print_check_result(result: dict) -> None:
         print("Manifest check passed.")
     else:
         print("Manifest check failed.")
+    if result.get("artifacts", {}).get("check_report"):
+        print(f"Check report: {Path(result['artifacts']['check_report']).resolve()}")
 
 
 def _print_patch_result(result: dict) -> None:
@@ -149,6 +151,8 @@ def _print_patch_result(result: dict) -> None:
         print(f"Patched DOCX: {artifacts['support_docx']}")
     if artifacts.get("manifest"):
         print(f"Patched manifest: {artifacts['manifest']}")
+    if artifacts.get("patch_report"):
+        print(f"Patch report: {Path(artifacts['patch_report']).resolve()}")
     if result.get("status") == "pass":
         print("Patch check passed.")
     else:

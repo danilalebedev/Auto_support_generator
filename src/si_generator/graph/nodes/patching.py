@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+from ...domain.issues import count_issues
 from ...domain.manifest import check_manifest, load_manifest, manifest_has_errors
 from ...domain.patching import (
     bookmark_order_for_compounds,
@@ -76,4 +78,37 @@ def check_patched_manifest_node(state: PatchSIState) -> dict:
             strict_artifacts=request.strict_artifacts,
         )
     )
-    return {"issues": issues, "status": "fail" if manifest_has_errors(issues) else "pass"}
+    status = "fail" if manifest_has_errors(issues) else "pass"
+    report_base = support_docx or manifest_path
+    report_path = _patch_report_path(report_base)
+    report = build_patch_report(state, status, issues, report_path)
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    artifacts = {**state.get("artifacts", {}), "patch_report": str(report_path)}
+    return {"issues": issues, "status": status, "artifacts": artifacts}
+
+
+def build_patch_report(state: PatchSIState, status: str, issues: list[dict], report_path: Path) -> dict:
+    request = state["request"]
+    return {
+        "run_id": state.get("run_id", ""),
+        "status": status,
+        "source_manifest": str(Path(request.manifest_path)),
+        "operations": {
+            "renumber": dict(request.renumber),
+            "remove": list(request.remove),
+            "reorder": list(request.reorder),
+        },
+        "strict_artifacts": request.strict_artifacts,
+        "issue_counts": count_issues(issues),
+        "issues": issues,
+        "artifacts": {
+            **state.get("artifacts", {}),
+            "patch_report": str(report_path),
+        },
+    }
+
+
+def _patch_report_path(base_path: Path) -> Path:
+    if base_path.name.endswith(".manifest.json"):
+        return base_path.with_name(f"{base_path.name[:-len('.manifest.json')]}.patch_report.json")
+    return base_path.with_suffix(".patch_report.json")

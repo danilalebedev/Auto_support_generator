@@ -51,6 +51,7 @@ class PatchWorkflowTests(unittest.TestCase):
             )
 
             patched = json.loads(patched_manifest.read_text(encoding="utf-8"))
+            patch_report = json.loads((root / "support_information_renumbered.patch_report.json").read_text(encoding="utf-8"))
             text = "\n".join(paragraph.text for paragraph in Document(patched_docx).paragraphs)
             issues = check_manifest(patched, manifest_path=patched_manifest)
             patched_docx_exists = patched_docx.exists()
@@ -59,6 +60,9 @@ class PatchWorkflowTests(unittest.TestCase):
         self.assertEqual(state["status"], "pass")
         self.assertTrue(patched_docx_exists)
         self.assertTrue(patched_manifest_exists)
+        self.assertEqual(Path(state["artifacts"]["patch_report"]), root / "support_information_renumbered.patch_report.json")
+        self.assertEqual(patch_report["status"], "pass")
+        self.assertEqual(patch_report["operations"]["renumber"], {"2a": "5a"})
         self.assertEqual(patched["compounds"]["cmp_001"]["number"], "5a")
         self.assertIn("Example (5a)", text)
         self.assertNotIn("Example (2a)", text)
@@ -87,6 +91,7 @@ class PatchWorkflowTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertIn("Patch check passed", stdout.getvalue())
+        self.assertIn("Patch report:", stdout.getvalue())
         self.assertIn("Example (6a)", text)
 
     def test_cli_patch_manifest_remove_mode(self) -> None:

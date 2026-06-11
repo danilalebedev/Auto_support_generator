@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from ...domain.bookmarks import bookmark_name_for_block_id
+from ...domain.issues import count_issues, generation_status
 from ..state import GenerateSIState
 
 
@@ -83,13 +84,13 @@ def build_manifest(state: GenerateSIState) -> dict:
 def build_run_summary(state: GenerateSIState, manifest: dict | None = None) -> dict:
     manifest = manifest or build_manifest(state)
     issues = list(state.get("issues", []))
-    issue_counts = _issue_counts(issues)
+    issue_counts = count_issues(issues)
     compounds = state.get("compounds", {})
     order = list(state.get("order", []))
 
     return {
         "run_id": state.get("run_id", ""),
-        "status": _run_status(issue_counts),
+        "status": generation_status(issue_counts),
         "compound_count": len(order),
         "issue_counts": issue_counts,
         "issues": issues,
@@ -173,24 +174,6 @@ def _compound_artifacts(compound) -> dict[str, str]:
     if compound.mnova_path:
         artifacts["mnova"] = compound.mnova_path
     return artifacts
-
-
-def _issue_counts(issues: list[dict]) -> dict[str, int]:
-    counts = {"info": 0, "warning": 0, "error": 0}
-    for issue in issues:
-        severity = str(issue.get("severity", "warning")).lower()
-        if severity not in counts:
-            severity = "warning"
-        counts[severity] += 1
-    return counts
-
-
-def _run_status(issue_counts: dict[str, int]) -> str:
-    if issue_counts.get("error", 0):
-        return "failed"
-    if issue_counts.get("warning", 0):
-        return "completed_with_warnings"
-    return "completed"
 
 
 def _issues_for_compound(issues: list[dict], compound_id: str) -> list[dict]:

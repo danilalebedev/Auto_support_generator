@@ -149,7 +149,7 @@ class SIGeneratorApp:
         self._result_row(results, 0, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"))
         self._result_row(results, 1, "Spectra package", self.result_spectra, lambda: self._open_result_path(self.result_spectra, "Spectra package"))
         self._result_row(results, 2, "Manifest", self.result_manifest, lambda: self._open_result_path(self.result_manifest, "Manifest"))
-        self._result_row(results, 3, "Run summary", self.result_run_summary, lambda: self._open_result_path(self.result_run_summary, "Run summary"))
+        self._result_row(results, 3, "Run report", self.result_run_summary, lambda: self._open_result_path(self.result_run_summary, "Run report"))
         self._result_row(results, 4, "Input warnings", self.result_warnings, lambda: self._open_result_path(self.result_warnings, "Input warnings"))
         self._result_row(
             results,
@@ -412,12 +412,15 @@ class SIGeneratorApp:
             result = run_check_si(request)
             for issue in result.get("issues", []):
                 self._log_queue.put(f"[{issue.get('severity', 'warning').upper()}] {issue.get('code', 'CHECK')}: {issue.get('message', '')}\n")
+            summary = _build_check_summary(result, request)
+            if summary.get("run_summary"):
+                self._log_queue.put(f"Check report: {summary['run_summary']}\n")
             if manifest_has_errors(result.get("issues", [])):
                 self._log_queue.put("\nManifest check failed.\n")
-                self._log_queue.put({"type": "run_failed", "error": "Manifest check failed"})
+                self._log_queue.put({"type": "run_failed", "error": "Manifest check failed", "summary": summary})
             else:
                 self._log_queue.put("\nManifest check passed.\n")
-                self._log_queue.put({"type": "run_succeeded", "summary": {"manifest": str(request.manifest_path.resolve())}})
+                self._log_queue.put({"type": "run_succeeded", "summary": summary})
         except Exception as exc:
             self._log_queue.put(f"\nERROR: {exc}\n")
             self._log_queue.put({"type": "run_failed", "error": str(exc)})
@@ -430,9 +433,11 @@ class SIGeneratorApp:
             for issue in result.get("issues", []):
                 self._log_queue.put(f"[{issue.get('severity', 'warning').upper()}] {issue.get('code', 'PATCH')}: {issue.get('message', '')}\n")
             summary = _build_patch_summary(result)
+            if summary.get("run_summary"):
+                self._log_queue.put(f"Patch report: {summary['run_summary']}\n")
             if manifest_has_errors(result.get("issues", [])):
                 self._log_queue.put("\nPatch check failed.\n")
-                self._log_queue.put({"type": "run_failed", "error": "Patch check failed"})
+                self._log_queue.put({"type": "run_failed", "error": "Patch check failed", "summary": summary})
             else:
                 self._log_queue.put(f"\nPatched {summary.get('support_docx', '')}\n")
                 if summary.get("manifest"):
@@ -458,6 +463,8 @@ class SIGeneratorApp:
                     self._apply_result_summary(item.get("summary", {}))
                 elif isinstance(item, dict) and item.get("type") == "run_failed":
                     self.status_text.set("Failed")
+                    if isinstance(item.get("summary"), dict):
+                        self._apply_result_summary(item.get("summary", {}))
                 else:
                     self.log.write(item)
         except queue.Empty:
@@ -659,6 +666,16 @@ def _build_patch_summary(state: dict[str, Any]) -> dict[str, str]:
     summary = {
         "support_docx": _resolved_artifact(artifacts, "support_docx"),
         "manifest": _resolved_artifact(artifacts, "manifest"),
+        "run_summary": _resolved_artifact(artifacts, "patch_report"),
+    }
+    return {key: value for key, value in summary.items() if value}
+
+
+def _build_check_summary(state: dict[str, Any], request: CheckSIRequest) -> dict[str, str]:
+    artifacts = state.get("artifacts", {})
+    summary = {
+        "manifest": str(Path(artifacts.get("manifest", request.manifest_path)).resolve()),
+        "run_summary": _resolved_artifact(artifacts, "check_report"),
     }
     return {key: value for key, value in summary.items() if value}
 

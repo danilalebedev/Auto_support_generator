@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from si_generator.gui import (
+    _build_check_summary,
     _build_check_request,
     _build_generate_request,
     _build_patch_request,
@@ -12,6 +13,7 @@ from si_generator.gui import (
     _build_result_summary,
     _existing_result_path,
 )
+from si_generator.graph.state import CheckSIRequest
 
 
 class GuiWorkflowTests(unittest.TestCase):
@@ -95,6 +97,21 @@ class GuiWorkflowTests(unittest.TestCase):
 
         self.assertEqual(request.manifest_path, manifest)
 
+    def test_builds_check_summary_from_report_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = root / "support_information.manifest.json"
+            report = root / "support_information.check_report.json"
+            manifest.write_text("{}", encoding="utf-8")
+
+            summary = _build_check_summary(
+                {"artifacts": {"manifest": str(manifest), "check_report": str(report)}},
+                CheckSIRequest(manifest_path=manifest),
+            )
+
+        self.assertEqual(summary["manifest"], str(manifest.resolve()))
+        self.assertEqual(summary["run_summary"], str(report.resolve()))
+
     def test_builds_patch_request_from_gui_values(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -134,18 +151,21 @@ class GuiWorkflowTests(unittest.TestCase):
             root = Path(tmp)
             support = root / "patched.docx"
             manifest = root / "patched.manifest.json"
+            report = root / "patched.patch_report.json"
 
             summary = _build_patch_summary(
                 {
                     "artifacts": {
                         "support_docx": str(support),
                         "manifest": str(manifest),
+                        "patch_report": str(report),
                     }
                 }
             )
 
         self.assertEqual(summary["support_docx"], str(support.resolve()))
         self.assertEqual(summary["manifest"], str(manifest.resolve()))
+        self.assertEqual(summary["run_summary"], str(report.resolve()))
 
     def test_existing_result_path_returns_resolved_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

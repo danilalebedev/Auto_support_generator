@@ -42,9 +42,14 @@ class CheckWorkflowTests(unittest.TestCase):
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
             state = run_check_si(CheckSIRequest(manifest_path=manifest_path))
+            report_path = manifest_path.with_name("support_information.check_report.json")
+            report = json.loads(report_path.read_text(encoding="utf-8"))
 
         self.assertEqual(state["status"], "pass")
         self.assertFalse(manifest_has_errors(state["issues"]))
+        self.assertEqual(Path(state["artifacts"]["check_report"]), report_path)
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["issue_counts"]["error"], 0)
 
     def test_manifest_check_reports_missing_docx_and_broken_compound_entry(self) -> None:
         manifest = {
@@ -181,6 +186,7 @@ class CheckWorkflowTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertIn("Manifest check passed", stdout.getvalue())
+        self.assertIn("Check report:", stdout.getvalue())
 
     def test_cli_check_manifest_mode_returns_nonzero_on_invalid_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -193,6 +199,7 @@ class CheckWorkflowTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         self.assertIn("MANIFEST_MISSING_SUPPORT_DOCX", stdout.getvalue())
+        self.assertIn("Check report:", stdout.getvalue())
 
 
 if __name__ == "__main__":
