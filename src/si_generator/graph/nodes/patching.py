@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from pathlib import Path
 
 from ...domain.issues import compound_issue_counts, count_issues
@@ -73,45 +74,54 @@ def _apply_renumber_patch_node(state: PatchSIState) -> dict:
     source_docx = support_docx_from_manifest(source_manifest, request.manifest_path, request.support_docx)
     output_docx = request.output_docx or default_patched_docx_path(source_docx)
     output_manifest = request.output_manifest or output_docx.with_suffix(".manifest.json")
+    temp_docx = _temporary_sibling(output_docx)
+    temp_manifest = _temporary_sibling(output_manifest)
 
-    patched_manifest = source_manifest
-    applied_numbers: dict[str, str] = {}
-    removed_ids: list[str] = []
-    removed_bookmarks: list[str] = []
-    if request.remove:
-        patched_manifest, removed_ids, removed_bookmarks = remove_manifest(patched_manifest, request.remove)
-    if request.renumber:
-        patched_manifest, applied_numbers = renumber_manifest(patched_manifest, request.renumber)
-    if request.reorder:
-        patched_manifest, reordered_ids = reorder_manifest(patched_manifest, request.reorder)
-    else:
-        reordered_ids = []
+    try:
+        patched_manifest = source_manifest
+        applied_numbers: dict[str, str] = {}
+        removed_ids: list[str] = []
+        removed_bookmarks: list[str] = []
+        if request.remove:
+            patched_manifest, removed_ids, removed_bookmarks = remove_manifest(patched_manifest, request.remove)
+        if request.renumber:
+            patched_manifest, applied_numbers = renumber_manifest(patched_manifest, request.renumber)
+        if request.reorder:
+            patched_manifest, reordered_ids = reorder_manifest(patched_manifest, request.reorder)
+        else:
+            reordered_ids = []
 
-    if applied_numbers:
-        patch_docx_numbers(source_docx, output_docx, applied_numbers)
-    else:
-        patch_docx_numbers(source_docx, output_docx, {})
-    if removed_bookmarks:
-        remove_docx_blocks(output_docx, output_docx, removed_bookmarks)
-    if reordered_ids:
-        reorder_docx_blocks(output_docx, output_docx, bookmark_order_for_compounds(patched_manifest, reordered_ids))
-    patch_result = {
-        "renumbered": applied_numbers,
-        "removed_ids": removed_ids,
-        "removed_bookmarks": removed_bookmarks,
-        "reordered_ids": reordered_ids,
-    }
-    set_manifest_output_paths(patched_manifest, support_docx=output_docx, manifest_path=output_manifest)
-    _append_patch_history(
-        patched_manifest,
-        run_id=state.get("run_id", ""),
-        source_manifest=request.manifest_path,
-        output_manifest=output_manifest,
-        output_docx=output_docx,
-        operations=_patch_operations(request),
-        patch_result=patch_result,
-    )
-    write_patched_manifest(patched_manifest, output_manifest)
+        if applied_numbers:
+            patch_docx_numbers(source_docx, temp_docx, applied_numbers)
+        else:
+            patch_docx_numbers(source_docx, temp_docx, {})
+        if removed_bookmarks:
+            remove_docx_blocks(temp_docx, temp_docx, removed_bookmarks)
+        if reordered_ids:
+            reorder_docx_blocks(temp_docx, temp_docx, bookmark_order_for_compounds(patched_manifest, reordered_ids))
+        patch_result = {
+            "renumbered": applied_numbers,
+            "removed_ids": removed_ids,
+            "removed_bookmarks": removed_bookmarks,
+            "reordered_ids": reordered_ids,
+        }
+        set_manifest_output_paths(patched_manifest, support_docx=output_docx, manifest_path=output_manifest)
+        _append_patch_history(
+            patched_manifest,
+            run_id=state.get("run_id", ""),
+            source_manifest=request.manifest_path,
+            output_manifest=output_manifest,
+            output_docx=output_docx,
+            operations=_patch_operations(request),
+            patch_result=patch_result,
+        )
+        write_patched_manifest(patched_manifest, temp_manifest)
+        temp_docx.replace(output_docx)
+        temp_manifest.replace(output_manifest)
+    except Exception:
+        temp_docx.unlink(missing_ok=True)
+        temp_manifest.unlink(missing_ok=True)
+        raise
 
     artifacts = {
         **state.get("artifacts", {}),
@@ -169,6 +179,10 @@ def _patch_report_path(base_path: Path) -> Path:
     if base_path.name.endswith(".manifest.json"):
         return base_path.with_name(f"{base_path.name[:-len('.manifest.json')]}.patch_report.json")
     return base_path.with_suffix(".patch_report.json")
+
+
+def _temporary_sibling(path: Path) -> Path:
+    return path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
 
 
 def _patch_operations(request) -> dict[str, object]:

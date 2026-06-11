@@ -204,11 +204,17 @@ class PatchWorkflowTests(unittest.TestCase):
             )
             report_path = root / "patched.patch_report.json"
             report = json.loads(report_path.read_text(encoding="utf-8"))
+            patched_docx_exists = patched_docx.exists()
+            patched_manifest_exists = (root / "patched.manifest.json").exists()
+            temp_outputs = [path.name for path in root.iterdir() if path.name.startswith(".patched")]
 
         self.assertEqual(state["status"], "fail")
         self.assertEqual(Path(state["artifacts"]["patch_report"]), report_path)
         self.assertIn("PATCH_APPLY_FAILED", {issue["code"] for issue in state["issues"]})
         self.assertIn("PATCH_APPLY_FAILED", {issue["code"] for issue in report["issues"]})
+        self.assertFalse(patched_docx_exists)
+        self.assertFalse(patched_manifest_exists)
+        self.assertEqual(temp_outputs, [])
 
     def test_patch_workflow_reorders_docx_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
