@@ -59,10 +59,16 @@ class GuiWorkflowTests(unittest.TestCase):
             root = Path(tmp)
             output = root / "support_information.docx"
             package = root / "processed_spectra.zip"
+            processed_mnova = root / "processed_mnova"
+            mnova_reports = root / "mnova_reports"
+            logs = root / "logs"
             manifest = root / "support_information.manifest.json"
             run_summary = root / "support_information.run_summary.json"
-            warnings = root / "logs" / "input_warnings.txt"
-            support_warnings = root / "logs" / "support_warnings.txt"
+            warnings = logs / "input_warnings.txt"
+            support_warnings = logs / "support_warnings.txt"
+            processed_mnova.mkdir()
+            mnova_reports.mkdir()
+            logs.mkdir()
             run_summary.write_text(
                 '{"status":"completed_with_warnings","compound_count":2,"issue_counts":{"warning":3}}',
                 encoding="utf-8",
@@ -77,6 +83,9 @@ class GuiWorkflowTests(unittest.TestCase):
                 "artifacts": {
                     "support_docx": str(output),
                     "processed_spectra_zip": str(package),
+                    "processed_mnova_dir": str(processed_mnova),
+                    "mnova_reports_dir": str(mnova_reports),
+                    "logs_dir": str(logs),
                     "manifest": str(manifest),
                     "run_summary": str(run_summary),
                     "input_warnings": str(warnings),
@@ -88,6 +97,9 @@ class GuiWorkflowTests(unittest.TestCase):
 
         self.assertEqual(summary["support_docx"], str(output.resolve()))
         self.assertEqual(summary["processed_spectra_zip"], str(package.resolve()))
+        self.assertEqual(summary["processed_mnova_dir"], str(processed_mnova.resolve()))
+        self.assertEqual(summary["mnova_reports_dir"], str(mnova_reports.resolve()))
+        self.assertEqual(summary["logs_dir"], str(logs.resolve()))
         self.assertEqual(summary["manifest"], str(manifest.resolve()))
         self.assertEqual(summary["run_summary"], str(run_summary.resolve()))
         self.assertEqual(summary["input_warnings"], str(warnings.resolve()))

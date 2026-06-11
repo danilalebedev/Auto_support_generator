@@ -49,6 +49,9 @@ class SIGeneratorApp:
         self.result_run_summary = StringVar(value="")
         self.result_warnings = StringVar(value="")
         self.result_support_warnings = StringVar(value="")
+        self.result_processed_mnova = StringVar(value="")
+        self.result_mnova_reports = StringVar(value="")
+        self.result_logs = StringVar(value="")
         self.result_overview = StringVar(value="")
         self.existing_manifest = StringVar(value="")
         self.patch_output_docx = StringVar(value="")
@@ -151,12 +154,15 @@ class SIGeneratorApp:
         self._result_row(results, 0, "Summary", self.result_overview)
         self._result_row(results, 1, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"))
         self._result_row(results, 2, "Spectra package", self.result_spectra, lambda: self._open_result_path(self.result_spectra, "Spectra package"))
-        self._result_row(results, 3, "Manifest", self.result_manifest, lambda: self._open_result_path(self.result_manifest, "Manifest"))
-        self._result_row(results, 4, "Run report", self.result_run_summary, lambda: self._open_result_path(self.result_run_summary, "Run report"))
-        self._result_row(results, 5, "Input warnings", self.result_warnings, lambda: self._open_result_path(self.result_warnings, "Input warnings"))
+        self._result_row(results, 3, "Processed Mnova", self.result_processed_mnova, lambda: self._open_result_path(self.result_processed_mnova, "Processed Mnova"))
+        self._result_row(results, 4, "Mnova reports", self.result_mnova_reports, lambda: self._open_result_path(self.result_mnova_reports, "Mnova reports"))
+        self._result_row(results, 5, "Logs", self.result_logs, lambda: self._open_result_path(self.result_logs, "Logs"))
+        self._result_row(results, 6, "Manifest", self.result_manifest, lambda: self._open_result_path(self.result_manifest, "Manifest"))
+        self._result_row(results, 7, "Run report", self.result_run_summary, lambda: self._open_result_path(self.result_run_summary, "Run report"))
+        self._result_row(results, 8, "Input warnings", self.result_warnings, lambda: self._open_result_path(self.result_warnings, "Input warnings"))
         self._result_row(
             results,
-            6,
+            9,
             "Support warnings",
             self.result_support_warnings,
             lambda: self._open_result_path(self.result_support_warnings, "Support warnings"),
@@ -495,6 +501,9 @@ class SIGeneratorApp:
         self.result_run_summary.set("")
         self.result_warnings.set("")
         self.result_support_warnings.set("")
+        self.result_processed_mnova.set("")
+        self.result_mnova_reports.set("")
+        self.result_logs.set("")
         self.result_overview.set("")
 
     def _apply_result_summary(self, summary: dict[str, str]) -> None:
@@ -504,6 +513,9 @@ class SIGeneratorApp:
         self.result_run_summary.set(summary.get("run_summary", ""))
         self.result_warnings.set(summary.get("input_warnings", ""))
         self.result_support_warnings.set(summary.get("support_warnings", ""))
+        self.result_processed_mnova.set(summary.get("processed_mnova_dir", ""))
+        self.result_mnova_reports.set(summary.get("mnova_reports_dir", ""))
+        self.result_logs.set(summary.get("logs_dir", ""))
         self.result_overview.set(summary.get("overview", ""))
         support_path = summary.get("support_docx")
         if support_path:
@@ -696,6 +708,9 @@ def _build_result_summary(state: dict[str, Any]) -> dict[str, str]:
     summary = {
         "support_docx": str(Path(artifacts.get("support_docx", output_path)).resolve()),
         "processed_spectra_zip": _resolved_artifact(artifacts, "processed_spectra_zip"),
+        "processed_mnova_dir": _resolved_artifact(artifacts, "processed_mnova_dir"),
+        "mnova_reports_dir": _resolved_artifact(artifacts, "mnova_reports_dir"),
+        "logs_dir": _resolved_artifact(artifacts, "logs_dir"),
         "manifest": _resolved_artifact(artifacts, "manifest"),
         "run_summary": report_path,
         "input_warnings": _resolved_artifact(artifacts, "input_warnings"),
