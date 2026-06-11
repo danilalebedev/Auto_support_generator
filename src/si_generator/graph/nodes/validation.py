@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ..compound_store import ordered_compounds
 from ..state import GenerateSIState, Issue
-from ...input_validation import validate_compound_inputs
+from ...domain.input_validation import validate_compound_inputs
 from ...nmr_validation import validate_support
 
 

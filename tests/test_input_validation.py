@@ -4,11 +4,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from si_generator.domain.input_validation import validate_compound_inputs as validate_domain_compound_inputs
 from si_generator.input_validation import validate_compound_inputs
 from si_generator.models import Compound
 
 
 class InputValidationTests(unittest.TestCase):
+    def test_legacy_module_reexports_domain_input_validation_api(self) -> None:
+        self.assertIs(validate_compound_inputs, validate_domain_compound_inputs)
+
     def test_solid_state_variants_require_melting_point(self) -> None:
         cases = [
             {"state": "solid", "color": ""},
