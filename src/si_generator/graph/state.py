@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
-from ..domain.types import JournalProfile, ReferenceStore, SpectrumRenderSpec
+from ..domain.types import GenerationConfig, JournalProfile, ReferenceStore, RuntimeConfig, SpectraProcessingConfig, SpectrumRenderSpec
 from ..models import Compound
 from ..render.si_document import SIDocument
 
@@ -53,6 +53,9 @@ class GenerateSIState(TypedDict, total=False):
     style_config: dict[str, Any]
     journal_profile: JournalProfile
     reference_store: ReferenceStore
+    spectra_config: SpectraProcessingConfig
+    generation_config: GenerationConfig
+    runtime_config: RuntimeConfig
     input_compounds: list[Compound]
     compounds: dict[str, Compound]
     order: list[str]

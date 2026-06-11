@@ -209,6 +209,7 @@ class GenerationConfig(TypedDict, total=False):
     include_elemental_analysis: bool
     include_references: bool
     include_xrd: bool
+    check_support: bool
     validate_only: bool
     patch_existing_support: bool
 
@@ -232,6 +233,7 @@ class ManifestCompound(TypedDict, total=False):
 class Manifest(TypedDict, total=False):
     run_id: str
     input_hashes: dict[str, str]
+    configs: dict[str, object]
     order: list[str]
     compounds: dict[str, ManifestCompound]
 
