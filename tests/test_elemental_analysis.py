@@ -29,6 +29,13 @@ class ElementalAnalysisTests(unittest.TestCase):
             "Anal. Calcd for C17H11FN2O3: C, 65.81; H, 3.57; N, 9.03. Found: C, 66.03; H, 3.55; N, 8.92.",
         )
 
+    def test_builds_block_for_found_non_default_elements(self) -> None:
+        block = calculate_elemental_analysis_block("C2H6OS", found="C, 30.75; H, 7.74; S, 41.04")
+
+        self.assertIn("S", block["calculated"])
+        self.assertEqual(block["found"]["S"], 41.04)
+        self.assertIn("S,", block["formatted_text"])
+
     def test_parse_found_percentages_accepts_mapping(self) -> None:
         self.assertEqual(parse_found_percentages({"C": 68.421, "H": 5.314}), {"C": 68.42, "H": 5.31})
 

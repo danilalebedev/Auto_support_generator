@@ -74,6 +74,7 @@ def validate_elemental_analysis(compounds: list[Compound], tolerance_percent: fl
         for element, found_value in block.get("found", {}).items():
             calculated_value = block.get("calculated", {}).get(element)
             if calculated_value is None:
+                _append_validation_issue(compound, "ELEMENTAL_ANALYSIS_UNEXPECTED_ELEMENT", f"EA {element} found {found_value:.2f}, but {element} is absent from formula")
                 continue
             if abs(found_value - calculated_value) > tolerance_percent:
                 _append_validation_issue(compound, "ELEMENTAL_ANALYSIS_MISMATCH", f"EA {element} calcd {calculated_value:.2f}, found {found_value:.2f}")

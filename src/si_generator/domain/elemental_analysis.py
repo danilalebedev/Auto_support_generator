@@ -31,11 +31,12 @@ def calculate_elemental_analysis_block(
     found: dict[str, float] | str | None = None,
     elements: tuple[str, ...] = DEFAULT_ELEMENTS,
 ) -> ElementalAnalysisBlock:
-    calculated = calculate_elemental_percentages(formula, elements)
+    found_percentages = parse_found_percentages(found)
+    calculated = calculate_elemental_percentages(formula, _analysis_elements(elements, found_percentages))
     block: ElementalAnalysisBlock = {
         "formula": formula,
         "calculated": calculated,
-        "found": parse_found_percentages(found),
+        "found": found_percentages,
     }
     block["formatted_text"] = format_elemental_analysis(block)
     return block
@@ -68,7 +69,7 @@ def format_elemental_analysis(block: ElementalAnalysisBlock) -> str:
     formula = str(block.get("formula", "")).strip()
     calculated = block.get("calculated", {})
     found = block.get("found", {})
-    elements = [element for element in calculated if element in calculated or element in found]
+    elements = _format_elements(calculated, found)
     if not elements:
         return ""
 
@@ -86,3 +87,19 @@ def found_from_block(value: Any) -> dict[str, float] | str | None:
     if isinstance(value, str):
         return value
     return None
+
+
+def _analysis_elements(default_elements: tuple[str, ...], found: dict[str, float]) -> tuple[str, ...]:
+    elements: list[str] = list(default_elements)
+    for element in found:
+        if element not in elements:
+            elements.append(element)
+    return tuple(elements)
+
+
+def _format_elements(calculated: dict[str, float], found: dict[str, float]) -> list[str]:
+    elements = list(calculated)
+    for element in found:
+        if element not in elements:
+            elements.append(element)
+    return elements

@@ -79,6 +79,14 @@ class NmrValidationTests(unittest.TestCase):
         self.assertEqual(compound.elemental_analysis["found"]["N"], 8.92)
         self.assertEqual(compound.validation_issues, [])
 
+    def test_elemental_analysis_validation_warns_for_unexpected_element(self) -> None:
+        compound = Compound(number="x", name="X", formula="C2H6O", elemental_analysis={"found": {"C": 52.10, "N": 1.25}})
+
+        validate_elemental_analysis([compound])
+
+        self.assertIn("EA N found 1.25", compound.nmr_check_warning)
+        self.assertEqual(compound.validation_issues[0]["code"], "ELEMENTAL_ANALYSIS_UNEXPECTED_ELEMENT")
+
 
 if __name__ == "__main__":
     unittest.main()
