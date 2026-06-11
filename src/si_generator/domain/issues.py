@@ -20,3 +20,17 @@ def generation_status(issue_counts: Mapping[str, int]) -> str:
     if issue_counts.get("warning", 0):
         return "completed_with_warnings"
     return "completed"
+
+
+def issues_by_compound(issues: Iterable[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for issue in issues:
+        compound_id = str(issue.get("compound_id") or "").strip()
+        if not compound_id:
+            continue
+        grouped.setdefault(compound_id, []).append(dict(issue))
+    return grouped
+
+
+def compound_issue_counts(issues: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    return {compound_id: len(items) for compound_id, items in issues_by_compound(issues).items()}

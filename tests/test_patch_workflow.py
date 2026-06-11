@@ -63,6 +63,7 @@ class PatchWorkflowTests(unittest.TestCase):
         self.assertEqual(Path(state["artifacts"]["patch_report"]), root / "support_information_renumbered.patch_report.json")
         self.assertEqual(patch_report["status"], "pass")
         self.assertEqual(patch_report["operations"]["renumber"], {"2a": "5a"})
+        self.assertEqual(patch_report["compound_issue_counts"], {})
         self.assertEqual(patched["compounds"]["cmp_001"]["number"], "5a")
         self.assertIn("Example (5a)", text)
         self.assertNotIn("Example (2a)", text)

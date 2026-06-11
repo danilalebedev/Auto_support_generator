@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ...domain.issues import count_issues
+from ...domain.issues import compound_issue_counts, count_issues
 from ...domain.manifest import check_manifest, load_manifest, manifest_has_errors
 from ..state import CheckSIState
 
@@ -45,6 +45,7 @@ def build_check_report(state: CheckSIState, status: str, issues: list[dict], rep
         "support_docx": str(Path(request.support_docx)) if request.support_docx else "",
         "strict_artifacts": request.strict_artifacts,
         "issue_counts": count_issues(issues),
+        "compound_issue_counts": compound_issue_counts(issues),
         "issues": issues,
         "artifacts": {
             **state.get("artifacts", {}),

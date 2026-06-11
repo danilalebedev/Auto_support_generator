@@ -50,6 +50,7 @@ class CheckWorkflowTests(unittest.TestCase):
         self.assertEqual(Path(state["artifacts"]["check_report"]), report_path)
         self.assertEqual(report["status"], "pass")
         self.assertEqual(report["issue_counts"]["error"], 0)
+        self.assertEqual(report["compound_issue_counts"], {})
 
     def test_manifest_check_reports_missing_docx_and_broken_compound_entry(self) -> None:
         manifest = {

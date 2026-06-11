@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from ...domain.bookmarks import bookmark_name_for_block_id
-from ...domain.issues import count_issues, generation_status
+from ...domain.issues import compound_issue_counts, count_issues, generation_status, issues_by_compound
 from ..state import GenerateSIState
 
 
@@ -85,6 +85,7 @@ def build_run_summary(state: GenerateSIState, manifest: dict | None = None) -> d
     manifest = manifest or build_manifest(state)
     issues = list(state.get("issues", []))
     issue_counts = count_issues(issues)
+    grouped_issues = issues_by_compound(issues)
     compounds = state.get("compounds", {})
     order = list(state.get("order", []))
 
@@ -93,6 +94,7 @@ def build_run_summary(state: GenerateSIState, manifest: dict | None = None) -> d
         "status": generation_status(issue_counts),
         "compound_count": len(order),
         "issue_counts": issue_counts,
+        "compound_issue_counts": compound_issue_counts(issues),
         "issues": issues,
         "output_paths": manifest.get("output_paths", {}),
         "artifacts": manifest.get("artifacts", {}),
@@ -104,7 +106,8 @@ def build_run_summary(state: GenerateSIState, manifest: dict | None = None) -> d
                 "number": compounds[compound_id].number,
                 "name": compounds[compound_id].name,
                 "formula": compounds[compound_id].formula,
-                "issue_count": len(_issues_for_compound(issues, compound_id)),
+                "issue_count": len(grouped_issues.get(compound_id, [])),
+                "issues": _compact_issues(grouped_issues.get(compound_id, [])),
             }
             for compound_id in order
             if compound_id in compounds
@@ -176,8 +179,15 @@ def _compound_artifacts(compound) -> dict[str, str]:
     return artifacts
 
 
-def _issues_for_compound(issues: list[dict], compound_id: str) -> list[dict]:
-    return [issue for issue in issues if issue.get("compound_id") == compound_id]
+def _compact_issues(issues: list[dict]) -> list[dict[str, str]]:
+    return [
+        {
+            "code": str(issue.get("code", "")),
+            "severity": str(issue.get("severity", "warning")),
+            "message": str(issue.get("message", "")),
+        }
+        for issue in issues
+    ]
 
 
 def _relative_paths(base_dir: Path, paths: dict[str, str]) -> dict[str, str]:

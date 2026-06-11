@@ -73,8 +73,10 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(run_summary["status"], "completed_with_warnings")
         self.assertEqual(run_summary["compound_count"], 1)
         self.assertEqual(run_summary["issue_counts"]["warning"], 1)
+        self.assertEqual(run_summary["compound_issue_counts"], {"cmp_001": 1})
         self.assertEqual(run_summary["compounds"][0]["id"], "cmp_001")
         self.assertEqual(run_summary["compounds"][0]["issue_count"], 1)
+        self.assertEqual(run_summary["compounds"][0]["issues"][0]["code"], "INPUT_WARNING")
         self.assertEqual(run_summary["output_paths"]["support_docx"], str(output_path))
 
 
