@@ -15,6 +15,7 @@ from .domain.patching import parse_renumber_map, parse_reorder_list
 from .domain.types import SpectrumEmbedMode
 from .external_tools import find_mnova_executable
 from .graph.state import CheckSIRequest, GenerateSIRequest, PatchSIRequest
+from .gui_settings import load_gui_settings, save_gui_settings
 from .workflows.check_si import run_check_si
 from .workflows.generate_si import output_path_from_state, run_generate_si
 from .workflows.patch_si import run_patch_si
@@ -52,8 +53,10 @@ class SIGeneratorApp:
         self._last_output_folder: Path | None = None
         self._log_queue: queue.Queue[Any] = queue.Queue()
 
+        self._load_saved_settings()
         self._configure_style()
         self._build_ui()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._poll_log_queue()
 
     def _configure_style(self) -> None:
@@ -209,6 +212,7 @@ class SIGeneratorApp:
         path = filedialog.askopenfilename(filetypes=filetypes)
         if path:
             variable.set(path)
+            self._save_settings()
 
     def _browse_output(self) -> None:
         path = filedialog.asksaveasfilename(
@@ -219,6 +223,7 @@ class SIGeneratorApp:
         if path:
             variable_path = Path(path)
             self.output_docx.set(str(variable_path))
+            self._save_settings()
 
     def _browse_patch_output(self) -> None:
         path = filedialog.asksaveasfilename(
@@ -228,6 +233,7 @@ class SIGeneratorApp:
         )
         if path:
             self.patch_output_docx.set(path)
+            self._save_settings()
 
     def _load_examples(self) -> None:
         examples = _examples_dir()
@@ -241,6 +247,7 @@ class SIGeneratorApp:
         self.spectra_zip.set(str(spectra))
         self.output_docx.set(str(_default_output_path()))
         self.status_text.set("Example loaded")
+        self._save_settings()
 
     def _open_examples_folder(self) -> None:
         examples = _examples_dir()
@@ -256,6 +263,7 @@ class SIGeneratorApp:
             return
         self.mnova_exe.set(str(path))
         self.status_text.set("MestReNova detected")
+        self._save_settings()
 
     def _start_generation(self) -> None:
         if self._is_running:
@@ -269,6 +277,7 @@ class SIGeneratorApp:
             return
 
         request.output_path.parent.mkdir(parents=True, exist_ok=True)
+        self._save_settings()
         self._is_running = True
         self.run_button.configure(state="disabled")
         self.status_text.set("Running")
@@ -291,6 +300,7 @@ class SIGeneratorApp:
         except ValueError as exc:
             messagebox.showerror("SI Generator", str(exc))
             return
+        self._save_settings()
         self._start_background_operation(
             "Check manifest",
             f"Manifest: {request.manifest_path}\n",
@@ -312,6 +322,7 @@ class SIGeneratorApp:
         except ValueError as exc:
             messagebox.showerror("SI Generator", str(exc))
             return
+        self._save_settings()
         self._start_background_operation(
             "Patch SI",
             f"Manifest: {request.manifest_path}\nOutput: {request.output_docx or 'auto'}\n",
@@ -438,6 +449,59 @@ class SIGeneratorApp:
         support_path = summary.get("support_docx")
         if support_path:
             self._last_output_folder = Path(support_path).expanduser().parent
+        if summary.get("manifest"):
+            self.existing_manifest.set(summary["manifest"])
+        self._save_settings()
+
+    def _load_saved_settings(self) -> None:
+        settings = load_gui_settings()
+        for key, variable in self._string_settings_variables().items():
+            value = settings.get(key)
+            if isinstance(value, str):
+                variable.set(value)
+        for key, variable in self._bool_settings_variables().items():
+            value = settings.get(key)
+            if isinstance(value, bool):
+                variable.set(value)
+
+    def _save_settings(self) -> None:
+        values: dict[str, str | bool] = {}
+        for key, variable in self._string_settings_variables().items():
+            values[key] = variable.get()
+        for key, variable in self._bool_settings_variables().items():
+            values[key] = bool(variable.get())
+        try:
+            save_gui_settings(values)
+        except OSError:
+            return
+
+    def _string_settings_variables(self) -> dict[str, StringVar]:
+        return {
+            "input_path": self.input_path,
+            "spectra_zip": self.spectra_zip,
+            "template_docx": self.template_docx,
+            "style_config": self.style_config,
+            "journal_profile": self.journal_profile,
+            "references_file": self.references_file,
+            "mnova_exe": self.mnova_exe,
+            "output_docx": self.output_docx,
+            "input_kind": self.input_kind,
+            "insert_spectra_as": self.insert_spectra_as,
+            "existing_manifest": self.existing_manifest,
+            "patch_output_docx": self.patch_output_docx,
+            "patch_renumber": self.patch_renumber,
+            "patch_reorder": self.patch_reorder,
+        }
+
+    def _bool_settings_variables(self) -> dict[str, BooleanVar]:
+        return {
+            "check_support": self.check_support,
+            "generate_loadings": self.generate_loadings,
+        }
+
+    def _on_close(self) -> None:
+        self._save_settings()
+        self.root.destroy()
 
 
 class _LogText(ttk.Frame):
