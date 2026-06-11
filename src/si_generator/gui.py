@@ -282,10 +282,8 @@ class SIGeneratorApp:
         if not table.exists() or not spectra.exists():
             messagebox.showerror("Auto Support Generator", f"Example files were not found in:\n{examples}")
             return
-        self.input_kind.set("word")
-        self.input_path.set(str(table))
-        self.spectra_zip.set(str(spectra))
-        self.output_docx.set(str(default_output_path()))
+        for field, value in _example_field_updates(table, spectra, default_output_path()).items():
+            getattr(self, field).set(value)
         self.status_text.set("Example loaded")
         self._save_settings()
 
@@ -813,6 +811,24 @@ def _dialog_initialdir(*candidates: str | Path | None) -> str | None:
         if str(parent) not in {"", "."} and parent.exists():
             return str(parent.resolve())
     return None
+
+
+def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) -> dict[str, str]:
+    return {
+        "input_kind": "word",
+        "input_path": str(table),
+        "spectra_zip": str(spectra_zip),
+        "output_docx": str(output_docx),
+        "template_docx": "",
+        "style_config": "",
+        "journal_profile": "",
+        "references_file": "",
+        "existing_manifest": "",
+        "patch_output_docx": "",
+        "patch_renumber": "",
+        "patch_remove": "",
+        "patch_reorder": "",
+    }
 
 
 def _required_existing_file(raw_path: str, message: str, *, suffixes: tuple[str, ...] = ()) -> Path:

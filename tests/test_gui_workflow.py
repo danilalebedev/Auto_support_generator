@@ -12,6 +12,7 @@ from si_generator.gui import (
     _build_patch_summary,
     _build_result_summary,
     _dialog_initialdir,
+    _example_field_updates,
     _existing_result_path,
     _report_overview,
 )
@@ -295,6 +296,25 @@ class GuiWorkflowTests(unittest.TestCase):
             result = _dialog_initialdir(Path(tmp) / "missing" / "out.docx", fallback)
 
         self.assertEqual(result, str(fallback.parent.resolve()))
+
+    def test_example_field_updates_clear_project_specific_paths(self) -> None:
+        updates = _example_field_updates(
+            Path("examples/test_input.docx"),
+            Path("examples/test_input.zip"),
+            Path("output/support_information.docx"),
+        )
+
+        self.assertEqual(updates["input_kind"], "word")
+        self.assertEqual(updates["input_path"], str(Path("examples/test_input.docx")))
+        self.assertEqual(updates["spectra_zip"], str(Path("examples/test_input.zip")))
+        self.assertEqual(updates["output_docx"], str(Path("output/support_information.docx")))
+        self.assertEqual(updates["template_docx"], "")
+        self.assertEqual(updates["style_config"], "")
+        self.assertEqual(updates["journal_profile"], "")
+        self.assertEqual(updates["references_file"], "")
+        self.assertEqual(updates["existing_manifest"], "")
+        self.assertEqual(updates["patch_renumber"], "")
+        self.assertNotIn("mnova_exe", updates)
 
 
 if __name__ == "__main__":
