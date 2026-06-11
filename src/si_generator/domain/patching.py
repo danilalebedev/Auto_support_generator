@@ -33,6 +33,10 @@ def parse_reorder_list(text: str) -> tuple[str, ...]:
     return tuple(item.strip() for item in text.split(",") if item.strip())
 
 
+def parse_remove_list(text: str) -> tuple[str, ...]:
+    return tuple(item.strip() for item in text.split(",") if item.strip())
+
+
 def renumber_manifest(manifest: dict[str, Any], renumber: dict[str, str]) -> tuple[dict[str, Any], dict[str, str]]:
     patched = json.loads(json.dumps(manifest, ensure_ascii=False))
     compounds = patched.get("compounds", {})
@@ -92,6 +96,37 @@ def reorder_manifest(manifest: dict[str, Any], order_tokens: tuple[str, ...]) ->
     return patched, resolved
 
 
+def remove_manifest(manifest: dict[str, Any], remove_tokens: tuple[str, ...]) -> tuple[dict[str, Any], list[str], list[str]]:
+    patched = json.loads(json.dumps(manifest, ensure_ascii=False))
+    if not remove_tokens:
+        return patched, [], []
+
+    compounds = patched.get("compounds", {}) or {}
+    id_by_number = {
+        str(compound.get("number")): str(compound_id)
+        for compound_id, compound in compounds.items()
+        if isinstance(compound, dict) and compound.get("number")
+    }
+
+    removed_ids: list[str] = []
+    removed_bookmarks: list[str] = []
+    for token in remove_tokens:
+        compound_id = token if token in compounds else id_by_number.get(token)
+        if not compound_id:
+            raise ValueError(f"Remove token '{token}' does not match a compound id or number.")
+        if compound_id in removed_ids:
+            raise ValueError(f"Remove token '{token}' resolves to duplicate compound id '{compound_id}'.")
+        compound = compounds.get(compound_id, {})
+        if isinstance(compound, dict) and compound.get("docx_bookmark"):
+            removed_bookmarks.append(str(compound["docx_bookmark"]))
+        removed_ids.append(compound_id)
+
+    patched["order"] = [compound_id for compound_id in patched.get("order", []) if str(compound_id) not in set(removed_ids)]
+    for compound_id in removed_ids:
+        compounds.pop(compound_id, None)
+    return patched, removed_ids, removed_bookmarks
+
+
 def patch_docx_numbers(input_docx: str | Path, output_docx: str | Path, renumber: dict[str, str]) -> Path:
     input_docx = Path(input_docx)
     output_docx = Path(output_docx)
@@ -107,6 +142,42 @@ def patch_docx_numbers(input_docx: str | Path, output_docx: str | Path, renumber
     for text_node in root.iter(f"{{{WORD_NS}}}t"):
         if text_node.text:
             text_node.text = _renumber_text(text_node.text, renumber)
+
+    with zipfile.ZipFile(output_docx, "w", zipfile.ZIP_DEFLATED) as target:
+        for name, data in members.items():
+            target.writestr(name, data)
+        target.writestr("word/document.xml", ET.tostring(root, encoding="utf-8", xml_declaration=True))
+    return output_docx
+
+
+def remove_docx_blocks(input_docx: str | Path, output_docx: str | Path, bookmark_names: list[str]) -> Path:
+    if not bookmark_names:
+        return Path(output_docx)
+
+    input_docx = Path(input_docx)
+    output_docx = Path(output_docx)
+    output_docx.parent.mkdir(parents=True, exist_ok=True)
+    if input_docx.resolve() != output_docx.resolve():
+        shutil.copy2(input_docx, output_docx)
+
+    with zipfile.ZipFile(output_docx, "r") as source:
+        document_xml = source.read("word/document.xml")
+        members = {item.filename: source.read(item.filename) for item in source.infolist() if item.filename != "word/document.xml"}
+
+    root = ET.fromstring(document_xml)
+    body = root.find(f"{{{WORD_NS}}}body")
+    if body is None:
+        raise ValueError("DOCX document body was not found.")
+
+    ranges = _bookmark_body_ranges(body, bookmark_names)
+    if len(ranges) != len(bookmark_names):
+        missing = [name for name in bookmark_names if name not in ranges]
+        raise ValueError("DOCX is missing bookmark ranges: " + ", ".join(missing))
+
+    remove_indexes = {index for name in bookmark_names for index in range(ranges[name][0], ranges[name][1] + 1)}
+    for index, child in enumerate(list(body)):
+        if index in remove_indexes:
+            body.remove(child)
 
     with zipfile.ZipFile(output_docx, "w", zipfile.ZIP_DEFLATED) as target:
         for name, data in members.items():

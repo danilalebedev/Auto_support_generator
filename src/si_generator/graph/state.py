@@ -52,6 +52,7 @@ class CheckSIRequest:
 class PatchSIRequest:
     manifest_path: Path
     renumber: dict[str, str]
+    remove: tuple[str, ...] = ()
     reorder: tuple[str, ...] = ()
     support_docx: Path | None = None
     output_docx: Path | None = None

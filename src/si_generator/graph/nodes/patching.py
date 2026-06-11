@@ -8,6 +8,8 @@ from ...domain.patching import (
     default_patched_docx_path,
     patch_docx_numbers,
     renumber_manifest,
+    remove_docx_blocks,
+    remove_manifest,
     reorder_docx_blocks,
     reorder_manifest,
     set_manifest_output_paths,
@@ -32,6 +34,9 @@ def apply_renumber_patch_node(state: PatchSIState) -> dict:
 
     patched_manifest = source_manifest
     applied_numbers: dict[str, str] = {}
+    removed_bookmarks: list[str] = []
+    if request.remove:
+        patched_manifest, _removed_ids, removed_bookmarks = remove_manifest(patched_manifest, request.remove)
     if request.renumber:
         patched_manifest, applied_numbers = renumber_manifest(patched_manifest, request.renumber)
     if request.reorder:
@@ -43,6 +48,8 @@ def apply_renumber_patch_node(state: PatchSIState) -> dict:
         patch_docx_numbers(source_docx, output_docx, applied_numbers)
     else:
         patch_docx_numbers(source_docx, output_docx, {})
+    if removed_bookmarks:
+        remove_docx_blocks(output_docx, output_docx, removed_bookmarks)
     if reordered_ids:
         reorder_docx_blocks(output_docx, output_docx, bookmark_order_for_compounds(patched_manifest, reordered_ids))
     set_manifest_output_paths(patched_manifest, support_docx=output_docx, manifest_path=output_manifest)

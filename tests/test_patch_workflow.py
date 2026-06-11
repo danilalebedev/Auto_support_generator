@@ -13,7 +13,7 @@ from si_generator.cli import main as cli_main
 from si_generator.docx_builder import build_document_from_model
 from si_generator.domain.bookmarks import bookmark_name_for_block_id
 from si_generator.domain.manifest import check_manifest, manifest_has_errors
-from si_generator.domain.patching import parse_renumber_map, parse_reorder_list
+from si_generator.domain.patching import parse_remove_list, parse_renumber_map, parse_reorder_list
 from si_generator.graph.state import PatchSIRequest
 from si_generator.models import Compound
 from si_generator.render.document_model import build_si_document_model
@@ -30,6 +30,9 @@ class PatchWorkflowTests(unittest.TestCase):
 
     def test_parse_reorder_list_accepts_numbers_or_ids(self) -> None:
         self.assertEqual(parse_reorder_list("2b, cmp_001"), ("2b", "cmp_001"))
+
+    def test_parse_remove_list_accepts_numbers_or_ids(self) -> None:
+        self.assertEqual(parse_remove_list("2a, cmp_002"), ("2a", "cmp_002"))
 
     def test_patch_workflow_renumbers_docx_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -86,6 +89,38 @@ class PatchWorkflowTests(unittest.TestCase):
         self.assertIn("Patch check passed", stdout.getvalue())
         self.assertIn("Example (6a)", text)
 
+    def test_cli_patch_manifest_remove_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, source_manifest = _write_source_support(
+                root,
+                [
+                    Compound(id="cmp_001", number="2a", name="Example A", color="white", state="solid"),
+                    Compound(id="cmp_002", number="2b", name="Example B", color="yellow", state="solid"),
+                ],
+            )
+            patched_docx = root / "patched_removed.docx"
+            stdout = StringIO()
+
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                exit_code = cli_main(
+                    [
+                        "--patch-manifest",
+                        str(source_manifest),
+                        "--remove",
+                        "2a",
+                        "--patched-output",
+                        str(patched_docx),
+                    ]
+                )
+
+            text = "\n".join(paragraph.text for paragraph in Document(patched_docx).paragraphs)
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Patch check passed", stdout.getvalue())
+        self.assertNotIn("Example A (2a)", text)
+        self.assertIn("Example B (2b)", text)
+
     def test_patch_workflow_reorders_docx_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -114,6 +149,37 @@ class PatchWorkflowTests(unittest.TestCase):
         self.assertEqual(state["status"], "pass")
         self.assertEqual(patched["order"], ["cmp_002", "cmp_001"])
         self.assertLess(text.index("Example B (2b)"), text.index("Example A (2a)"))
+
+    def test_patch_workflow_removes_docx_block_and_manifest_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, source_manifest = _write_source_support(
+                root,
+                [
+                    Compound(id="cmp_001", number="2a", name="Example A", color="white", state="solid"),
+                    Compound(id="cmp_002", number="2b", name="Example B", color="yellow", state="solid"),
+                ],
+            )
+            patched_docx = root / "support_information_removed.docx"
+            patched_manifest = root / "support_information_removed.manifest.json"
+
+            state = run_patch_si(
+                PatchSIRequest(
+                    manifest_path=source_manifest,
+                    renumber={},
+                    remove=("2a",),
+                    output_docx=patched_docx,
+                    output_manifest=patched_manifest,
+                )
+            )
+            patched = json.loads(patched_manifest.read_text(encoding="utf-8"))
+            text = "\n".join(paragraph.text for paragraph in Document(patched_docx).paragraphs)
+
+        self.assertEqual(state["status"], "pass")
+        self.assertEqual(patched["order"], ["cmp_002"])
+        self.assertNotIn("cmp_001", patched["compounds"])
+        self.assertNotIn("Example A (2a)", text)
+        self.assertIn("Example B (2b)", text)
 
 
 def _write_source_support(root: Path, compounds: list[Compound] | None = None) -> tuple[Path, Path]:

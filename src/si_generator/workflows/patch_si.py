@@ -3,7 +3,7 @@ from __future__ import annotations
 from argparse import Namespace
 from pathlib import Path
 
-from ..domain.patching import parse_renumber_map, parse_reorder_list
+from ..domain.patching import parse_remove_list, parse_renumber_map, parse_reorder_list
 from ..graph.graphs import build_patch_si_graph
 from ..graph.state import PatchSIRequest, PatchSIState, make_run_id
 
@@ -21,6 +21,7 @@ def patch_request_from_args(args: Namespace) -> PatchSIRequest:
     return PatchSIRequest(
         manifest_path=Path(args.patch_manifest),
         renumber=parse_renumber_map(args.renumber) if getattr(args, "renumber", None) else {},
+        remove=parse_remove_list(getattr(args, "remove", "") or ""),
         reorder=parse_reorder_list(getattr(args, "reorder", "") or ""),
         support_docx=Path(args.support_docx) if getattr(args, "support_docx", None) else None,
         output_docx=Path(args.patched_output) if getattr(args, "patched_output", None) else None,

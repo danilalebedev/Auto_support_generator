@@ -98,12 +98,14 @@ class GuiWorkflowTests(unittest.TestCase):
             request = _build_patch_request(
                 manifest_text=str(manifest),
                 renumber_text="2a=3a,2b=3b",
+                remove_text="2c",
                 reorder_text="2b,2a",
                 output_docx_text=str(output),
             )
 
         self.assertEqual(request.manifest_path, manifest)
         self.assertEqual(request.renumber, {"2a": "3a", "2b": "3b"})
+        self.assertEqual(request.remove, ("2c",))
         self.assertEqual(request.reorder, ("2b", "2a"))
         self.assertEqual(request.output_docx, output)
 
@@ -112,10 +114,11 @@ class GuiWorkflowTests(unittest.TestCase):
             manifest = Path(tmp) / "support_information.manifest.json"
             manifest.write_text("{}", encoding="utf-8")
 
-            with self.assertRaisesRegex(ValueError, "renumber or reorder"):
+            with self.assertRaisesRegex(ValueError, "renumber, remove, or reorder"):
                 _build_patch_request(
                     manifest_text=str(manifest),
                     renumber_text="",
+                    remove_text="",
                     reorder_text="",
                 )
 

@@ -603,10 +603,21 @@ py -m si_generator ^
   --patched-output output\support_information_renumbered.docx
 ```
 
-Сейчас patch workflow поддерживает безопасную перенумерацию и перестановку compound-блоков по
+Сейчас patch workflow поддерживает безопасную перенумерацию, удаление и перестановку compound-блоков по
 `manifest` и невидимым Word bookmarks: он создает новый `.docx`, новый `.manifest.json` и сразу
 проверяет, что bookmarks в документе совпадают с manifest. Замена отдельных структур будет добавлена
 отдельной patch-операцией.
+
+Удалить одно или несколько соединений без полной регенерации:
+
+```powershell
+py -m si_generator ^
+  --patch-manifest output\support_information.manifest.json ^
+  --remove 2a,2c ^
+  --patched-output output\support_information_removed.docx
+```
+
+В `--remove` можно указывать номера соединений или внутренние `cmp_...` id из manifest.
 
 Поменять порядок compound-блоков без полной регенерации:
 

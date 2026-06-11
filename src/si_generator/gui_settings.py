@@ -22,6 +22,7 @@ STRING_FIELDS = (
     "existing_manifest",
     "patch_output_docx",
     "patch_renumber",
+    "patch_remove",
     "patch_reorder",
 )
 BOOL_FIELDS = ("check_support", "generate_loadings")

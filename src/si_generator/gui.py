@@ -10,7 +10,7 @@ from tkinter import ttk
 from typing import Any
 
 from .domain.manifest import manifest_has_errors
-from .domain.patching import parse_renumber_map, parse_reorder_list
+from .domain.patching import parse_remove_list, parse_renumber_map, parse_reorder_list
 from .domain.types import SpectrumEmbedMode
 from .external_tools import find_mnova_executable
 from .graph.state import CheckSIRequest, GenerateSIRequest, PatchSIRequest
@@ -49,6 +49,7 @@ class SIGeneratorApp:
         self.existing_manifest = StringVar(value="")
         self.patch_output_docx = StringVar(value="")
         self.patch_renumber = StringVar(value="")
+        self.patch_remove = StringVar(value="")
         self.patch_reorder = StringVar(value="")
 
         self._is_running = False
@@ -164,9 +165,12 @@ class SIGeneratorApp:
         ttk.Label(tools, text="Renumber").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
         ttk.Entry(tools, textvariable=self.patch_renumber).grid(row=2, column=1, sticky="ew", pady=4)
         ttk.Label(tools, text="Example: 2a=3a,2b=3b", style="Muted.TLabel").grid(row=2, column=2, sticky="w", padx=(8, 0), pady=4)
-        ttk.Label(tools, text="Reorder").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(tools, textvariable=self.patch_reorder).grid(row=3, column=1, sticky="ew", pady=4)
-        ttk.Button(tools, text="Apply patch", command=self._start_patch).grid(row=3, column=2, sticky="e", padx=(8, 0), pady=4)
+        ttk.Label(tools, text="Remove").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(tools, textvariable=self.patch_remove).grid(row=3, column=1, sticky="ew", pady=4)
+        ttk.Label(tools, text="Example: 2a,2c", style="Muted.TLabel").grid(row=3, column=2, sticky="w", padx=(8, 0), pady=4)
+        ttk.Label(tools, text="Reorder").grid(row=4, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(tools, textvariable=self.patch_reorder).grid(row=4, column=1, sticky="ew", pady=4)
+        ttk.Button(tools, text="Apply patch", command=self._start_patch).grid(row=4, column=2, sticky="e", padx=(8, 0), pady=4)
 
         log_frame = ttk.LabelFrame(outer, text="Run Log", padding=8)
         log_frame.grid(row=5, column=0, sticky="nsew")
@@ -326,6 +330,7 @@ class SIGeneratorApp:
             request = _build_patch_request(
                 manifest_text=self.existing_manifest.get(),
                 renumber_text=self.patch_renumber.get(),
+                remove_text=self.patch_remove.get(),
                 reorder_text=self.patch_reorder.get(),
                 output_docx_text=self.patch_output_docx.get(),
             )
@@ -504,6 +509,7 @@ class SIGeneratorApp:
             "existing_manifest": self.existing_manifest,
             "patch_output_docx": self.patch_output_docx,
             "patch_renumber": self.patch_renumber,
+            "patch_remove": self.patch_remove,
             "patch_reorder": self.patch_reorder,
         }
 
@@ -601,17 +607,20 @@ def _build_patch_request(
     *,
     manifest_text: str,
     renumber_text: str,
-    reorder_text: str,
+    remove_text: str = "",
+    reorder_text: str = "",
     output_docx_text: str = "",
 ) -> PatchSIRequest:
     manifest_path = _required_existing_file(manifest_text, "Choose an existing manifest JSON.")
     renumber = parse_renumber_map(renumber_text) if renumber_text.strip() else {}
+    remove = parse_remove_list(remove_text)
     reorder = parse_reorder_list(reorder_text)
-    if not renumber and not reorder:
-        raise ValueError("Enter renumber or reorder patch instructions.")
+    if not renumber and not remove and not reorder:
+        raise ValueError("Enter renumber, remove, or reorder patch instructions.")
     return PatchSIRequest(
         manifest_path=manifest_path,
         renumber=renumber,
+        remove=remove,
         reorder=reorder,
         output_docx=_optional_output_docx(output_docx_text),
     )
