@@ -19,6 +19,7 @@ class NmrValidationTests(unittest.TestCase):
         compound = Compound(number="x", name="X", formula="C2H6O", hrms_found="999.0000")
         validate_hrms([compound])
         self.assertIn("HRMS calcd", compound.nmr_check_warning)
+        self.assertEqual(compound.validation_issues[0]["code"], "HRMS_MISMATCH")
 
     def test_support_validation_accepts_matching_nmr_hrms_and_elemental_analysis(self) -> None:
         compound = Compound(
@@ -35,6 +36,7 @@ class NmrValidationTests(unittest.TestCase):
         validate_support([compound])
 
         self.assertEqual(compound.nmr_check_warning, "")
+        self.assertEqual(compound.validation_issues, [])
 
     def test_support_validation_warns_for_nmr_elemental_analysis_and_hrms_mismatch(self) -> None:
         compound = Compound(
@@ -53,6 +55,10 @@ class NmrValidationTests(unittest.TestCase):
         self.assertIn("C expected 2, found 1", compound.nmr_check_warning)
         self.assertIn("HRMS calcd", compound.nmr_check_warning)
         self.assertIn("EA C calcd 52.14, found 60.00", compound.nmr_check_warning)
+        self.assertEqual(
+            {issue["code"] for issue in compound.validation_issues},
+            {"NMR_H_COUNT_MISMATCH", "NMR_C_COUNT_MISMATCH", "HRMS_MISMATCH", "ELEMENTAL_ANALYSIS_MISMATCH"},
+        )
 
     def test_elemental_analysis_validation_updates_block(self) -> None:
         compound = Compound(number="x", name="X", formula="C17H11FN2O3", elemental_analysis={"found": "C, 66.03; H, 3.55; N, 8.92"})
@@ -61,6 +67,7 @@ class NmrValidationTests(unittest.TestCase):
 
         self.assertEqual(compound.elemental_analysis["calculated"]["C"], 65.81)
         self.assertEqual(compound.elemental_analysis["found"]["N"], 8.92)
+        self.assertEqual(compound.validation_issues, [])
 
 
 if __name__ == "__main__":

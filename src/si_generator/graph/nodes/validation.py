@@ -69,14 +69,18 @@ def validate_support_node(state: GenerateSIState) -> dict:
         if compound.nmr_check_warning:
             message = f"{compound.number}: {compound.nmr_check_warning}" if compound.number else compound.nmr_check_warning
             warnings.append(message)
-            issues.append(
-                {
-                    "code": "SUPPORT_CHECK_WARNING",
-                    "severity": "warning",
-                    "message": message,
-                    "compound_id": compound.id or compound.number,
-                }
-            )
+            validation_issues = getattr(compound, "validation_issues", [])
+            if validation_issues:
+                issues.extend(validation_issues)
+            else:
+                issues.append(
+                    {
+                        "code": "SUPPORT_CHECK_WARNING",
+                        "severity": "warning",
+                        "message": message,
+                        "compound_id": compound.id or compound.number,
+                    }
+                )
 
     result = {"compounds": state.get("compounds", {}), "issues": issues}
     if warnings:

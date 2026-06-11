@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .domain.types import ElementalAnalysisBlock, HRMSBlock, NMRSpectrumBlock, ReactionBlock
+from .domain.types import ElementalAnalysisBlock, HRMSBlock, Issue, NMRSpectrumBlock, ReactionBlock
 
 
 @dataclass(slots=True)
@@ -42,6 +42,7 @@ class Compound:
     structure_path: str = ""
     has_word_structure: bool = False
     nmr_check_warning: str = ""
+    validation_issues: list[Issue] = field(default_factory=list)
 
     @property
     def label(self) -> str:

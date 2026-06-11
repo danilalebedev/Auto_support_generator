@@ -5,10 +5,12 @@ import re
 from .chemistry import parse_formula
 from .domain.elemental_analysis import calculate_elemental_analysis_block, found_from_block
 from .domain.massspec import calculate_hrms
+from .domain.types import Issue
 from .models import Compound
 
 
 def validate_support(compounds: list[Compound]) -> None:
+    _reset_validation(compounds)
     validate_nmr_counts(compounds)
     validate_hrms(compounds)
     validate_elemental_analysis(compounds)
@@ -22,26 +24,23 @@ def validate_nmr_counts(compounds: list[Compound]) -> None:
         try:
             formula = parse_formula(compound.formula)
         except ValueError as exc:
-            _append_warning(compound, f"Formula could not be checked: {exc}")
+            _append_validation_issue(compound, "FORMULA_CHECK_FAILED", f"Formula could not be checked: {exc}")
             continue
         expected_h = formula.get("H", 0)
         expected_c = formula.get("C", 0)
-        notes = []
 
         if compound.h1_nmr:
             found_h = count_h_from_1h_nmr(compound.h1_nmr)
             if found_h != expected_h:
-                notes.append(f"H expected {expected_h}, found {found_h}")
+                _append_validation_issue(compound, "NMR_H_COUNT_MISMATCH", f"H expected {expected_h}, found {found_h}")
 
         if compound.c13_nmr:
             found_c = count_c_from_13c_nmr(compound.c13_nmr)
             fluorine_split_allowance = formula.get("F", 0)
             if found_c < expected_c:
-                notes.append(f"C expected {expected_c}, found {found_c}")
+                _append_validation_issue(compound, "NMR_C_COUNT_MISMATCH", f"C expected {expected_c}, found {found_c}")
             elif found_c > expected_c + fluorine_split_allowance:
-                notes.append(f"C expected {expected_c}, found {found_c}")
-
-        compound.nmr_check_warning = "; ".join(notes)
+                _append_validation_issue(compound, "NMR_C_COUNT_MISMATCH", f"C expected {expected_c}, found {found_c}")
 
 
 def validate_hrms(compounds: list[Compound], tolerance_da: float = 0.005) -> None:
@@ -53,10 +52,10 @@ def validate_hrms(compounds: list[Compound], tolerance_da: float = 0.005) -> Non
             calcd = compound.hrms_calculated or float(compound.hrms.get("calculated_mz") or 0) or calculate_hrms(compound.formula, compound.hrms_adduct).calculated_mz
             found = float(found_text)
         except (ValueError, TypeError):
-            _append_warning(compound, "HRMS could not be checked")
+            _append_validation_issue(compound, "HRMS_CHECK_FAILED", "HRMS could not be checked")
             continue
         if abs(found - calcd) > tolerance_da:
-            _append_warning(compound, f"HRMS calcd {calcd:.4f}, found {found:.4f}")
+            _append_validation_issue(compound, "HRMS_MISMATCH", f"HRMS calcd {calcd:.4f}, found {found:.4f}")
 
 
 def validate_elemental_analysis(compounds: list[Compound], tolerance_percent: float = 0.4) -> None:
@@ -69,7 +68,7 @@ def validate_elemental_analysis(compounds: list[Compound], tolerance_percent: fl
         try:
             block = calculate_elemental_analysis_block(compound.formula, found=found)
         except ValueError as exc:
-            _append_warning(compound, f"Elemental analysis could not be checked: {exc}")
+            _append_validation_issue(compound, "ELEMENTAL_ANALYSIS_CHECK_FAILED", f"Elemental analysis could not be checked: {exc}")
             continue
         compound.elemental_analysis = block
         for element, found_value in block.get("found", {}).items():
@@ -77,7 +76,24 @@ def validate_elemental_analysis(compounds: list[Compound], tolerance_percent: fl
             if calculated_value is None:
                 continue
             if abs(found_value - calculated_value) > tolerance_percent:
-                _append_warning(compound, f"EA {element} calcd {calculated_value:.2f}, found {found_value:.2f}")
+                _append_validation_issue(compound, "ELEMENTAL_ANALYSIS_MISMATCH", f"EA {element} calcd {calculated_value:.2f}, found {found_value:.2f}")
+
+
+def _reset_validation(compounds: list[Compound]) -> None:
+    for compound in compounds:
+        compound.nmr_check_warning = ""
+        compound.validation_issues = []
+
+
+def _append_validation_issue(compound: Compound, code: str, text: str) -> None:
+    issue: Issue = {
+        "code": code,
+        "severity": "warning",
+        "message": text,
+        "compound_id": compound.id or compound.number,
+    }
+    compound.validation_issues.append(issue)
+    _append_warning(compound, text)
 
 
 def _append_warning(compound: Compound, text: str) -> None:

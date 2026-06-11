@@ -210,7 +210,9 @@ class GraphStateTests(unittest.TestCase):
             warning_path = Path(result["artifacts"]["support_warnings"])
             text = warning_path.read_text(encoding="utf-8")
 
-        self.assertTrue(any(issue["code"] == "SUPPORT_CHECK_WARNING" for issue in result["issues"]))
+        issue_codes = {issue["code"] for issue in result["issues"]}
+        self.assertIn("NMR_H_COUNT_MISMATCH", issue_codes)
+        self.assertIn("HRMS_MISMATCH", issue_codes)
         self.assertIn("2a: H expected 6, found 2", text)
         self.assertIn("HRMS calcd", text)
 
