@@ -91,6 +91,7 @@ class HRMSBlock(TypedDict, total=False):
     found_mz: float
     found_text: str
     calculated_mz: float
+    ion_formula: str
     isotope_policy: Literal["monoisotopic", "auto_halogen", "explicit"]
     isotope_labels: dict[str, int]
     formatted_text: str

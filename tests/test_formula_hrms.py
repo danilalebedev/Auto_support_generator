@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from si_generator.chemistry import calc_hrms_mz, ion_formula, parse_formula
-from si_generator.domain.massspec import calculate_hrms
+from si_generator.domain.massspec import build_hrms_block, calculate_hrms
 
 
 class FormulaHrmsTests(unittest.TestCase):
@@ -21,6 +21,21 @@ class FormulaHrmsTests(unittest.TestCase):
 
         self.assertEqual(result.calculated_mz, 272.9921)
         self.assertEqual(result.ion_formula, "C11H11BrFO2+")
+        self.assertEqual(result.isotope_labels, {"Br": 79})
+
+    def test_builds_structured_hrms_block_with_halogen_isotopes(self) -> None:
+        block = build_hrms_block(
+            formula="C7H5ClO",
+            label="HRMS (ESI-TOF) m/z",
+            adduct="[M+H]+",
+            found_text="141.0102",
+        )
+
+        self.assertEqual(block["adduct"], "[M+H]+")
+        self.assertEqual(block["isotope_policy"], "auto_halogen")
+        self.assertEqual(block["isotope_labels"], {"Cl": 35})
+        self.assertEqual(block["ion_formula"], "C7H6ClO+")
+        self.assertEqual(block["found_mz"], 141.0102)
 
 
 if __name__ == "__main__":

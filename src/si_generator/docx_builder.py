@@ -9,7 +9,8 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import RGBColor
 from docx.shared import Pt
 
-from .domain.massspec import calculate_hrms
+from .chemistry import parse_formula
+from .domain.massspec import build_hrms_block
 from .domain.references import format_reference
 from .domain.types import JournalProfile
 from .domain.types import ReferenceStore
@@ -223,20 +224,29 @@ def _add_ir_line(document: Document, text: str, style_config: dict[str, Any]) ->
 
 
 def _add_hrms_line(document: Document, compound: Compound, style_config: dict[str, Any]) -> None:
-    if not compound.hrms_calculated or not compound.hrms_ion_formula:
-        result = calculate_hrms(compound.formula, compound.hrms_adduct)
-        compound.hrms_calculated = result.calculated_mz
-        compound.hrms_ion_formula = result.ion_formula
+    hrms = compound.hrms or {}
+    if not hrms.get("calculated_mz") or not hrms.get("ion_formula"):
+        hrms = build_hrms_block(
+            formula=compound.formula,
+            label=compound.hrms_label,
+            adduct=compound.hrms_adduct,
+            found_text=compound.hrms_found,
+            isotope_policy=str(hrms.get("isotope_policy", "auto_halogen")),
+            isotope_labels=hrms.get("isotope_labels"),
+        )
+        compound.hrms = hrms
+        compound.hrms_calculated = float(hrms["calculated_mz"])
+        compound.hrms_ion_formula = str(hrms["ion_formula"])
 
     paragraph = document.add_paragraph()
     paragraph.paragraph_format.space_after = Pt(0)
     apply_paragraph_style(paragraph, style_config, "hrms")
-    label_run = paragraph.add_run(f"{compound.hrms_label}: ")
+    label_run = paragraph.add_run(f"{hrms.get('label') or compound.hrms_label}: ")
     apply_run_style(label_run, style_config, "hrms.label")
-    _add_adduct_runs(paragraph, compound.hrms_adduct, style_config)
+    _add_adduct_runs(paragraph, str(hrms.get("adduct") or compound.hrms_adduct), style_config)
     paragraph.add_run(" calcd for ")
-    _add_formula_runs(paragraph, compound.hrms_ion_formula, style_config)
-    paragraph.add_run(f" {compound.hrms_calculated:.4f}. Found {float(compound.hrms_found):.4f}.")
+    _add_formula_runs(paragraph, str(hrms.get("ion_formula") or compound.hrms_ion_formula), style_config, hrms.get("isotope_labels", {}))
+    paragraph.add_run(f" {float(hrms['calculated_mz']):.4f}. Found {float(compound.hrms_found):.4f}.")
 
 
 def _add_nmr_warning(document: Document, text: str) -> None:
@@ -294,7 +304,11 @@ def _add_spectrum_nmr_title(document: Document, nucleus: str, conditions: str, s
         _add_conditions_runs(paragraph, conditions, style_config, "appendix.spectrum_title")
 
 
-def _add_formula_runs(paragraph, formula: str, style_config: dict[str, Any]) -> None:
+def _add_formula_runs(paragraph, formula: str, style_config: dict[str, Any], isotope_labels: dict[str, int] | None = None) -> None:
+    if isotope_labels and config_get(style_config, "hrms.formula.isotope_labels", True):
+        if _add_labeled_formula_runs(paragraph, formula, style_config, isotope_labels):
+            return
+
     chunks = []
     current = ""
     current_is_digit = None
@@ -314,6 +328,31 @@ def _add_formula_runs(paragraph, formula: str, style_config: dict[str, Any]) -> 
         run.font.subscript = bool(is_digit and config_get(style_config, "hrms.formula.subscripts", True))
         if text in {"+", "-"}:
             run.font.superscript = bool(config_get(style_config, "hrms.formula.charge_superscript", True))
+
+
+def _add_labeled_formula_runs(paragraph, formula: str, style_config: dict[str, Any], isotope_labels: dict[str, int]) -> bool:
+    charge = ""
+    formula_body = formula
+    if formula_body.endswith(("+", "-")):
+        charge = formula_body[-1]
+        formula_body = formula_body[:-1]
+    try:
+        elements = parse_formula(formula_body)
+    except ValueError:
+        return False
+
+    for element, count in elements.items():
+        if element in isotope_labels:
+            run = paragraph.add_run(str(isotope_labels[element]))
+            run.font.superscript = bool(config_get(style_config, "hrms.formula.isotope_label_superscript", True))
+        paragraph.add_run(element)
+        if count != 1:
+            run = paragraph.add_run(str(count))
+            run.font.subscript = bool(config_get(style_config, "hrms.formula.subscripts", True))
+    if charge:
+        run = paragraph.add_run(charge)
+        run.font.superscript = bool(config_get(style_config, "hrms.formula.charge_superscript", True))
+    return True
 
 
 def _add_isotope_run(paragraph, text: str, style_config: dict[str, Any]):
