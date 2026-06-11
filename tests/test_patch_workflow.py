@@ -167,6 +167,49 @@ class PatchWorkflowTests(unittest.TestCase):
         self.assertIn("MANIFEST_LOAD_FAILED", stdout.getvalue())
         self.assertIn("Patch report:", stdout.getvalue())
 
+    def test_patch_workflow_writes_report_when_docx_bookmark_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_docx = root / "support_information.docx"
+            source_manifest = root / "support_information.manifest.json"
+            patched_docx = root / "patched.docx"
+            Document().save(source_docx)
+            source_manifest.write_text(
+                json.dumps(
+                    {
+                        "run_id": "run",
+                        "artifacts": {"support_docx": str(source_docx), "manifest": str(source_manifest)},
+                        "output_paths": {"support_docx": str(source_docx), "manifest": str(source_manifest)},
+                        "order": ["cmp_001"],
+                        "compounds": {
+                            "cmp_001": {
+                                "id": "cmp_001",
+                                "number": "2a",
+                                "docx_block_id": "compound:cmp_001",
+                                "docx_bookmark": bookmark_name_for_block_id("compound:cmp_001"),
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            state = run_patch_si(
+                PatchSIRequest(
+                    manifest_path=source_manifest,
+                    renumber={},
+                    remove=("2a",),
+                    output_docx=patched_docx,
+                )
+            )
+            report_path = root / "patched.patch_report.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(state["status"], "fail")
+        self.assertEqual(Path(state["artifacts"]["patch_report"]), report_path)
+        self.assertIn("PATCH_APPLY_FAILED", {issue["code"] for issue in state["issues"]})
+        self.assertIn("PATCH_APPLY_FAILED", {issue["code"] for issue in report["issues"]})
+
     def test_patch_workflow_reorders_docx_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -41,6 +41,31 @@ def load_patch_manifest_node(state: PatchSIState) -> dict:
 
 
 def apply_renumber_patch_node(state: PatchSIState) -> dict:
+    try:
+        return _apply_renumber_patch_node(state)
+    except Exception as exc:
+        request = state["request"]
+        artifacts = dict(state.get("artifacts", {}))
+        if request.output_docx:
+            artifacts["support_docx"] = str(request.output_docx)
+        issues = [
+            *state.get("issues", []),
+            {
+                "code": "PATCH_APPLY_FAILED",
+                "severity": "error",
+                "message": f"could not apply patch: {exc}",
+                "path": str(request.manifest_path),
+            },
+        ]
+        return {
+            "manifest": state.get("manifest", {}),
+            "artifacts": artifacts,
+            "issues": issues,
+            "patch_result": _empty_patch_result(),
+        }
+
+
+def _apply_renumber_patch_node(state: PatchSIState) -> dict:
     request = state["request"]
     source_manifest = state.get("manifest", {})
     if manifest_has_errors(state.get("issues", [])):
