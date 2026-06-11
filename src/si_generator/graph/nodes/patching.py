@@ -55,19 +55,28 @@ def apply_renumber_patch_node(state: PatchSIState) -> dict:
         remove_docx_blocks(output_docx, output_docx, removed_bookmarks)
     if reordered_ids:
         reorder_docx_blocks(output_docx, output_docx, bookmark_order_for_compounds(patched_manifest, reordered_ids))
+    patch_result = {
+        "renumbered": applied_numbers,
+        "removed_ids": removed_ids,
+        "removed_bookmarks": removed_bookmarks,
+        "reordered_ids": reordered_ids,
+    }
     set_manifest_output_paths(patched_manifest, support_docx=output_docx, manifest_path=output_manifest)
+    _append_patch_history(
+        patched_manifest,
+        run_id=state.get("run_id", ""),
+        source_manifest=request.manifest_path,
+        output_manifest=output_manifest,
+        output_docx=output_docx,
+        operations=_patch_operations(request),
+        patch_result=patch_result,
+    )
     write_patched_manifest(patched_manifest, output_manifest)
 
     artifacts = {
         **state.get("artifacts", {}),
         "support_docx": str(Path(output_docx)),
         "manifest": str(Path(output_manifest)),
-    }
-    patch_result = {
-        "renumbered": applied_numbers,
-        "removed_ids": removed_ids,
-        "removed_bookmarks": removed_bookmarks,
-        "reordered_ids": reordered_ids,
     }
     return {"manifest": patched_manifest, "artifacts": artifacts, "patch_result": patch_result}
 
@@ -100,11 +109,7 @@ def build_patch_report(state: PatchSIState, status: str, issues: list[dict], rep
         "run_id": state.get("run_id", ""),
         "status": status,
         "source_manifest": str(Path(request.manifest_path)),
-        "operations": {
-            "renumber": dict(request.renumber),
-            "remove": list(request.remove),
-            "reorder": list(request.reorder),
-        },
+        "operations": _patch_operations(request),
         "patch_result": state.get(
             "patch_result",
             {
@@ -129,3 +134,36 @@ def _patch_report_path(base_path: Path) -> Path:
     if base_path.name.endswith(".manifest.json"):
         return base_path.with_name(f"{base_path.name[:-len('.manifest.json')]}.patch_report.json")
     return base_path.with_suffix(".patch_report.json")
+
+
+def _patch_operations(request) -> dict[str, object]:
+    return {
+        "renumber": dict(request.renumber),
+        "remove": list(request.remove),
+        "reorder": list(request.reorder),
+    }
+
+
+def _append_patch_history(
+    manifest: dict,
+    *,
+    run_id: str,
+    source_manifest: Path,
+    output_manifest: Path,
+    output_docx: Path,
+    operations: dict[str, object],
+    patch_result: dict[str, object],
+) -> None:
+    history = manifest.setdefault("patch_history", [])
+    if not isinstance(history, list):
+        manifest["patch_history"] = history = []
+    history.append(
+        {
+            "run_id": run_id,
+            "source_manifest": str(Path(source_manifest)),
+            "output_manifest": str(Path(output_manifest)),
+            "output_docx": str(Path(output_docx)),
+            "operations": operations,
+            "result": patch_result,
+        }
+    )
