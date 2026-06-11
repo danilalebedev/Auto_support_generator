@@ -181,7 +181,7 @@ class Compound(TypedDict, total=False):
     issues: list[Issue]
 
 
-class SpectraProcessingConfig(TypedDict, total=False):
+class SpectraConfig(TypedDict, total=False):
     extract_nmr: bool
     insert_spectra_as: SpectrumEmbedMode
     target_signal_height_fraction: float
@@ -191,6 +191,9 @@ class SpectraProcessingConfig(TypedDict, total=False):
     mnova_executable_path: str
     mnova_script_path: str
     keep_intermediate_reports: bool
+
+
+SpectraProcessingConfig = SpectraConfig
 
 
 class JournalProfile(TypedDict, total=False):
@@ -247,7 +250,7 @@ class SIState(TypedDict, total=False):
     run_id: str
     compounds: dict[str, Compound]
     order: list[str]
-    spectra_config: SpectraProcessingConfig
+    spectra_config: SpectraConfig
     generation_config: GenerationConfig
     runtime_config: RuntimeConfig
     journal_profile: JournalProfile

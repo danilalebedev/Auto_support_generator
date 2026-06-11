@@ -11,7 +11,7 @@ from ..domain.types import (
     JournalProfile,
     ReferenceStore,
     RuntimeConfig,
-    SpectraProcessingConfig,
+    SpectraConfig,
     SpectrumRenderSpec,
 )
 from ..domain.compound import Compound
@@ -24,7 +24,7 @@ class GenerateSIState(TypedDict, total=False):
     style_config: dict[str, Any]
     journal_profile: JournalProfile
     reference_store: ReferenceStore
-    spectra_config: SpectraProcessingConfig
+    spectra_config: SpectraConfig
     generation_config: GenerationConfig
     runtime_config: RuntimeConfig
     input_compounds: list[Compound]

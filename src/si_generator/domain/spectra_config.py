@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .types import PeakPickingPolicy, SpectraProcessingConfig, SpectrumEmbedMode, SpectrumRenderSpec
+from .types import PeakPickingPolicy, SpectraConfig, SpectrumEmbedMode, SpectrumRenderSpec
 
 
 DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION = 0.80
@@ -16,8 +16,8 @@ def build_spectra_config(
     extract_nmr: bool = True,
     insert_spectra_as: SpectrumEmbedMode = "png",
     mnova_executable_path: str | None = None,
-) -> SpectraProcessingConfig:
-    config: SpectraProcessingConfig = {
+) -> SpectraConfig:
+    config: SpectraConfig = {
         "extract_nmr": extract_nmr,
         "insert_spectra_as": insert_spectra_as,
         "target_signal_height_fraction": DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION,
@@ -33,7 +33,7 @@ def build_spectra_config(
 
 def build_spectrum_render_spec(
     nucleus: str,
-    spectra_config: SpectraProcessingConfig | dict | None = None,
+    spectra_config: SpectraConfig | dict | None = None,
 ) -> SpectrumRenderSpec:
     config = spectra_config or {}
     spec: SpectrumRenderSpec = {

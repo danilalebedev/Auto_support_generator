@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from si_generator.domain.types import SpectraConfig, SpectraProcessingConfig
 from si_generator.domain.spectra_config import (
     DEFAULT_PEAK_PICKING,
     DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION,
@@ -12,6 +13,9 @@ from si_generator.domain.spectra_config import (
 
 
 class SpectraConfigTests(unittest.TestCase):
+    def test_legacy_spectra_processing_config_alias_matches_spectra_config(self) -> None:
+        self.assertIs(SpectraProcessingConfig, SpectraConfig)
+
     def test_builds_default_spectra_processing_config(self) -> None:
         config = build_spectra_config()
 
