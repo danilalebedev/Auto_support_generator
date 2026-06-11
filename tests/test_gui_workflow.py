@@ -14,6 +14,7 @@ from si_generator.gui import (
     _dialog_initialdir,
     _example_field_updates,
     _existing_result_path,
+    _mousewheel_units,
     _report_overview,
 )
 from si_generator.graph.state import CheckSIRequest
@@ -315,6 +316,11 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(updates["existing_manifest"], "")
         self.assertEqual(updates["patch_renumber"], "")
         self.assertNotIn("mnova_exe", updates)
+
+    def test_mousewheel_units_scroll_in_platform_direction(self) -> None:
+        self.assertEqual(_mousewheel_units(120), -1)
+        self.assertEqual(_mousewheel_units(-120), 1)
+        self.assertEqual(_mousewheel_units(0), 0)
 
 
 if __name__ == "__main__":

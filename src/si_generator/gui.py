@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import tkinter as tk
 import threading
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -27,8 +28,10 @@ class SIGeneratorApp:
     def __init__(self, root: Tk) -> None:
         self.root = root
         self.root.title("Auto Support Generator")
-        self.root.geometry("980x720")
-        self.root.minsize(820, 620)
+        self.root.geometry("980x680")
+        self.root.minsize(720, 480)
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
 
         self.input_path = StringVar()
         self.spectra_zip = StringVar()
@@ -83,8 +86,10 @@ class SIGeneratorApp:
         style.configure("Status.TLabel", foreground="#355070")
 
     def _build_ui(self) -> None:
-        outer = ttk.Frame(self.root, padding=18)
-        outer.pack(fill="both", expand=True)
+        scroll_area = _ScrollableFrame(self.root, padding=18)
+        scroll_area.grid(row=0, column=0, sticky="nsew")
+
+        outer = scroll_area.content
         outer.columnconfigure(0, weight=1)
         outer.rowconfigure(5, weight=1)
 
@@ -202,8 +207,8 @@ class SIGeneratorApp:
         scroll.grid(row=0, column=1, sticky="ns")
         self.log.configure(yscrollcommand=scroll.set)
 
-        actions = ttk.Frame(outer)
-        actions.grid(row=6, column=0, sticky="ew", pady=(12, 0))
+        actions = ttk.Frame(self.root, padding=(18, 8, 18, 18))
+        actions.grid(row=1, column=0, sticky="ew")
         actions.columnconfigure(0, weight=1)
         self.run_button = ttk.Button(actions, text="Generate SI", command=self._start_generation, style="Accent.TButton")
         self.run_button.pack(side="right")
@@ -584,6 +589,49 @@ class SIGeneratorApp:
     def _on_close(self) -> None:
         self._save_settings()
         self.root.destroy()
+
+
+class _ScrollableFrame(ttk.Frame):
+    def __init__(self, parent, *, padding: int = 0) -> None:
+        super().__init__(parent)
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+
+        self.canvas = tk.Canvas(self, borderwidth=0, highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        self.scrollbar.grid(row=0, column=1, sticky="ns")
+
+        self.content = ttk.Frame(self.canvas, padding=padding)
+        self._window_id = self.canvas.create_window((0, 0), window=self.content, anchor="nw")
+        self.content.bind("<Configure>", self._sync_scroll_region)
+        self.canvas.bind("<Configure>", self._sync_content_width)
+        self.canvas.bind("<Enter>", self._bind_mousewheel)
+        self.canvas.bind("<Leave>", self._unbind_mousewheel)
+        self.content.bind("<Enter>", self._bind_mousewheel)
+        self.content.bind("<Leave>", self._unbind_mousewheel)
+
+    def _sync_scroll_region(self, _event=None) -> None:
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _sync_content_width(self, event) -> None:
+        self.canvas.itemconfigure(self._window_id, width=event.width)
+
+    def _bind_mousewheel(self, _event=None) -> None:
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _unbind_mousewheel(self, _event=None) -> None:
+        self.canvas.unbind_all("<MouseWheel>")
+
+    def _on_mousewheel(self, event) -> None:
+        self.canvas.yview_scroll(_mousewheel_units(event.delta), "units")
+
+
+def _mousewheel_units(delta: int) -> int:
+    if delta == 0:
+        return 0
+    return -1 * int(delta / abs(delta))
 
 
 class _LogText(ttk.Frame):
