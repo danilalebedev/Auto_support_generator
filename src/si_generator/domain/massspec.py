@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from ..chemistry import calc_hrms_mz, ion_formula
@@ -68,8 +69,25 @@ def build_hrms_block(
     return block
 
 
+def extract_mz_text(value: object) -> str:
+    text = str(value).strip()
+    found_match = re.search(r"\bfound\b\s*:?\s*(\d+(?:[\.,]\d+)?)", text, flags=re.IGNORECASE)
+    if found_match:
+        return found_match.group(1).replace(",", ".")
+
+    decimal_match = re.search(r"\d+[\.,]\d+", text)
+    if decimal_match:
+        return decimal_match.group(0).replace(",", ".")
+
+    integer_match = re.search(r"\d+", text)
+    return integer_match.group(0) if integer_match else ""
+
+
 def parse_mz_value(value: object) -> float:
-    return float(str(value).strip().replace(",", "."))
+    text = extract_mz_text(value)
+    if not text:
+        raise ValueError(f"No m/z value found in {value!r}")
+    return float(text)
 
 
 def hrms_found_text(block: HRMSBlock | None, legacy_found: str = "") -> str:

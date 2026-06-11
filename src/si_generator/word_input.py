@@ -18,6 +18,7 @@ from docx import Document
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 
+from .domain.massspec import extract_mz_text
 from .domain.references import parse_reference_keys
 from .domain.reactions import reaction_from_fields
 from .models import Compound
@@ -387,8 +388,7 @@ def _reaction_field_key(key: str) -> str:
 
 
 def _first_number(value: str) -> str:
-    match = re.search(r"\d+(?:[\.,]\d+)?", value)
-    return match.group(0).replace(",", ".") if match else ""
+    return extract_mz_text(value)
 
 
 def _adduct_from_headers(headers: list[str]) -> str | None:

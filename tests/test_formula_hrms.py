@@ -3,7 +3,15 @@ from __future__ import annotations
 import unittest
 
 from si_generator.chemistry import calc_hrms_mz, ion_formula, parse_formula
-from si_generator.domain.massspec import build_hrms_block, calculate_hrms, hrms_adduct_text, hrms_found_text, hrms_label_text, parse_mz_value
+from si_generator.domain.massspec import (
+    build_hrms_block,
+    calculate_hrms,
+    extract_mz_text,
+    hrms_adduct_text,
+    hrms_found_text,
+    hrms_label_text,
+    parse_mz_value,
+)
 
 
 class FormulaHrmsTests(unittest.TestCase):
@@ -39,6 +47,7 @@ class FormulaHrmsTests(unittest.TestCase):
 
     def test_hrms_decimal_comma_is_accepted(self) -> None:
         self.assertEqual(parse_mz_value("272,9921"), 272.9921)
+        self.assertEqual(extract_mz_text("calcd 100.0000. Found 272,9921"), "272.9921")
         block = build_hrms_block(
             formula="C11H10BrFO2",
             label="HRMS (ESI/Q-TOF) m/z",

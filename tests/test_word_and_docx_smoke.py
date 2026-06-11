@@ -24,6 +24,7 @@ class WordAndDocxSmokeTests(unittest.TestCase):
 
     def test_hrms_number_extraction_accepts_decimal_comma(self) -> None:
         self.assertEqual(_first_number("Found 272,9921"), "272.9921")
+        self.assertEqual(_first_number("calcd 100.0000. Found 272,9920"), "272.9920")
 
     def test_cli_generates_docx_without_mnova(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
