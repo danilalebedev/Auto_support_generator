@@ -4,7 +4,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from si_generator.gui import _build_generate_request, _build_result_summary
+from si_generator.gui import (
+    _build_check_request,
+    _build_generate_request,
+    _build_patch_request,
+    _build_patch_summary,
+    _build_result_summary,
+)
 
 
 class GuiWorkflowTests(unittest.TestCase):
@@ -68,6 +74,64 @@ class GuiWorkflowTests(unittest.TestCase):
 
         self.assertEqual(summary["support_docx"], str(output.resolve()))
         self.assertEqual(summary["processed_spectra_zip"], str(package.resolve()))
+        self.assertEqual(summary["manifest"], str(manifest.resolve()))
+
+    def test_builds_check_request_from_manifest_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "support_information.manifest.json"
+            manifest.write_text("{}", encoding="utf-8")
+
+            request = _build_check_request(str(manifest))
+
+        self.assertEqual(request.manifest_path, manifest)
+
+    def test_builds_patch_request_from_gui_values(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = root / "support_information.manifest.json"
+            output = root / "patched.docx"
+            manifest.write_text("{}", encoding="utf-8")
+
+            request = _build_patch_request(
+                manifest_text=str(manifest),
+                renumber_text="2a=3a,2b=3b",
+                reorder_text="2b,2a",
+                output_docx_text=str(output),
+            )
+
+        self.assertEqual(request.manifest_path, manifest)
+        self.assertEqual(request.renumber, {"2a": "3a", "2b": "3b"})
+        self.assertEqual(request.reorder, ("2b", "2a"))
+        self.assertEqual(request.output_docx, output)
+
+    def test_patch_request_requires_operation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "support_information.manifest.json"
+            manifest.write_text("{}", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "renumber or reorder"):
+                _build_patch_request(
+                    manifest_text=str(manifest),
+                    renumber_text="",
+                    reorder_text="",
+                )
+
+    def test_builds_patch_summary_from_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            support = root / "patched.docx"
+            manifest = root / "patched.manifest.json"
+
+            summary = _build_patch_summary(
+                {
+                    "artifacts": {
+                        "support_docx": str(support),
+                        "manifest": str(manifest),
+                    }
+                }
+            )
+
+        self.assertEqual(summary["support_docx"], str(support.resolve()))
         self.assertEqual(summary["manifest"], str(manifest.resolve()))
 
 

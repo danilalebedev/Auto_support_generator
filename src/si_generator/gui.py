@@ -10,10 +10,14 @@ from tkinter import BooleanVar, StringVar, Tk, filedialog, messagebox
 from tkinter import ttk
 from typing import Any
 
+from .domain.manifest import manifest_has_errors
+from .domain.patching import parse_renumber_map, parse_reorder_list
 from .domain.types import SpectrumEmbedMode
 from .external_tools import find_mnova_executable
-from .graph.state import GenerateSIRequest
+from .graph.state import CheckSIRequest, GenerateSIRequest, PatchSIRequest
+from .workflows.check_si import run_check_si
 from .workflows.generate_si import output_path_from_state, run_generate_si
+from .workflows.patch_si import run_patch_si
 
 
 class SIGeneratorApp:
@@ -39,6 +43,10 @@ class SIGeneratorApp:
         self.result_support = StringVar(value="")
         self.result_spectra = StringVar(value="")
         self.result_manifest = StringVar(value="")
+        self.existing_manifest = StringVar(value="")
+        self.patch_output_docx = StringVar(value="")
+        self.patch_renumber = StringVar(value="")
+        self.patch_reorder = StringVar(value="")
 
         self._is_running = False
         self._last_output_folder: Path | None = None
@@ -65,7 +73,7 @@ class SIGeneratorApp:
         outer = ttk.Frame(self.root, padding=18)
         outer.pack(fill="both", expand=True)
         outer.columnconfigure(0, weight=1)
-        outer.rowconfigure(4, weight=1)
+        outer.rowconfigure(5, weight=1)
 
         header = ttk.Frame(outer)
         header.grid(row=0, column=0, sticky="ew", pady=(0, 14))
@@ -134,8 +142,28 @@ class SIGeneratorApp:
         self._result_row(results, 1, "Spectra package", self.result_spectra)
         self._result_row(results, 2, "Manifest", self.result_manifest)
 
+        tools = ttk.LabelFrame(outer, text="Existing SI Tools", padding=12)
+        tools.grid(row=4, column=0, sticky="ew", pady=(0, 12))
+        tools.columnconfigure(1, weight=1)
+        self._file_row(
+            tools,
+            0,
+            "Manifest",
+            self.existing_manifest,
+            lambda: self._browse_file(self.existing_manifest, [("Manifest JSON", "*.json"), ("All files", "*.*")]),
+            optional=True,
+            extra_button=("Check", self._start_manifest_check),
+        )
+        self._file_row(tools, 1, "Patched output .docx", self.patch_output_docx, self._browse_patch_output, optional=True)
+        ttk.Label(tools, text="Renumber").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(tools, textvariable=self.patch_renumber).grid(row=2, column=1, sticky="ew", pady=4)
+        ttk.Label(tools, text="Example: 2a=3a,2b=3b", style="Muted.TLabel").grid(row=2, column=2, sticky="w", padx=(8, 0), pady=4)
+        ttk.Label(tools, text="Reorder").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(tools, textvariable=self.patch_reorder).grid(row=3, column=1, sticky="ew", pady=4)
+        ttk.Button(tools, text="Apply patch", command=self._start_patch).grid(row=3, column=2, sticky="e", padx=(8, 0), pady=4)
+
         log_frame = ttk.LabelFrame(outer, text="Run Log", padding=8)
-        log_frame.grid(row=4, column=0, sticky="nsew")
+        log_frame.grid(row=5, column=0, sticky="nsew")
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
 
@@ -146,7 +174,7 @@ class SIGeneratorApp:
         self.log.configure(yscrollcommand=scroll.set)
 
         actions = ttk.Frame(outer)
-        actions.grid(row=5, column=0, sticky="ew", pady=(12, 0))
+        actions.grid(row=6, column=0, sticky="ew", pady=(12, 0))
         actions.columnconfigure(0, weight=1)
         self.run_button = ttk.Button(actions, text="Generate SI", command=self._start_generation, style="Accent.TButton")
         self.run_button.pack(side="right")
@@ -191,6 +219,15 @@ class SIGeneratorApp:
         if path:
             variable_path = Path(path)
             self.output_docx.set(str(variable_path))
+
+    def _browse_patch_output(self) -> None:
+        path = filedialog.asksaveasfilename(
+            defaultextension=".docx",
+            filetypes=[("Word documents", "*.docx"), ("All files", "*.*")],
+            initialfile="support_information_patched.docx",
+        )
+        if path:
+            self.patch_output_docx.set(path)
 
     def _load_examples(self) -> None:
         examples = _examples_dir()
@@ -245,6 +282,52 @@ class SIGeneratorApp:
         thread = threading.Thread(target=self._run_workflow, args=(request,), daemon=True)
         thread.start()
 
+    def _start_manifest_check(self) -> None:
+        if self._is_running:
+            messagebox.showinfo("SI Generator", "Another operation is already running.")
+            return
+        try:
+            request = _build_check_request(self.existing_manifest.get())
+        except ValueError as exc:
+            messagebox.showerror("SI Generator", str(exc))
+            return
+        self._start_background_operation(
+            "Check manifest",
+            f"Manifest: {request.manifest_path}\n",
+            self._run_check_workflow,
+            request,
+        )
+
+    def _start_patch(self) -> None:
+        if self._is_running:
+            messagebox.showinfo("SI Generator", "Another operation is already running.")
+            return
+        try:
+            request = _build_patch_request(
+                manifest_text=self.existing_manifest.get(),
+                renumber_text=self.patch_renumber.get(),
+                reorder_text=self.patch_reorder.get(),
+                output_docx_text=self.patch_output_docx.get(),
+            )
+        except ValueError as exc:
+            messagebox.showerror("SI Generator", str(exc))
+            return
+        self._start_background_operation(
+            "Patch SI",
+            f"Manifest: {request.manifest_path}\nOutput: {request.output_docx or 'auto'}\n",
+            self._run_patch_workflow,
+            request,
+        )
+
+    def _start_background_operation(self, title: str, details: str, target, request) -> None:
+        self._is_running = True
+        self.run_button.configure(state="disabled")
+        self.status_text.set("Running")
+        self.progress.start(12)
+        self.log.write(f"\n> {title}\n{details}\n")
+        thread = threading.Thread(target=target, args=(request,), daemon=True)
+        thread.start()
+
     def _build_request(self) -> GenerateSIRequest:
         return _build_generate_request(
             input_kind=self.input_kind.get(),
@@ -274,6 +357,44 @@ class SIGeneratorApp:
                 self._log_queue.put(f"Manifest: {summary['manifest']}\n")
             self._log_queue.put("\nDone.\n")
             self._log_queue.put({"type": "run_succeeded", "summary": summary})
+        except Exception as exc:
+            self._log_queue.put(f"\nERROR: {exc}\n")
+            self._log_queue.put({"type": "run_failed", "error": str(exc)})
+        finally:
+            self._log_queue.put("__RUN_FINISHED__")
+
+    def _run_check_workflow(self, request: CheckSIRequest) -> None:
+        try:
+            result = run_check_si(request)
+            for issue in result.get("issues", []):
+                self._log_queue.put(f"[{issue.get('severity', 'warning').upper()}] {issue.get('code', 'CHECK')}: {issue.get('message', '')}\n")
+            if manifest_has_errors(result.get("issues", [])):
+                self._log_queue.put("\nManifest check failed.\n")
+                self._log_queue.put({"type": "run_failed", "error": "Manifest check failed"})
+            else:
+                self._log_queue.put("\nManifest check passed.\n")
+                self._log_queue.put({"type": "run_succeeded", "summary": {"manifest": str(request.manifest_path.resolve())}})
+        except Exception as exc:
+            self._log_queue.put(f"\nERROR: {exc}\n")
+            self._log_queue.put({"type": "run_failed", "error": str(exc)})
+        finally:
+            self._log_queue.put("__RUN_FINISHED__")
+
+    def _run_patch_workflow(self, request: PatchSIRequest) -> None:
+        try:
+            result = run_patch_si(request)
+            for issue in result.get("issues", []):
+                self._log_queue.put(f"[{issue.get('severity', 'warning').upper()}] {issue.get('code', 'PATCH')}: {issue.get('message', '')}\n")
+            summary = _build_patch_summary(result)
+            if manifest_has_errors(result.get("issues", [])):
+                self._log_queue.put("\nPatch check failed.\n")
+                self._log_queue.put({"type": "run_failed", "error": "Patch check failed"})
+            else:
+                self._log_queue.put(f"\nPatched {summary.get('support_docx', '')}\n")
+                if summary.get("manifest"):
+                    self._log_queue.put(f"Manifest: {summary['manifest']}\n")
+                self._log_queue.put("\nDone.\n")
+                self._log_queue.put({"type": "run_succeeded", "summary": summary})
         except Exception as exc:
             self._log_queue.put(f"\nERROR: {exc}\n")
             self._log_queue.put({"type": "run_failed", "error": str(exc)})
@@ -393,6 +514,40 @@ def _build_generate_request(
     )
 
 
+def _build_check_request(manifest_text: str) -> CheckSIRequest:
+    manifest_path = _required_existing_file(manifest_text, "Choose an existing manifest JSON.")
+    return CheckSIRequest(manifest_path=manifest_path)
+
+
+def _build_patch_request(
+    *,
+    manifest_text: str,
+    renumber_text: str,
+    reorder_text: str,
+    output_docx_text: str = "",
+) -> PatchSIRequest:
+    manifest_path = _required_existing_file(manifest_text, "Choose an existing manifest JSON.")
+    renumber = parse_renumber_map(renumber_text) if renumber_text.strip() else {}
+    reorder = parse_reorder_list(reorder_text)
+    if not renumber and not reorder:
+        raise ValueError("Enter renumber or reorder patch instructions.")
+    return PatchSIRequest(
+        manifest_path=manifest_path,
+        renumber=renumber,
+        reorder=reorder,
+        output_docx=_optional_output_docx(output_docx_text),
+    )
+
+
+def _build_patch_summary(state: dict[str, Any]) -> dict[str, str]:
+    artifacts = state.get("artifacts", {})
+    summary = {
+        "support_docx": _resolved_artifact(artifacts, "support_docx"),
+        "manifest": _resolved_artifact(artifacts, "manifest"),
+    }
+    return {key: value for key, value in summary.items() if value}
+
+
 def _build_result_summary(state: dict[str, Any]) -> dict[str, str]:
     artifacts = state.get("artifacts", {})
     output_path = output_path_from_state(state)
@@ -423,6 +578,16 @@ def _optional_existing_file(raw_path: str, label: str) -> Path | None:
     path = Path(raw_path).expanduser()
     if not path.exists():
         raise ValueError(f"{label} does not exist: {path}")
+    return path
+
+
+def _optional_output_docx(raw_path: str) -> Path | None:
+    raw_path = raw_path.strip().strip('"')
+    if not raw_path:
+        return None
+    path = Path(raw_path).expanduser()
+    if not path.name.lower().endswith(".docx"):
+        raise ValueError("Patched output file must be a .docx file.")
     return path
 
 
