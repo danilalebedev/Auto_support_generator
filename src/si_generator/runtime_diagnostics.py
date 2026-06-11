@@ -25,6 +25,8 @@ def preflight_generate_request(
     issues.extend(_check_output_path(request.output_path))
     if request.spectra_zip:
         issues.extend(_check_spectra_zip(request.spectra_zip))
+    else:
+        issues.extend(_check_missing_spectra_zip(request))
     if _mnova_required(request):
         issues.extend(_check_mnova_script(Path(mnova_script_path)))
         issues.extend(_check_mnova(request, mnova_finder))
@@ -44,6 +46,9 @@ def format_preflight_issues(issues: list[Issue]) -> str:
         path = issue.get("path", "")
         suffix = f" ({path})" if path else ""
         lines.append(f"[{severity}] {code}: {message}{suffix}")
+        detail = str(issue.get("detail", "")).strip()
+        if detail:
+            lines.append(f"  Details: {detail}")
     return "\n".join(lines)
 
 
@@ -95,6 +100,18 @@ def _check_spectra_zip(spectra_zip: Path) -> list[Issue]:
     except OSError as exc:
         return [_issue("PREFLIGHT_SPECTRA_ZIP_INVALID", "error", f"Spectra zip cannot be read: {exc}", spectra_zip)]
     return []
+
+
+def _check_missing_spectra_zip(request: GenerateSIRequest) -> list[Issue]:
+    if request.insert_spectra_as == "none":
+        return []
+    return [
+        _issue(
+            "PREFLIGHT_SPECTRA_ZIP_NOT_SELECTED",
+            "warning",
+            "Spectra appendix is enabled, but no spectra zip was selected. Generated spectrum images and Mnova files will be skipped unless input rows already point to processed spectrum assets.",
+        )
+    ]
 
 
 def _check_mnova(request: GenerateSIRequest, mnova_finder: MnovaFinder) -> list[Issue]:

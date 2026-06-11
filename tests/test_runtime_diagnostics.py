@@ -21,6 +21,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 input_kind="word",
                 output_path=output_docx,
                 no_extract_nmr=True,
+                insert_spectra_as="none",
             )
 
             issues = preflight_generate_request(request, mnova_finder=_raising_mnova_finder)
@@ -46,6 +47,39 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         self.assertTrue(issue_has_errors(issues))
         self.assertIn("PREFLIGHT_SPECTRA_ZIP_INVALID", {issue["code"] for issue in issues})
+
+    def test_preflight_warns_when_spectra_appendix_is_enabled_without_zip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_docx = root / "input.docx"
+            input_docx.write_bytes(b"placeholder")
+            request = GenerateSIRequest(
+                input_path=input_docx,
+                input_kind="word",
+                output_path=root / "support_information.docx",
+                insert_spectra_as="png",
+            )
+
+            issues = preflight_generate_request(request, mnova_finder=_raising_mnova_finder)
+
+        self.assertFalse(issue_has_errors(issues))
+        self.assertIn("PREFLIGHT_SPECTRA_ZIP_NOT_SELECTED", {issue["code"] for issue in issues})
+
+    def test_preflight_is_silent_without_zip_when_spectra_appendix_is_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_docx = root / "input.docx"
+            input_docx.write_bytes(b"placeholder")
+            request = GenerateSIRequest(
+                input_path=input_docx,
+                input_kind="word",
+                output_path=root / "support_information.docx",
+                insert_spectra_as="none",
+            )
+
+            issues = preflight_generate_request(request, mnova_finder=_raising_mnova_finder)
+
+        self.assertEqual(issues, [])
 
     def test_preflight_requires_mnova_when_spectra_will_be_extracted(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -114,11 +148,20 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(issues, [])
 
     def test_format_preflight_issues_is_log_friendly(self) -> None:
-        issues = [{"code": "PREFLIGHT_INPUT_MISSING", "severity": "error", "message": "Missing", "path": "input.docx"}]
+        issues = [
+            {
+                "code": "PREFLIGHT_INPUT_MISSING",
+                "severity": "error",
+                "message": "Missing",
+                "path": "input.docx",
+                "detail": "file is absent",
+            }
+        ]
 
         formatted = format_preflight_issues(issues)
 
         self.assertIn("[ERROR] PREFLIGHT_INPUT_MISSING: Missing (input.docx)", formatted)
+        self.assertIn("Details: file is absent", formatted)
 
 
 def _raising_mnova_finder(path):
