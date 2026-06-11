@@ -565,6 +565,18 @@ py -m si_generator ^
   --output output\support_information.docx
 ```
 
+Проверить уже сгенерированный output и его `support_information.manifest.json`:
+
+```powershell
+py -m si_generator ^
+  --check-manifest output\support_information.manifest.json
+```
+
+Этот режим не пересобирает SI. Он проверяет структуру manifest, наличие финального `.docx`,
+соответствие списка соединений и доступность перечисленных артефактов. Если нужно проверить
+только manifest и итоговый документ, без строгой проверки всех PNG/MNova файлов, добавьте
+`--no-strict-artifacts`.
+
 Отключить проверку:
 
 ```powershell

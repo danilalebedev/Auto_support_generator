@@ -3,6 +3,7 @@ from __future__ import annotations
 from langgraph.graph import END, START, StateGraph
 
 from .nodes.elemental_analysis import calculate_elemental_analysis_node
+from .nodes.check import check_manifest_node, load_manifest_node
 from .nodes.ingest import read_input_table_node
 from .nodes.hrms import calculate_hrms_node
 from .nodes.loadings import calculate_loadings_node
@@ -13,7 +14,7 @@ from .nodes.render import build_document_model_node, postprocess_word_objects_no
 from .nodes.settings import load_settings_node
 from .nodes.spectra import mnova_batch_node, plan_nmr_processing_node, prepare_spectra_zip_node, route_nmr_processing
 from .nodes.validation import validate_input_node, validate_support_node
-from .state import GenerateSIState
+from .state import CheckSIState, GenerateSIState
 
 
 def build_generate_si_graph():
@@ -62,5 +63,18 @@ def build_generate_si_graph():
     builder.add_edge("render_docx", "postprocess_word_objects")
     builder.add_edge("postprocess_word_objects", "write_manifest")
     builder.add_edge("write_manifest", END)
+
+    return builder.compile()
+
+
+def build_check_si_graph():
+    builder = StateGraph(CheckSIState)
+
+    builder.add_node("load_manifest", load_manifest_node)
+    builder.add_node("check_manifest", check_manifest_node)
+
+    builder.add_edge(START, "load_manifest")
+    builder.add_edge("load_manifest", "check_manifest")
+    builder.add_edge("check_manifest", END)
 
     return builder.compile()

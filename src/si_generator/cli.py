@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import sys
 
+from .domain.manifest import manifest_has_errors
+from .workflows.check_si import check_request_from_args, run_check_si
 from .workflows.generate_si import output_path_from_state, request_from_args, run_generate_si
 
 
@@ -17,6 +19,12 @@ def main(argv: list[str] | None = None) -> int:
 def _main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
+    if args.check_manifest:
+        result = run_check_si(check_request_from_args(args))
+        _print_check_result(result)
+        return 1 if manifest_has_errors(result.get("issues", [])) else 0
+    if not args.output:
+        parser.error("--output is required unless --check-manifest is used.")
     result = run_generate_si(request_from_args(args))
     print(f"Generated {output_path_from_state(result).resolve()}")
     return 0
@@ -27,7 +35,14 @@ def _build_parser() -> argparse.ArgumentParser:
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument("--input", "-i", help="Path to compounds CSV.")
     input_group.add_argument("--word-input", help="Path to a Word table with ChemDraw/ChemSketch OLE structures.")
-    parser.add_argument("--output", "-o", required=True, help="Path to output DOCX.")
+    input_group.add_argument("--check-manifest", help="Check an existing support_information.manifest.json file.")
+    parser.add_argument("--output", "-o", help="Path to output DOCX.")
+    parser.add_argument("--support-docx", help="Optional DOCX path override for --check-manifest.")
+    parser.add_argument(
+        "--no-strict-artifacts",
+        action="store_true",
+        help="For --check-manifest, only validate manifest structure and support DOCX, not every listed artifact path.",
+    )
     parser.add_argument(
         "--template-docx",
         help="Optional Word file used as the visual template: margins, page setup, and named styles.",
@@ -77,3 +92,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Do not add support-check warnings for NMR counts and HRMS values.",
     )
     return parser
+
+
+def _print_check_result(result: dict) -> None:
+    status = result.get("status", "fail")
+    issues = result.get("issues", [])
+    for issue in issues:
+        severity = issue.get("severity", "warning").upper()
+        code = issue.get("code", "CHECK")
+        message = issue.get("message", "")
+        print(f"[{severity}] {code}: {message}")
+    if status == "pass":
+        print("Manifest check passed.")
+    else:
+        print("Manifest check failed.")

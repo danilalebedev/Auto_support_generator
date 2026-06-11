@@ -39,6 +39,13 @@ class GenerateSIRequest:
         return self.output_path.parent
 
 
+@dataclass(slots=True)
+class CheckSIRequest:
+    manifest_path: Path
+    support_docx: Path | None = None
+    strict_artifacts: bool = True
+
+
 class Issue(TypedDict, total=False):
     code: str
     severity: Literal["info", "warning", "error"]
@@ -65,6 +72,15 @@ class GenerateSIState(TypedDict, total=False):
     artifacts: dict[str, str]
     issues: list[Issue]
     manifest: dict[str, Any]
+
+
+class CheckSIState(TypedDict, total=False):
+    run_id: str
+    request: CheckSIRequest
+    manifest: dict[str, Any]
+    artifacts: dict[str, str]
+    issues: list[Issue]
+    status: Literal["pass", "fail"]
 
 
 def make_run_id(now: datetime | None = None) -> str:
