@@ -39,7 +39,7 @@ class ElementalAnalysisTests(unittest.TestCase):
     def test_parse_found_percentages_accepts_mapping(self) -> None:
         self.assertEqual(parse_found_percentages({"C": 68.421, "H": 5.314}), {"C": 68.42, "H": 5.31})
 
-    def test_graph_node_is_gated_by_generation_config(self) -> None:
+    def test_graph_node_respects_generation_flags(self) -> None:
         compound = Compound(
             number="2a",
             name="Example",
@@ -52,16 +52,43 @@ class ElementalAnalysisTests(unittest.TestCase):
             {"compounds": compounds, "order": order, "issues": [], "generation_config": {"include_elemental_analysis": False}}
         )
         applied = calculate_elemental_analysis_node(
-            {"compounds": compounds, "order": order, "issues": [], "generation_config": {"include_elemental_analysis": True}}
+            {
+                "compounds": compounds,
+                "order": order,
+                "issues": [],
+                "generation_config": {"include_elemental_analysis": True, "calculate_elemental_analysis": False},
+            }
         )
 
-        self.assertIn("compounds", skipped)
-        skipped_block = skipped["compounds"]["cmp_001"].elemental_analysis
-        self.assertEqual(skipped_block["calculated"]["C"], 52.14)
+        self.assertEqual(skipped, {})
         updated = applied["compounds"]["cmp_001"].elemental_analysis
         self.assertEqual(updated["calculated"]["C"], 52.14)
         self.assertEqual(updated["found"]["H"], 13.20)
         self.assertEqual(applied["issues"], [])
+
+    def test_graph_node_can_calculate_elemental_analysis_for_all_compounds(self) -> None:
+        compound = Compound(number="2a", name="Example", formula="C2H6O")
+        compounds, order = make_compound_store([compound])
+
+        skipped = calculate_elemental_analysis_node(
+            {
+                "compounds": compounds,
+                "order": order,
+                "issues": [],
+                "generation_config": {"include_elemental_analysis": True, "calculate_elemental_analysis": False},
+            }
+        )
+        applied = calculate_elemental_analysis_node(
+            {
+                "compounds": compounds,
+                "order": order,
+                "issues": [],
+                "generation_config": {"include_elemental_analysis": True, "calculate_elemental_analysis": True},
+            }
+        )
+
+        self.assertEqual(skipped, {})
+        self.assertEqual(applied["compounds"]["cmp_001"].elemental_analysis["calculated"]["C"], 52.14)
 
 
 if __name__ == "__main__":

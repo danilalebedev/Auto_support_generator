@@ -9,6 +9,13 @@ DEFAULT_STYLE_CONFIG: dict[str, Any] = {
     "document": {
         "base_style": "Normal",
     },
+    "generation": {
+        "include_ir": True,
+        "include_elemental_analysis": True,
+        "calculate_elemental_analysis": False,
+        "include_references": True,
+        "include_xrd": False,
+    },
     "compound": {
         "title": {
             "paragraph_style": "",

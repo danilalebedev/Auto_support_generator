@@ -1,6 +1,13 @@
 document:
   base_style: Normal
 
+generation:
+  include_ir: true
+  include_elemental_analysis: true
+  calculate_elemental_analysis: false
+  include_references: true
+  include_xrd: false
+
 compound:
   title:
     paragraph_style:

@@ -7,8 +7,10 @@ from ...domain.elemental_analysis import calculate_elemental_analysis_block, fou
 
 def calculate_elemental_analysis_node(state: GenerateSIState) -> dict:
     generation_config = state.get("generation_config", {})
+    if generation_config.get("include_elemental_analysis", True) is False:
+        return {}
     compounds = ordered_compounds(state)
-    include_all = bool(generation_config.get("include_elemental_analysis", False))
+    include_all = bool(generation_config.get("calculate_elemental_analysis", False))
     if not include_all and not any(compound.elemental_analysis for compound in compounds):
         return {}
 

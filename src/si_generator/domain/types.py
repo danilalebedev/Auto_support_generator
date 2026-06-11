@@ -209,6 +209,7 @@ class GenerationConfig(TypedDict, total=False):
     generate_loadings: bool
     include_ir: bool
     include_elemental_analysis: bool
+    calculate_elemental_analysis: bool
     include_references: bool
     include_xrd: bool
     check_support: bool

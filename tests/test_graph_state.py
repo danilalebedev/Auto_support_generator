@@ -8,6 +8,7 @@ from si_generator.chemistry import calc_hrms_mz
 from si_generator.graph.compound_store import make_compound_store, ordered_compounds
 from si_generator.graph.nodes.hrms import calculate_hrms_node
 from si_generator.graph.nodes.nmr import apply_peak_picking_policy_node, parse_nmr_reports_node
+from si_generator.graph.nodes.render import build_document_model_node
 from si_generator.graph.nodes.settings import load_settings_node
 from si_generator.graph.nodes.spectra import plan_nmr_processing_node, route_nmr_processing
 from si_generator.graph.nodes.validation import validate_input_node, validate_support_node
@@ -59,7 +60,75 @@ class GraphStateTests(unittest.TestCase):
         self.assertEqual(result["spectra_config"]["target_signal_height_fraction"], 0.80)
         self.assertEqual(result["spectra_config"]["mnova_executable_path"], "C:\\Tools\\MestReNova.exe")
         self.assertFalse(result["generation_config"]["check_support"])
+        self.assertTrue(result["generation_config"]["include_ir"])
+        self.assertTrue(result["generation_config"]["include_elemental_analysis"])
+        self.assertFalse(result["generation_config"]["calculate_elemental_analysis"])
         self.assertFalse(result["runtime_config"]["dry_run"])
+
+    def test_settings_node_merges_generation_flags_from_style_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            style_path = Path(tmp) / "style_config.yml"
+            references_path = Path(tmp) / "references.yml"
+            style_path.write_text(
+                "generation:\n"
+                "  include_ir: false\n"
+                "  include_elemental_analysis: false\n"
+                "  calculate_elemental_analysis: true\n"
+                "  include_references: false\n",
+                encoding="utf-8",
+            )
+            references_path.write_text("references:\norder: []\n", encoding="utf-8")
+            request = GenerateSIRequest(
+                input_path=Path("examples/test_input.docx"),
+                input_kind="word",
+                output_path=Path("output/support_information.docx"),
+                style_config_path=style_path,
+                references_path=references_path,
+            )
+
+            result = load_settings_node({"request": request})
+
+        self.assertFalse(result["generation_config"]["include_ir"])
+        self.assertFalse(result["generation_config"]["include_elemental_analysis"])
+        self.assertTrue(result["generation_config"]["calculate_elemental_analysis"])
+        self.assertFalse(result["generation_config"]["include_references"])
+
+    def test_document_model_node_honors_generation_visibility_flags(self) -> None:
+        compound = Compound(
+            number="2a",
+            name="Example",
+            formula="C17H11FN2O3",
+            ir="IR (ATR, cm-1): 3038, 2957.",
+            elemental_analysis={"found": "C, 66.03; H, 3.55; N, 8.92"},
+            references=["ref1"],
+        )
+        compounds, order = make_compound_store([compound])
+        store = {
+            "references": {"ref1": {"key": "ref1", "authors": ["Doe J."], "title": "Reference"}},
+            "order": ["ref1"],
+        }
+
+        result = build_document_model_node(
+            {
+                "compounds": compounds,
+                "order": order,
+                "reference_store": store,
+                "spectra_config": {"insert_spectra_as": "none"},
+                "generation_config": {
+                    "include_ir": False,
+                    "include_elemental_analysis": False,
+                    "include_references": False,
+                },
+            }
+        )
+
+        model = result["document_model"]
+        rendered_compound = model["sections"][0]["blocks"][0]["content"]
+        self.assertEqual([section["id"] for section in model["sections"]], ["compound_descriptions"])
+        self.assertEqual(rendered_compound.ir, "")
+        self.assertEqual(rendered_compound.elemental_analysis, {})
+        self.assertEqual(compounds["cmp_001"].ir, "IR (ATR, cm-1): 3038, 2957.")
+        self.assertTrue(compounds["cmp_001"].elemental_analysis)
 
     def test_nmr_route_skips_when_disabled(self) -> None:
         request = GenerateSIRequest(
