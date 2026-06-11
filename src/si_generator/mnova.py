@@ -5,21 +5,14 @@ import json
 import locale
 import shutil
 import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from .external_tools import find_mnova_executable, make_ascii_work_dir
+from .runtime_paths import bundled_resource_path
 
 
-def _resource_path(relative_path: str) -> Path:
-    bundle_root = getattr(sys, "_MEIPASS", None)
-    if bundle_root:
-        return Path(bundle_root) / relative_path
-    return Path(__file__).resolve().parents[2] / relative_path
-
-
-SCRIPT_PATH = _resource_path("scripts/extract_nmr_report.qs")
+SCRIPT_PATH = bundled_resource_path("scripts/extract_nmr_report.qs", package_file=__file__)
 
 
 @dataclass(frozen=True)

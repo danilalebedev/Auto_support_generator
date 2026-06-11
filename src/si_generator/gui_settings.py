@@ -6,6 +6,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from .runtime_paths import gui_settings_path
+
 
 SETTINGS_VERSION = 1
 STRING_FIELDS = (
@@ -30,8 +32,7 @@ CHOICE_FIELDS = {
 
 
 def default_gui_settings_path() -> Path:
-    base = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "AutoSupportGenerator"
-    return base / "gui_settings.json"
+    return gui_settings_path(environ=os.environ)
 
 
 def load_gui_settings(path: str | Path | None = None) -> dict[str, str | bool]:

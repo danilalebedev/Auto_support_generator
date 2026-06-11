@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import queue
-import sys
 import threading
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -17,6 +16,7 @@ from .external_tools import find_mnova_executable
 from .graph.state import CheckSIRequest, GenerateSIRequest, PatchSIRequest
 from .gui_settings import load_gui_settings, save_gui_settings
 from .runtime_diagnostics import format_preflight_issues, issue_has_errors, preflight_generate_request
+from .runtime_paths import default_output_path, examples_dir
 from .workflows.check_si import run_check_si
 from .workflows.generate_si import output_path_from_state, run_generate_si
 from .workflows.patch_si import run_patch_si
@@ -36,7 +36,7 @@ class SIGeneratorApp:
         self.journal_profile = StringVar()
         self.references_file = StringVar()
         self.mnova_exe = StringVar()
-        self.output_docx = StringVar(value=str(_default_output_path()))
+        self.output_docx = StringVar(value=str(default_output_path()))
         self.input_kind = StringVar(value="word")
         self.insert_spectra_as = StringVar(value="png")
         self.check_support = BooleanVar(value=True)
@@ -237,7 +237,7 @@ class SIGeneratorApp:
             self._save_settings()
 
     def _load_examples(self) -> None:
-        examples = _examples_dir()
+        examples = examples_dir()
         table = examples / "test_input.docx"
         spectra = examples / "test_input.zip"
         if not table.exists() or not spectra.exists():
@@ -246,12 +246,12 @@ class SIGeneratorApp:
         self.input_kind.set("word")
         self.input_path.set(str(table))
         self.spectra_zip.set(str(spectra))
-        self.output_docx.set(str(_default_output_path()))
+        self.output_docx.set(str(default_output_path()))
         self.status_text.set("Example loaded")
         self._save_settings()
 
     def _open_examples_folder(self) -> None:
-        examples = _examples_dir()
+        examples = examples_dir()
         examples.mkdir(parents=True, exist_ok=True)
         os.startfile(str(examples))
 
@@ -682,22 +682,6 @@ def main() -> None:
     root = Tk()
     SIGeneratorApp(root)
     root.mainloop()
-
-
-def _app_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parents[2]
-
-
-def _examples_dir() -> Path:
-    return _app_base_dir() / "examples"
-
-
-def _default_output_path() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "AutoSupportGenerator" / "output" / "support_information.docx"
-    return Path.cwd() / "output" / "support_information.docx"
 
 
 if __name__ == "__main__":
