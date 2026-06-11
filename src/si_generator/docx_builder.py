@@ -6,17 +6,32 @@ from typing import Any
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Inches
 from docx.shared import RGBColor
 from docx.shared import Pt
 
 from .domain.massspec import calculate_hrms
 from .models import Compound
+from .render.document_model import build_si_document_model
+from .render.si_document import DocumentBlock, SIDocument
 from .style_config import DEFAULT_STYLE_CONFIG, apply_paragraph_style, apply_run_style, config_get
 
 
 def build_document(
     compounds: list[Compound],
+    output_path: str | Path,
+    style_config: dict[str, Any] | None = None,
+    template_path: str | Path | None = None,
+) -> Path:
+    return build_document_from_model(
+        build_si_document_model(compounds),
+        output_path,
+        style_config=style_config,
+        template_path=template_path,
+    )
+
+
+def build_document_from_model(
+    document_model: SIDocument,
     output_path: str | Path,
     style_config: dict[str, Any] | None = None,
     template_path: str | Path | None = None,
@@ -31,14 +46,34 @@ def build_document(
     else:
         _configure_styles(document)
 
-    for index, compound in enumerate(compounds):
-        if index:
-            document.add_paragraph()
-        _add_compound_block(document, compound, style_config)
-
-    _add_spectra_appendix(document, compounds, style_config)
+    _render_document_model(document, document_model, style_config)
     document.save(output_path)
     return output_path
+
+
+def _render_document_model(document: Document, document_model: SIDocument, style_config: dict[str, Any]) -> None:
+    sections = document_model.get("sections", [])
+    for section in sections:
+        blocks = section.get("blocks", [])
+        if section.get("id") == "compound_descriptions":
+            _render_compound_description_blocks(document, blocks, style_config)
+        elif section.get("id") == "spectra_appendix" and blocks:
+            _render_spectra_appendix_blocks(document, blocks, style_config)
+
+
+def _render_compound_description_blocks(document: Document, blocks: list[DocumentBlock], style_config: dict[str, Any]) -> None:
+    for index, block in enumerate(blocks):
+        if index:
+            document.add_paragraph()
+        _add_compound_block(document, block["content"], style_config)
+
+
+def _render_spectra_appendix_blocks(document: Document, blocks: list[DocumentBlock], style_config: dict[str, Any]) -> None:
+    document.add_page_break()
+    for index, block in enumerate(blocks):
+        if index:
+            document.add_page_break()
+        _add_spectrum_page(document, block["content"], block["nucleus"], block["image_path"], style_config)
 
 
 def _configure_styles(document: Document) -> None:
@@ -120,14 +155,6 @@ def _add_summary_paragraph(document: Document, text: str, style_config: dict[str
     return paragraph
 
 
-def _add_labelled_line(document: Document, label: str, text: str) -> None:
-    paragraph = document.add_paragraph()
-    paragraph.paragraph_format.space_after = Pt(0)
-    label_run = paragraph.add_run(f"{label}: ")
-    label_run.bold = True
-    paragraph.add_run(text.strip())
-
-
 def _add_nmr_line(document: Document, label: str, text: str, conditions: str, style_config: dict[str, Any]) -> None:
     paragraph = document.add_paragraph()
     paragraph.paragraph_format.space_after = Pt(0)
@@ -195,23 +222,6 @@ def _add_nmr_warning(document: Document, text: str) -> None:
     run = paragraph.add_run(f"(Support check: {text})")
     run.font.color.rgb = RGBColor(192, 0, 0)
     run.bold = True
-
-
-def _add_spectra_appendix(document: Document, compounds: list[Compound], style_config: dict[str, Any]) -> None:
-    spectra = []
-    for compound in compounds:
-        if compound.h1_image_path and Path(compound.h1_image_path).exists():
-            spectra.append((compound, "1H", compound.h1_image_path))
-        if compound.c13_image_path and Path(compound.c13_image_path).exists():
-            spectra.append((compound, "13C", compound.c13_image_path))
-    if not spectra:
-        return
-
-    document.add_page_break()
-    for index, (compound, nucleus, image_path) in enumerate(spectra):
-        if index:
-            document.add_page_break()
-        _add_spectrum_page(document, compound, nucleus, image_path, style_config)
 
 
 def _add_spectrum_page(document: Document, compound: Compound, nucleus: str, image_path: str, style_config: dict[str, Any]) -> None:

@@ -7,6 +7,7 @@ from typing import Any, Literal, TypedDict
 
 from ..domain.types import SpectrumRenderSpec
 from ..models import Compound
+from ..render.si_document import SIDocument
 
 
 InputKind = Literal["csv", "word"]
@@ -52,6 +53,7 @@ class GenerateSIState(TypedDict, total=False):
     compounds: dict[str, Compound]
     order: list[str]
     spectra_plan: dict[str, dict[str, SpectrumRenderSpec]]
+    document_model: SIDocument
     output_path: Path
     artifacts: dict[str, str]
     issues: list[Issue]
