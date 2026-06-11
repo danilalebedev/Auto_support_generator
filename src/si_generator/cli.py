@@ -119,7 +119,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-check-support",
         action="store_true",
-        help="Do not add support-check warnings for NMR counts and HRMS values.",
+        help="Do not add support-check warnings for NMR counts, HRMS values, and elemental analysis.",
     )
     return parser
 

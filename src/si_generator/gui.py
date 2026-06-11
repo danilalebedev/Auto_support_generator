@@ -128,7 +128,7 @@ class SIGeneratorApp:
         options.columnconfigure(3, weight=1)
         ttk.Checkbutton(
             options,
-            text="Check support (NMR counts and HRMS values)",
+            text="Check support (NMR, HRMS, elemental analysis)",
             variable=self.check_support,
         ).grid(row=0, column=0, sticky="w")
         ttk.Label(options, text="Spectra appendix").grid(row=0, column=1, sticky="e", padx=(12, 8))
