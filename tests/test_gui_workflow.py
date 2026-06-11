@@ -23,6 +23,7 @@ class GuiWorkflowTests(unittest.TestCase):
                 output_docx_text=str(output),
                 spectra_zip_text=str(spectra),
                 journal_profile_text="acs",
+                references_text="",
                 check_support=False,
             )
 

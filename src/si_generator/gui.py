@@ -26,6 +26,7 @@ class SIGeneratorApp:
         self.template_docx = StringVar()
         self.style_config = StringVar()
         self.journal_profile = StringVar()
+        self.references_file = StringVar()
         self.mnova_exe = StringVar()
         self.output_docx = StringVar(value=str(_default_output_path()))
         self.input_kind = StringVar(value="word")
@@ -81,16 +82,17 @@ class SIGeneratorApp:
         self._file_row(files, 3, "Template .docx", self.template_docx, lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
         self._file_row(files, 4, "Style config .yml", self.style_config, lambda: self._browse_file(self.style_config, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
         self._file_row(files, 5, "Journal profile", self.journal_profile, lambda: self._browse_file(self.journal_profile, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
+        self._file_row(files, 6, "References .yml", self.references_file, lambda: self._browse_file(self.references_file, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
         self._file_row(
             files,
-            6,
+            7,
             "MestReNova .exe",
             self.mnova_exe,
             lambda: self._browse_file(self.mnova_exe, [("MestReNova", "*.exe"), ("All files", "*.*")]),
             optional=True,
             extra_button=("Detect", self._detect_mnova),
         )
-        self._file_row(files, 7, "Output .docx", self.output_docx, self._browse_output)
+        self._file_row(files, 8, "Output .docx", self.output_docx, self._browse_output)
 
         options = ttk.LabelFrame(outer, text="Options", padding=12)
         options.grid(row=2, column=0, sticky="ew", pady=(12, 12))
@@ -218,6 +220,7 @@ class SIGeneratorApp:
             template_docx_text=self.template_docx.get(),
             style_config_text=self.style_config.get(),
             journal_profile_text=self.journal_profile.get(),
+            references_text=self.references_file.get(),
             mnova_exe_text=self.mnova_exe.get(),
             check_support=self.check_support.get(),
         )
@@ -310,6 +313,7 @@ def _build_generate_request(
     template_docx_text: str = "",
     style_config_text: str = "",
     journal_profile_text: str = "",
+    references_text: str = "",
     mnova_exe_text: str = "",
     check_support: bool = True,
 ) -> GenerateSIRequest:
@@ -326,6 +330,7 @@ def _build_generate_request(
         template_docx=_optional_existing_file(template_docx_text, "Template .docx"),
         style_config_path=_optional_existing_file(style_config_text, "Style config"),
         journal_profile=_optional_profile(journal_profile_text),
+        references_path=_optional_existing_file(references_text, "References .yml"),
         mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe"),
         no_check_support=not check_support,
     )

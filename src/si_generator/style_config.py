@@ -104,6 +104,18 @@ DEFAULT_STYLE_CONFIG: dict[str, Any] = {
             "align": "center",
         },
     },
+    "references": {
+        "title": {
+            "paragraph_style": "",
+            "bold": True,
+            "italic": False,
+        },
+        "body": {
+            "paragraph_style": "",
+            "bold": False,
+            "italic": False,
+        },
+    },
 }
 
 

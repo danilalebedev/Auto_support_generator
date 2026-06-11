@@ -35,6 +35,7 @@ class Compound:
     mnova_path: str = ""
     extra_nmr: str = ""
     ir: str = ""
+    references: list[str] = field(default_factory=list)
     structure_path: str = ""
     has_word_structure: bool = False
     nmr_check_warning: str = ""

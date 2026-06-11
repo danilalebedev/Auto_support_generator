@@ -8,12 +8,28 @@ from ...nmr_validation import validate_support
 
 def validate_input_node(state: GenerateSIState) -> dict:
     request = state["request"]
-    warnings = validate_compound_inputs(ordered_compounds(state), require_structure=request.input_kind == "word")
+    compounds = ordered_compounds(state)
+    warnings = validate_compound_inputs(compounds, require_structure=request.input_kind == "word")
+    warnings.extend(_reference_warnings(compounds, state))
     issues: list[Issue] = list(state.get("issues", []))
     for warning in warnings:
         print(f"[Input warning] {warning}", flush=True)
         issues.append({"code": "INPUT_WARNING", "severity": "warning", "message": warning})
     return {"issues": issues}
+
+
+def _reference_warnings(compounds, state: GenerateSIState) -> list[str]:
+    warnings: list[str] = []
+    reference_store = state.get("reference_store", {})
+    references = reference_store.get("references", {}) if isinstance(reference_store, dict) else {}
+    any_reference_keys = any(compound.references for compound in compounds)
+    if any_reference_keys and not references:
+        return ["references are listed in the input table, but no references file was loaded."]
+    for compound in compounds:
+        for key in compound.references:
+            if key not in references:
+                warnings.append(f"{compound.number}: reference '{key}' was not found in the references file.")
+    return warnings
 
 
 def validate_support_node(state: GenerateSIState) -> dict:

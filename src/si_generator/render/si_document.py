@@ -6,6 +6,7 @@ from typing import Any, Literal, TypedDict
 DocumentBlockKind = Literal[
     "compound_description",
     "spectrum_page",
+    "reference",
 ]
 
 

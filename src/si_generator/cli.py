@@ -41,6 +41,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional built-in profile name (default, acs, rsc, wiley) or path to a journal profile YAML.",
     )
     parser.add_argument(
+        "--references",
+        help="Optional YAML file with bibliography entries referenced by the compound table.",
+    )
+    parser.add_argument(
         "--spectra-zip",
         help="Zip archive with compound-number folders containing NMR spectra.",
     )

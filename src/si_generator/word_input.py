@@ -18,6 +18,7 @@ from docx import Document
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 
+from .domain.references import parse_reference_keys
 from .models import Compound
 from .structure_metadata import extract_structure_metadata_by_row
 
@@ -98,6 +99,7 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
                     c13_spectrum_path=fields.get("c13_spectrum_path", ""),
                     extra_nmr=fields.get("extra_nmr", ""),
                     ir=fields.get("ir", ""),
+                    references=parse_reference_keys(fields.get("references", "")),
                     has_word_structure=has_structure,
                 )
             )
@@ -159,6 +161,7 @@ def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Comp
                 c13_spectrum_path=fields.get("c13_spectrum_path", ""),
                 extra_nmr=fields.get("extra_nmr", ""),
                 ir=fields.get("ir", ""),
+                references=parse_reference_keys(fields.get("references", "")),
                 has_word_structure=metadata is not None,
             )
         )
@@ -337,6 +340,8 @@ def _map_row(headers: list[str], values: list[str]) -> dict[str, str]:
             result["formula"] = value
         elif key == "ir":
             result["ir"] = value
+        elif key in {"references", "refs", "referencekeys"}:
+            result["references"] = value
         elif "nmr" in key:
             result["extra_nmr"] = value
 

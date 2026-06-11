@@ -48,6 +48,7 @@ class JournalProfileTests(unittest.TestCase):
             template_docx=None,
             style_config=None,
             journal_profile="rsc",
+            references=None,
             spectra_zip=None,
             mnova_exe=None,
             no_extract_nmr=True,

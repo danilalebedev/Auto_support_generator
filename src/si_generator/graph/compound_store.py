@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from .state import GenerateSIState
+from ..domain.references import parse_reference_keys
 from ..models import Compound
 
 
@@ -14,6 +15,7 @@ def make_compound_store(compounds: Iterable[Compound]) -> tuple[dict[str, Compou
     for index, compound in enumerate(compounds, start=1):
         compound_id = _unique_compound_id(compound.id, index, used_ids)
         compound.id = compound_id
+        compound.references = parse_reference_keys(compound.references)
         if not compound.source_row:
             compound.source_row = index
         store[compound_id] = compound
