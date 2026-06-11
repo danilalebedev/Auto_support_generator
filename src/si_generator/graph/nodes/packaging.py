@@ -69,7 +69,14 @@ def build_manifest(state: GenerateSIState) -> dict:
         manifest["compounds"][compound_id] = {
             "id": compound_id,
             "number": compound.number,
+            "name": compound.name,
+            "formula": compound.formula,
             "source_row": compound.source_row,
+            "structure": {
+                "has_word_structure": compound.has_word_structure,
+                "path": compound.structure_path,
+            },
+            "analytical_blocks": _analytical_blocks(compound),
             "structure_placeholder": f"STRUCTURE:{compound.number}",
             "docx_block_id": f"compound:{compound_id}",
             "docx_bookmark": bookmark_name_for_block_id(f"compound:{compound_id}"),
@@ -177,6 +184,20 @@ def _compound_artifacts(compound) -> dict[str, str]:
     if compound.mnova_path:
         artifacts["mnova"] = compound.mnova_path
     return artifacts
+
+
+def _analytical_blocks(compound) -> dict[str, bool]:
+    return {
+        "preparation": bool(compound.preparation or compound.reaction),
+        "yield": bool(compound.yield_text),
+        "physical_properties": bool(compound.color or compound.state or compound.melting_point or compound.rf),
+        "h1_nmr": bool(compound.h1_nmr or compound.nmr_spectra.get("1H")),
+        "c13_nmr": bool(compound.c13_nmr or compound.nmr_spectra.get("13C")),
+        "extra_nmr": bool(compound.extra_nmr),
+        "ir": bool(compound.ir),
+        "hrms": bool(compound.hrms or compound.hrms_found),
+        "elemental_analysis": bool(compound.elemental_analysis),
+    }
 
 
 def _compact_issues(issues: list[dict]) -> list[dict[str, str]]:

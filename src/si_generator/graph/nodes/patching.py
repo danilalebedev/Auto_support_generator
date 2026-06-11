@@ -36,9 +36,10 @@ def apply_renumber_patch_node(state: PatchSIState) -> dict:
 
     patched_manifest = source_manifest
     applied_numbers: dict[str, str] = {}
+    removed_ids: list[str] = []
     removed_bookmarks: list[str] = []
     if request.remove:
-        patched_manifest, _removed_ids, removed_bookmarks = remove_manifest(patched_manifest, request.remove)
+        patched_manifest, removed_ids, removed_bookmarks = remove_manifest(patched_manifest, request.remove)
     if request.renumber:
         patched_manifest, applied_numbers = renumber_manifest(patched_manifest, request.renumber)
     if request.reorder:
@@ -62,7 +63,13 @@ def apply_renumber_patch_node(state: PatchSIState) -> dict:
         "support_docx": str(Path(output_docx)),
         "manifest": str(Path(output_manifest)),
     }
-    return {"manifest": patched_manifest, "artifacts": artifacts}
+    patch_result = {
+        "renumbered": applied_numbers,
+        "removed_ids": removed_ids,
+        "removed_bookmarks": removed_bookmarks,
+        "reordered_ids": reordered_ids,
+    }
+    return {"manifest": patched_manifest, "artifacts": artifacts, "patch_result": patch_result}
 
 
 def check_patched_manifest_node(state: PatchSIState) -> dict:
@@ -98,6 +105,15 @@ def build_patch_report(state: PatchSIState, status: str, issues: list[dict], rep
             "remove": list(request.remove),
             "reorder": list(request.reorder),
         },
+        "patch_result": state.get(
+            "patch_result",
+            {
+                "renumbered": {},
+                "removed_ids": [],
+                "removed_bookmarks": [],
+                "reordered_ids": [],
+            },
+        ),
         "strict_artifacts": request.strict_artifacts,
         "issue_counts": count_issues(issues),
         "compound_issue_counts": compound_issue_counts(issues),

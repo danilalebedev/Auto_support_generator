@@ -63,6 +63,10 @@ class PatchWorkflowTests(unittest.TestCase):
         self.assertEqual(Path(state["artifacts"]["patch_report"]), root / "support_information_renumbered.patch_report.json")
         self.assertEqual(patch_report["status"], "pass")
         self.assertEqual(patch_report["operations"]["renumber"], {"2a": "5a"})
+        self.assertEqual(state["patch_result"]["renumbered"], {"2a": "5a"})
+        self.assertEqual(patch_report["patch_result"]["renumbered"], {"2a": "5a"})
+        self.assertEqual(patch_report["patch_result"]["removed_ids"], [])
+        self.assertEqual(patch_report["patch_result"]["reordered_ids"], [])
         self.assertEqual(patch_report["compound_issue_counts"], {})
         self.assertEqual(patched["compounds"]["cmp_001"]["number"], "5a")
         self.assertIn("Example (5a)", text)
@@ -150,9 +154,12 @@ class PatchWorkflowTests(unittest.TestCase):
                 )
             )
             patched = json.loads(patched_manifest.read_text(encoding="utf-8"))
+            patch_report = json.loads((root / "support_information_reordered.patch_report.json").read_text(encoding="utf-8"))
             text = "\n".join(paragraph.text for paragraph in Document(patched_docx).paragraphs)
 
         self.assertEqual(state["status"], "pass")
+        self.assertEqual(state["patch_result"]["reordered_ids"], ["cmp_002", "cmp_001"])
+        self.assertEqual(patch_report["patch_result"]["reordered_ids"], ["cmp_002", "cmp_001"])
         self.assertEqual(patched["order"], ["cmp_002", "cmp_001"])
         self.assertLess(text.index("Example B (2b)"), text.index("Example A (2a)"))
 
@@ -179,9 +186,16 @@ class PatchWorkflowTests(unittest.TestCase):
                 )
             )
             patched = json.loads(patched_manifest.read_text(encoding="utf-8"))
+            patch_report = json.loads((root / "support_information_removed.patch_report.json").read_text(encoding="utf-8"))
             text = "\n".join(paragraph.text for paragraph in Document(patched_docx).paragraphs)
 
         self.assertEqual(state["status"], "pass")
+        self.assertEqual(state["patch_result"]["removed_ids"], ["cmp_001"])
+        self.assertEqual(patch_report["patch_result"]["removed_ids"], ["cmp_001"])
+        self.assertEqual(
+            patch_report["patch_result"]["removed_bookmarks"],
+            [bookmark_name_for_block_id("compound:cmp_001")],
+        )
         self.assertEqual(patched["order"], ["cmp_002"])
         self.assertNotIn("cmp_001", patched["compounds"])
         self.assertNotIn("Example A (2a)", text)

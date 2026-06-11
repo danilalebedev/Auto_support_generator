@@ -30,7 +30,19 @@ class PackagingTests(unittest.TestCase):
             h1_image = output_path.parent / "processed_spectra" / "2a" / "2a_1H.png"
             h1_image.parent.mkdir(parents=True)
 
-            compound = Compound(number="2a", name="Example")
+            structure_path = root / "structures" / "2a.cdx"
+            compound = Compound(
+                number="2a",
+                name="Example",
+                formula="C2H6O",
+                color="white",
+                state="solid",
+                h1_nmr="1.23 (s, 3H)",
+                hrms_found="47.0491",
+                ir="IR (KBr, cm-1): 1700",
+            )
+            compound.structure_path = str(structure_path)
+            compound.has_word_structure = True
             compound.h1_image_path = str(h1_image)
             compounds, order = make_compound_store([compound])
             state = {
@@ -64,6 +76,26 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(manifest["relative_paths"]["processed_spectra_zip"], "processed_spectra.zip")
         self.assertEqual(manifest["relative_paths"]["input_warnings"], str(Path("logs") / "input_warnings.txt"))
         self.assertEqual(manifest["relative_paths"]["support_warnings"], str(Path("logs") / "support_warnings.txt"))
+        self.assertEqual(manifest["compounds"]["cmp_001"]["name"], "Example")
+        self.assertEqual(manifest["compounds"]["cmp_001"]["formula"], "C2H6O")
+        self.assertEqual(
+            manifest["compounds"]["cmp_001"]["structure"],
+            {"has_word_structure": True, "path": str(structure_path)},
+        )
+        self.assertEqual(
+            manifest["compounds"]["cmp_001"]["analytical_blocks"],
+            {
+                "preparation": False,
+                "yield": False,
+                "physical_properties": True,
+                "h1_nmr": True,
+                "c13_nmr": False,
+                "extra_nmr": False,
+                "ir": True,
+                "hrms": True,
+                "elemental_analysis": False,
+            },
+        )
         self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_png"], str(Path("processed_spectra") / "2a" / "2a_1H.png"))
         self.assertEqual(manifest["configs"]["spectra"]["extract_nmr"], False)
         self.assertEqual(

@@ -101,6 +101,7 @@ class PatchSIState(TypedDict, total=False):
     run_id: str
     request: PatchSIRequest
     manifest: dict[str, Any]
+    patch_result: dict[str, Any]
     artifacts: dict[str, str]
     issues: list[Issue]
     status: Literal["pass", "fail"]
