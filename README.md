@@ -531,7 +531,8 @@ $env:PYTHONPATH='src'
 
 Тесты покрывают расчет HRMS, проверку ЯМР, чтение текущего Word-примера,
 smoke-генерацию `.docx` без запуска MestReNova, LangGraph request/state,
-маршрутизацию генерации SI и запись `support_information.manifest.json`.
+маршрутизацию генерации SI, расчет HRMS перед render-этапом и запись
+`support_information.manifest.json`.
 Новая архитектурная основа лежит в:
 
 ```text

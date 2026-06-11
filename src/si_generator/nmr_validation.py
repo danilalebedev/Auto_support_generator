@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import re
 
-from .chemistry import calc_hrms_mz
 from .chemistry import parse_formula
+from .domain.massspec import calculate_hrms
 from .models import Compound
 
 
@@ -43,7 +43,7 @@ def validate_hrms(compounds: list[Compound], tolerance_da: float = 0.005) -> Non
         if not compound.formula or not compound.hrms_found:
             continue
         try:
-            calcd = calc_hrms_mz(compound.formula, compound.hrms_adduct)
+            calcd = compound.hrms_calculated or calculate_hrms(compound.formula, compound.hrms_adduct).calculated_mz
             found = float(compound.hrms_found)
         except (ValueError, TypeError):
             _append_warning(compound, "HRMS could not be checked")

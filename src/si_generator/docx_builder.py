@@ -10,7 +10,7 @@ from docx.shared import Inches
 from docx.shared import RGBColor
 from docx.shared import Pt
 
-from .chemistry import calc_hrms_mz, ion_formula
+from .domain.massspec import calculate_hrms
 from .models import Compound
 from .style_config import DEFAULT_STYLE_CONFIG, apply_paragraph_style, apply_run_style, config_get
 
@@ -173,7 +173,11 @@ def _add_ir_line(document: Document, text: str, style_config: dict[str, Any]) ->
 
 
 def _add_hrms_line(document: Document, compound: Compound, style_config: dict[str, Any]) -> None:
-    calcd = calc_hrms_mz(compound.formula, compound.hrms_adduct)
+    if not compound.hrms_calculated or not compound.hrms_ion_formula:
+        result = calculate_hrms(compound.formula, compound.hrms_adduct)
+        compound.hrms_calculated = result.calculated_mz
+        compound.hrms_ion_formula = result.ion_formula
+
     paragraph = document.add_paragraph()
     paragraph.paragraph_format.space_after = Pt(0)
     apply_paragraph_style(paragraph, style_config, "hrms")
@@ -181,8 +185,8 @@ def _add_hrms_line(document: Document, compound: Compound, style_config: dict[st
     apply_run_style(label_run, style_config, "hrms.label")
     _add_adduct_runs(paragraph, compound.hrms_adduct, style_config)
     paragraph.add_run(" calcd for ")
-    _add_formula_runs(paragraph, ion_formula(compound.formula, compound.hrms_adduct), style_config)
-    paragraph.add_run(f" {calcd:.4f}. Found {float(compound.hrms_found):.4f}.")
+    _add_formula_runs(paragraph, compound.hrms_ion_formula, style_config)
+    paragraph.add_run(f" {compound.hrms_calculated:.4f}. Found {float(compound.hrms_found):.4f}.")
 
 
 def _add_nmr_warning(document: Document, text: str) -> None:

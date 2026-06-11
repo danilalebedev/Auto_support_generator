@@ -4,6 +4,7 @@ from pathlib import Path
 import unittest
 
 from si_generator.graph.compound_store import make_compound_store, ordered_compounds
+from si_generator.graph.nodes.hrms import calculate_hrms_node
 from si_generator.graph.nodes.spectra import route_nmr_processing
 from si_generator.graph.state import GenerateSIRequest
 from si_generator.models import Compound
@@ -56,6 +57,28 @@ class GraphStateTests(unittest.TestCase):
         compounds, order = make_compound_store([compound])
 
         self.assertEqual(route_nmr_processing({"request": request, "compounds": compounds, "order": order}), "run_mnova")
+
+    def test_hrms_node_calculates_before_rendering(self) -> None:
+        request = GenerateSIRequest(
+            input_path=Path("examples/test_input.docx"),
+            input_kind="word",
+            output_path=Path("output/support_information.docx"),
+        )
+        compound = Compound(
+            number="2a",
+            name="Test compound",
+            formula="C11H10BrFO2",
+            hrms_found="272.9921",
+            hrms_adduct="[M+H]+",
+        )
+        compounds, order = make_compound_store([compound])
+
+        result = calculate_hrms_node({"request": request, "compounds": compounds, "order": order, "issues": []})
+
+        updated = result["compounds"]["cmp_001"]
+        self.assertEqual(updated.hrms_calculated, 272.9921)
+        self.assertEqual(updated.hrms_ion_formula, "C11H11BrFO2+")
+        self.assertEqual(result["issues"], [])
 
 
 if __name__ == "__main__":
