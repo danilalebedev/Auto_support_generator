@@ -13,7 +13,7 @@ def find_mnova_executable(explicit_path: str | Path | None = None) -> Path:
     Windows registry, then common installation folders.
     """
     if explicit_path:
-        explicit = Path(explicit_path)
+        explicit = _clean_path(explicit_path)
         if explicit.is_file():
             return explicit.resolve()
         raise FileNotFoundError(f"Selected MestReNova executable does not exist: {explicit}")
@@ -140,12 +140,17 @@ def _unique_paths(paths: list[Path]) -> list[Path]:
     result: list[Path] = []
     seen: set[str] = set()
     for path in paths:
-        key = str(path).strip().strip('"').lower()
+        cleaned = _clean_path(path)
+        key = str(cleaned).lower()
         if not key or key in seen:
             continue
         seen.add(key)
-        result.append(Path(str(path).strip().strip('"')))
+        result.append(cleaned)
     return result
+
+
+def _clean_path(path: str | Path) -> Path:
+    return Path(str(path).strip().strip('"'))
 
 
 def make_ascii_work_dir(prefix: str) -> Path:
