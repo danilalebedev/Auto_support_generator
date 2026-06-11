@@ -6,7 +6,7 @@ from .chemistry import parse_formula
 from .domain.elemental_analysis import DEFAULT_ELEMENTS, calculate_elemental_analysis_block, found_from_block
 from .domain.massspec import calculate_hrms, hrms_adduct_text, hrms_found_text, parse_mz_value
 from .domain.types import Issue
-from .models import Compound
+from .domain.compound import Compound
 
 
 def validate_support(compounds: list[Compound]) -> None:

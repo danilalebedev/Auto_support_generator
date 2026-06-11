@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .domain.references import parse_reference_keys
 from .domain.reactions import reaction_from_fields
-from .models import Compound
+from .domain.compound import Compound
 
 
 FIELD_ALIASES = {
@@ -50,4 +50,3 @@ def read_compounds(path: str | Path) -> list[Compound]:
                 raise ValueError(f"Invalid columns near CSV row {row_number}: {exc}") from exc
 
     return compounds
-

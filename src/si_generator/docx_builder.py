@@ -20,7 +20,7 @@ from .domain.references import format_reference
 from .domain.reactions import calculate_reaction_loadings
 from .domain.types import JournalProfile
 from .domain.types import ReferenceStore
-from .models import Compound
+from .domain.compound import Compound
 from .render.document_model import build_si_document_model
 from .render.si_document import DocumentBlock, SIDocument
 from .style_config import DEFAULT_STYLE_CONFIG, apply_paragraph_style, apply_run_style, config_get

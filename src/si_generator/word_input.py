@@ -21,7 +21,7 @@ from rdkit.Chem import rdMolDescriptors
 from .domain.massspec import extract_mz_text
 from .domain.references import parse_reference_keys
 from .domain.reactions import reaction_from_fields
-from .models import Compound
+from .domain.compound import Compound
 from .structure_metadata import extract_structure_metadata_by_row
 
 

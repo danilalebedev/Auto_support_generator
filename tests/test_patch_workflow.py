@@ -76,6 +76,7 @@ class PatchWorkflowTests(unittest.TestCase):
         self.assertEqual(patched["patch_history"][0]["operations"]["renumber"], {"2a": "5a"})
         self.assertEqual(patched["patch_history"][0]["result"]["renumbered"], {"2a": "5a"})
         self.assertEqual(patched["compounds"]["cmp_001"]["number"], "5a")
+        self.assertEqual(patched["compounds"]["cmp_001"]["domain_snapshot"]["number"], "5a")
         self.assertIn("Example (5a)", text)
         self.assertNotIn("Example (2a)", text)
         self.assertFalse(manifest_has_errors(issues))
@@ -297,6 +298,7 @@ def _write_source_support(root: Path, compounds: list[Compound] | None = None) -
         compound_entries[compound.id] = {
             "id": compound.id,
             "number": compound.number,
+            "domain_snapshot": compound.to_domain_dict(),
             "source_row": index,
             "structure_placeholder": f"STRUCTURE:{compound.number}",
             "docx_block_id": f"compound:{compound.id}",

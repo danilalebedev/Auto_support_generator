@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from ...domain.bookmarks import bookmark_name_for_block_id
+from ...domain.compound import compound_to_domain_dict
 from ...domain.issues import compound_issue_counts, count_issues, generation_status, issue_code_counts, issues_by_compound
 from ..state import GenerateSIState
 
@@ -72,6 +73,7 @@ def build_manifest(state: GenerateSIState) -> dict:
             "name": compound.name,
             "formula": compound.formula,
             "source_row": compound.source_row,
+            "domain_snapshot": compound_to_domain_dict(compound),
             "structure": {
                 "has_word_structure": compound.has_word_structure,
                 "path": compound.structure_path,
@@ -114,6 +116,7 @@ def build_run_summary(state: GenerateSIState, manifest: dict | None = None) -> d
                 "number": compounds[compound_id].number,
                 "name": compounds[compound_id].name,
                 "formula": compounds[compound_id].formula,
+                "domain_snapshot": compound_to_domain_dict(compounds[compound_id]),
                 "issue_count": len(grouped_issues.get(compound_id, [])),
                 "issues": _compact_issues(grouped_issues.get(compound_id, [])),
             }

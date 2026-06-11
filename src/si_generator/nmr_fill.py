@@ -8,7 +8,7 @@ from pathlib import Path
 from .domain.types import SpectrumRenderSpec
 from .chemistry import parse_formula
 from .mnova import MnovaTask, extract_reports_batch
-from .models import Compound
+from .domain.compound import Compound
 from .nmr_validation import count_c_from_13c_nmr
 
 

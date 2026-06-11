@@ -7,7 +7,7 @@ from ..domain.references import select_references_for_compounds
 from ..domain.types import JournalProfile
 from ..domain.types import ReferenceStore
 from ..domain.types import SpectrumEmbedMode
-from ..models import Compound
+from ..domain.compound import Compound
 from .si_document import DocumentBlock, SIDocument, SISection
 
 

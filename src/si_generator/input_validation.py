@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .chemistry import parse_formula
 from .domain.massspec import hrms_found_text
-from .models import Compound
+from .domain.compound import Compound
 
 
 SOLID_STATE_MARKERS = (

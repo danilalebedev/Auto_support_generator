@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Literal, TypedDict
 
 from ..domain.types import GenerationConfig, JournalProfile, ReferenceStore, RuntimeConfig, SpectraProcessingConfig, SpectrumEmbedMode, SpectrumRenderSpec
-from ..models import Compound
+from ..domain.compound import Compound
 from ..render.si_document import SIDocument
 
 

@@ -50,6 +50,7 @@ def renumber_manifest(manifest: dict[str, Any], renumber: dict[str, str]) -> tup
         if not new_number or new_number == old_number:
             continue
         compound["number"] = new_number
+        _renumber_domain_snapshot(compound, new_number)
         if compound.get("structure_placeholder"):
             compound["structure_placeholder"] = str(compound["structure_placeholder"]).replace(old_number, new_number)
         applied[old_number] = new_number
@@ -58,6 +59,12 @@ def renumber_manifest(manifest: dict[str, Any], renumber: dict[str, str]) -> tup
         raise ValueError("None of the requested renumber keys matched manifest compound ids or numbers.")
     _raise_on_duplicate_numbers(patched)
     return patched, applied
+
+
+def _renumber_domain_snapshot(compound: dict[str, Any], new_number: str) -> None:
+    snapshot = compound.get("domain_snapshot")
+    if isinstance(snapshot, dict):
+        snapshot["number"] = new_number
 
 
 def reorder_manifest(manifest: dict[str, Any], order_tokens: tuple[str, ...]) -> tuple[dict[str, Any], list[str]]:

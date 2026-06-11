@@ -4,7 +4,7 @@ from collections.abc import Iterable
 
 from .state import GenerateSIState
 from ..domain.references import parse_reference_keys
-from ..models import Compound
+from ..domain.compound import Compound
 
 
 def make_compound_store(compounds: Iterable[Compound]) -> tuple[dict[str, Compound], list[str]]:

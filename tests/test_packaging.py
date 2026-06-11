@@ -78,6 +78,10 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(manifest["relative_paths"]["support_warnings"], str(Path("logs") / "support_warnings.txt"))
         self.assertEqual(manifest["compounds"]["cmp_001"]["name"], "Example")
         self.assertEqual(manifest["compounds"]["cmp_001"]["formula"], "C2H6O")
+        self.assertEqual(manifest["compounds"]["cmp_001"]["domain_snapshot"]["number"], "2a")
+        self.assertEqual(manifest["compounds"]["cmp_001"]["domain_snapshot"]["physical"]["state"], "solid")
+        self.assertEqual(manifest["compounds"]["cmp_001"]["domain_snapshot"]["nmr"]["spectra"]["1H"]["formatted_text"], "1.23 (s, 3H)")
+        self.assertEqual(manifest["compounds"]["cmp_001"]["domain_snapshot"]["ir"]["peaks_cm1"], [1700])
         self.assertEqual(
             manifest["compounds"]["cmp_001"]["structure"],
             {"has_word_structure": True, "path": str(structure_path)},
@@ -108,6 +112,7 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(run_summary["issue_code_counts"], {"INPUT_WARNING": 1})
         self.assertEqual(run_summary["compound_issue_counts"], {"cmp_001": 1})
         self.assertEqual(run_summary["compounds"][0]["id"], "cmp_001")
+        self.assertEqual(run_summary["compounds"][0]["domain_snapshot"]["number"], "2a")
         self.assertEqual(run_summary["compounds"][0]["issue_count"], 1)
         self.assertEqual(run_summary["compounds"][0]["issues"][0]["code"], "INPUT_WARNING")
         self.assertEqual(run_summary["output_paths"]["support_docx"], str(output_path))

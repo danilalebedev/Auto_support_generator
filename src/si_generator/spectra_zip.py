@@ -4,7 +4,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from .models import Compound
+from .domain.compound import Compound
 
 
 def prepare_spectra_zip(zip_path: str | Path, work_dir: str | Path) -> Path:
@@ -92,4 +92,3 @@ def _prefer_by_name(paths: list[Path], include: list[str], exclude: list[str] | 
         return value, str(path)
 
     return sorted(paths, key=score)[0]
-
