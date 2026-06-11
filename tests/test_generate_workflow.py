@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 from docx import Document
@@ -30,8 +31,18 @@ class GenerateWorkflowTests(unittest.TestCase):
 
             self.assertEqual(output_path_from_state(state), output_path)
             self.assertTrue(output_path.exists())
+            manifest_path = output_path.with_suffix(".manifest.json")
+            self.assertTrue(manifest_path.exists())
             self.assertEqual(Path(state["artifacts"]["support_docx"]), output_path)
+            self.assertEqual(Path(state["artifacts"]["manifest"]), manifest_path)
             self.assertIn("spectra_root", state["artifacts"])
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["order"][:2], ["cmp_001", "cmp_002"])
+            self.assertEqual(manifest["compounds"]["cmp_001"]["number"], "2a")
+            self.assertIn("compound_table", manifest["input_hashes"])
+            self.assertIn("spectra_zip", manifest["input_hashes"])
+            self.assertEqual(Path(manifest["artifacts"]["support_docx"]), output_path)
+            self.assertEqual(Path(manifest["artifacts"]["manifest"]), manifest_path)
             text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
             self.assertIn("Methyl (E)-3-(2-(bromomethyl)phenyl)acrylate", text)
             self.assertNotIn("Compound 2a", text)

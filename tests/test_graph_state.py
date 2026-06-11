@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import unittest
 
+from si_generator.graph.compound_store import make_compound_store, ordered_compounds
 from si_generator.graph.nodes.spectra import route_nmr_processing
 from si_generator.graph.state import GenerateSIRequest
 from si_generator.models import Compound
@@ -18,11 +19,22 @@ class GraphStateTests(unittest.TestCase):
         )
         state = make_initial_generate_state(request)
 
+        self.assertRegex(state["run_id"], r"^\d{8}T\d{6}$")
         self.assertIs(state["request"], request)
         self.assertEqual(state["artifacts"], {})
         self.assertEqual(state["issues"], [])
         self.assertEqual(request.input_base_dir, Path("examples"))
         self.assertEqual(request.output_dir, Path("output"))
+
+    def test_compound_store_assigns_ids_and_preserves_order(self) -> None:
+        compounds, order = make_compound_store(
+            [Compound(number="2a", name="A"), Compound(number="2b", name="B", id="custom")]
+        )
+
+        self.assertEqual(order, ["cmp_001", "custom"])
+        self.assertEqual(compounds["cmp_001"].id, "cmp_001")
+        self.assertEqual(compounds["cmp_001"].source_row, 1)
+        self.assertEqual([compound.number for compound in ordered_compounds({"compounds": compounds, "order": order})], ["2a", "2b"])
 
     def test_nmr_route_skips_when_disabled(self) -> None:
         request = GenerateSIRequest(
@@ -32,7 +44,7 @@ class GraphStateTests(unittest.TestCase):
             no_extract_nmr=True,
         )
 
-        self.assertEqual(route_nmr_processing({"request": request, "compounds": []}), "skip_mnova")
+        self.assertEqual(route_nmr_processing({"request": request, "compounds": {}, "order": []}), "skip_mnova")
 
     def test_nmr_route_runs_when_spectra_are_assigned(self) -> None:
         request = GenerateSIRequest(
@@ -41,8 +53,9 @@ class GraphStateTests(unittest.TestCase):
             output_path=Path("output/support_information.docx"),
         )
         compound = Compound(number="2a", name="Test compound", h1_spectrum_path="2a/1H/fid")
+        compounds, order = make_compound_store([compound])
 
-        self.assertEqual(route_nmr_processing({"request": request, "compounds": [compound]}), "run_mnova")
+        self.assertEqual(route_nmr_processing({"request": request, "compounds": compounds, "order": order}), "run_mnova")
 
 
 if __name__ == "__main__":

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 class Compound:
     number: str
     name: str
+    id: str = ""
+    source_row: int = 0
     preparation: str = ""
     yield_text: str = ""
     color: str = ""
