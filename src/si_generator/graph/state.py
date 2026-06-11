@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
+from ..domain.types import SpectrumRenderSpec
 from ..models import Compound
 
 
@@ -50,6 +51,7 @@ class GenerateSIState(TypedDict, total=False):
     input_compounds: list[Compound]
     compounds: dict[str, Compound]
     order: list[str]
+    spectra_plan: dict[str, dict[str, SpectrumRenderSpec]]
     output_path: Path
     artifacts: dict[str, str]
     issues: list[Issue]

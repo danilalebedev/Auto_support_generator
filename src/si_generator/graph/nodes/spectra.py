@@ -2,8 +2,17 @@ from __future__ import annotations
 
 from ..compound_store import ordered_compounds
 from ..state import GenerateSIState
+from ...domain.types import SpectrumRenderSpec
 from ...nmr_fill import fill_nmr_from_mnova
 from ...spectra_zip import assign_spectra_from_folder, prepare_spectra_zip
+
+
+DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION = 0.80
+DEFAULT_PEAK_PICKING = "normal"
+DEFAULT_X_RANGES = {
+    "1H": (-1.0, 12.0),
+    "13C": (-10.0, 210.0),
+}
 
 
 def prepare_spectra_zip_node(state: GenerateSIState) -> dict:
@@ -15,6 +24,22 @@ def prepare_spectra_zip_node(state: GenerateSIState) -> dict:
     spectra_root = prepare_spectra_zip(request.spectra_zip, request.output_dir / "logs" / "_spectra_zip")
     assign_spectra_from_folder(compounds, spectra_root)
     return {"compounds": state.get("compounds", {}), "artifacts": {**state.get("artifacts", {}), "spectra_root": str(spectra_root)}}
+
+
+def plan_nmr_processing_node(state: GenerateSIState) -> dict:
+    spectra_plan: dict[str, dict[str, SpectrumRenderSpec]] = {}
+
+    for compound in ordered_compounds(state):
+        compound_plan: dict[str, SpectrumRenderSpec] = {}
+        if compound.h1_spectrum_path:
+            compound_plan["1H"] = _default_render_spec("1H")
+        if compound.c13_spectrum_path:
+            compound_plan["13C"] = _default_render_spec("13C")
+        if compound_plan:
+            compound_id = compound.id or compound.number
+            spectra_plan[compound_id] = compound_plan
+
+    return {"spectra_plan": spectra_plan}
 
 
 def route_nmr_processing(state: GenerateSIState) -> str:
@@ -36,6 +61,16 @@ def mnova_batch_node(state: GenerateSIState) -> dict:
         request.output_dir / "logs" / "mnova_batch",
         output_root=request.output_dir,
         mnova_exe=request.mnova_exe,
+        render_specs_by_compound=state.get("spectra_plan"),
     )
     return {"compounds": state.get("compounds", {})}
+
+
+def _default_render_spec(nucleus: str) -> SpectrumRenderSpec:
+    return {
+        "nucleus": nucleus,
+        "x_range_ppm": DEFAULT_X_RANGES[nucleus],
+        "target_signal_height_fraction": DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION,
+        "peak_picking": DEFAULT_PEAK_PICKING,
+    }
 

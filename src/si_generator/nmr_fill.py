@@ -5,6 +5,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
+from .domain.types import SpectrumRenderSpec
 from .chemistry import parse_formula
 from .mnova import MnovaTask, extract_reports_batch
 from .models import Compound
@@ -17,6 +18,7 @@ def fill_nmr_from_mnova(
     output_dir: str | Path,
     output_root: str | Path | None = None,
     mnova_exe: str | Path | None = None,
+    render_specs_by_compound: dict[str, dict[str, SpectrumRenderSpec]] | None = None,
 ) -> None:
     base_dir = Path(base_dir).resolve()
     output_dir = Path(output_dir).resolve()
@@ -28,16 +30,35 @@ def fill_nmr_from_mnova(
     processed_root = output_root / "processed_mnova"
     reports_root = output_root / "mnova_reports"
     for compound in compounds:
+        compound_specs = (render_specs_by_compound or {}).get(compound.id or compound.number, {})
         mnova_path = processed_root / compound.number / f"{compound.number}.mnova"
         compound.mnova_path = str(mnova_path)
         if compound.h1_spectrum_path:
             image_path = image_root / f"{compound.number}_1H" / f"{compound.number}_1H.png"
             compound.h1_image_path = str(image_path)
-            tasks.append(MnovaTask(compound.number, "1H", _resolve_path(compound.h1_spectrum_path, base_dir), image_path, mnova_path))
+            tasks.append(
+                MnovaTask(
+                    compound.number,
+                    "1H",
+                    _resolve_path(compound.h1_spectrum_path, base_dir),
+                    image_path,
+                    mnova_path,
+                    dict(compound_specs.get("1H", {})),
+                )
+            )
         if compound.c13_spectrum_path:
             image_path = image_root / f"{compound.number}_13C" / f"{compound.number}_13C.png"
             compound.c13_image_path = str(image_path)
-            tasks.append(MnovaTask(compound.number, "13C", _resolve_path(compound.c13_spectrum_path, base_dir), image_path, mnova_path))
+            tasks.append(
+                MnovaTask(
+                    compound.number,
+                    "13C",
+                    _resolve_path(compound.c13_spectrum_path, base_dir),
+                    image_path,
+                    mnova_path,
+                    dict(compound_specs.get("13C", {})),
+                )
+            )
 
     if not tasks:
         return

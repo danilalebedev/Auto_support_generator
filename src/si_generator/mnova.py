@@ -29,6 +29,7 @@ class MnovaTask:
     input_path: Path
     image_path: Path | None = None
     mnova_path: Path | None = None
+    render_spec: dict[str, object] | None = None
 
 
 def extract_report(input_path: Path, output_path: Path, nucleus: str, timeout: int = 120) -> Path:
@@ -87,7 +88,8 @@ def extract_reports_batch(
                 output_map[key]["mnova"] = task.mnova_path
             image_path = _mnova_arg(staged_image) if staged_image else ""
             mnova_path = _mnova_arg(staged_mnova) if staged_mnova else ""
-            lines.append(f"{task.compound}\t{task.nucleus}\t{_mnova_arg(staged_input)}\t{image_path}\t{mnova_path}")
+            render_spec = _render_spec_arg(task.render_spec)
+            lines.append(f"{task.compound}\t{task.nucleus}\t{_mnova_arg(staged_input)}\t{image_path}\t{mnova_path}\t{render_spec}")
         run_tasks_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
         sf_arg = ",".join(
@@ -196,6 +198,12 @@ def _read_mnova_text(path: Path) -> str:
 
 def _mnova_arg(path: Path) -> str:
     return str(path.resolve()).replace("\\", "/")
+
+
+def _render_spec_arg(render_spec: dict[str, object] | None) -> str:
+    if not render_spec:
+        return "{}"
+    return json.dumps(render_spec, ensure_ascii=True, separators=(",", ":"))
 
 
 def _safe_token(value: str) -> str:
