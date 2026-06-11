@@ -56,6 +56,7 @@ class GuiWorkflowTests(unittest.TestCase):
             output = root / "support_information.docx"
             package = root / "processed_spectra.zip"
             manifest = root / "support_information.manifest.json"
+            warnings = root / "logs" / "input_warnings.txt"
             state = {
                 "request": _build_generate_request(
                     input_kind="word",
@@ -67,6 +68,7 @@ class GuiWorkflowTests(unittest.TestCase):
                     "support_docx": str(output),
                     "processed_spectra_zip": str(package),
                     "manifest": str(manifest),
+                    "input_warnings": str(warnings),
                 },
             }
 
@@ -75,6 +77,7 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(summary["support_docx"], str(output.resolve()))
         self.assertEqual(summary["processed_spectra_zip"], str(package.resolve()))
         self.assertEqual(summary["manifest"], str(manifest.resolve()))
+        self.assertEqual(summary["input_warnings"], str(warnings.resolve()))
 
     def test_builds_check_request_from_manifest_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
