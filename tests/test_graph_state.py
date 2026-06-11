@@ -130,6 +130,8 @@ class GraphStateTests(unittest.TestCase):
         updated = result["compounds"]["cmp_001"]
         self.assertEqual(updated.hrms_calculated, 272.9921)
         self.assertEqual(updated.hrms_ion_formula, "C11H11BrFO2+")
+        self.assertEqual(updated.hrms["calculated_mz"], 272.9921)
+        self.assertEqual(updated.hrms["isotope_labels"], {"Br": 79})
         self.assertEqual(result["issues"], [])
 
     def test_nmr_nodes_parse_text_and_apply_policy(self) -> None:

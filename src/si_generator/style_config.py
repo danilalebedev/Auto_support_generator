@@ -69,6 +69,8 @@ DEFAULT_STYLE_CONFIG: dict[str, Any] = {
         "formula": {
             "subscripts": True,
             "charge_superscript": True,
+            "isotope_labels": True,
+            "isotope_label_superscript": True,
         },
         "adduct": {
             "superscript_charge": False,

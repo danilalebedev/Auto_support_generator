@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from ..compound_store import ordered_compounds
 from ..state import GenerateSIState, Issue
-from ...domain.massspec import calculate_hrms
+from ...domain.massspec import build_hrms_block
 
 
 def calculate_hrms_node(state: GenerateSIState) -> dict:
@@ -12,7 +12,14 @@ def calculate_hrms_node(state: GenerateSIState) -> dict:
         if not compound.formula or not compound.hrms_found:
             continue
         try:
-            result = calculate_hrms(compound.formula, compound.hrms_adduct)
+            result = build_hrms_block(
+                formula=compound.formula,
+                label=compound.hrms_label,
+                adduct=compound.hrms_adduct,
+                found_text=compound.hrms_found,
+                isotope_policy=str(compound.hrms.get("isotope_policy", "auto_halogen")),
+                isotope_labels=compound.hrms.get("isotope_labels"),
+            )
         except ValueError as exc:
             issues.append(
                 {
@@ -23,7 +30,8 @@ def calculate_hrms_node(state: GenerateSIState) -> dict:
                 }
             )
             continue
-        compound.hrms_calculated = result.calculated_mz
-        compound.hrms_ion_formula = result.ion_formula
+        compound.hrms = result
+        compound.hrms_calculated = float(result["calculated_mz"])
+        compound.hrms_ion_formula = str(result["ion_formula"])
 
     return {"compounds": state.get("compounds", {}), "issues": issues}

@@ -52,6 +52,26 @@ class DocumentModelTests(unittest.TestCase):
         self.assertIn("(2a)", text)
         self.assertIn("white solid.", text)
 
+    def test_renders_hrms_isotope_labels(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "support_information.docx"
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="Bromide example",
+                formula="C11H10BrFO2",
+                hrms_found="272.9921",
+                hrms_adduct="[M+H]+",
+            )
+            model = build_si_document_model([compound])
+
+            build_document_from_model(model, output_path)
+
+            text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
+
+        self.assertIn("79Br", text)
+        self.assertIn("272.9921", text)
+
 
 if __name__ == "__main__":
     unittest.main()
