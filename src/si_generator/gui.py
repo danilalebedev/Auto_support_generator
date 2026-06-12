@@ -40,6 +40,9 @@ class SIGeneratorApp:
         self.style_config = StringVar()
         self.journal_profile = StringVar()
         self.references_file = StringVar()
+        self.loadings_schema_docx = StringVar()
+        self.loadings_scope_docx = StringVar()
+        self.loadings_template_docx = StringVar()
         self.mnova_exe = StringVar()
         self.output_docx = StringVar(value=str(default_output_path()))
         self.input_kind = StringVar(value="word")
@@ -94,7 +97,7 @@ class SIGeneratorApp:
 
         outer = scroll_area.content
         outer.columnconfigure(0, weight=1)
-        outer.rowconfigure(5, weight=1)
+        outer.rowconfigure(6, weight=1)
 
         header = ttk.Frame(outer)
         header.grid(row=0, column=0, sticky="ew", pady=(0, 14))
@@ -131,8 +134,41 @@ class SIGeneratorApp:
         )
         self._file_row(files, 8, "Output .docx", self.output_docx, self._browse_output)
 
+        loadings = ttk.LabelFrame(outer, text="Reagent Loadings", padding=12)
+        loadings.grid(row=2, column=0, sticky="ew", pady=(12, 12))
+        loadings.columnconfigure(1, weight=1)
+        ttk.Checkbutton(
+            loadings,
+            text="Calculate reagent loadings",
+            variable=self.generate_loadings,
+        ).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        self._file_row(
+            loadings,
+            1,
+            "Reaction schema .docx",
+            self.loadings_schema_docx,
+            lambda: self._browse_file(self.loadings_schema_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
+            optional=True,
+        )
+        self._file_row(
+            loadings,
+            2,
+            "Scope .docx",
+            self.loadings_scope_docx,
+            lambda: self._browse_file(self.loadings_scope_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
+            optional=True,
+        )
+        self._file_row(
+            loadings,
+            3,
+            "Description template .docx",
+            self.loadings_template_docx,
+            lambda: self._browse_file(self.loadings_template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
+            optional=True,
+        )
+
         options = ttk.LabelFrame(outer, text="Options", padding=12)
-        options.grid(row=2, column=0, sticky="ew", pady=(12, 12))
+        options.grid(row=3, column=0, sticky="ew", pady=(0, 12))
         options.columnconfigure(5, weight=1)
         ttk.Checkbutton(
             options,
@@ -150,18 +186,13 @@ class SIGeneratorApp:
         ttk.Label(options, textvariable=self.status_text, style="Status.TLabel").grid(row=0, column=5, sticky="e", padx=(12, 0))
         self.progress = ttk.Progressbar(options, mode="indeterminate", length=180)
         self.progress.grid(row=0, column=6, sticky="e", padx=(12, 0))
-        ttk.Checkbutton(
-            options,
-            text="Calculate reagent loadings",
-            variable=self.generate_loadings,
-        ).grid(row=1, column=0, sticky="w", pady=(8, 0))
         ttk.Label(options, text="1H threshold (%)").grid(row=1, column=1, sticky="e", padx=(12, 8), pady=(8, 0))
         ttk.Entry(options, textvariable=self.peak_threshold_1h_percent, width=6).grid(row=1, column=2, sticky="w", pady=(8, 0))
         ttk.Label(options, text="13C threshold (%)").grid(row=1, column=3, sticky="e", padx=(12, 8), pady=(8, 0))
         ttk.Entry(options, textvariable=self.peak_threshold_13c_percent, width=6).grid(row=1, column=4, sticky="w", pady=(8, 0))
 
         results = ttk.LabelFrame(outer, text="Results", padding=12)
-        results.grid(row=3, column=0, sticky="ew", pady=(0, 12))
+        results.grid(row=4, column=0, sticky="ew", pady=(0, 12))
         results.columnconfigure(1, weight=1)
         self._result_row(results, 0, "Summary", self.result_overview)
         self._result_row(results, 1, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"))
@@ -181,7 +212,7 @@ class SIGeneratorApp:
         )
 
         tools = ttk.LabelFrame(outer, text="Existing SI Tools", padding=12)
-        tools.grid(row=4, column=0, sticky="ew", pady=(0, 12))
+        tools.grid(row=5, column=0, sticky="ew", pady=(0, 12))
         tools.columnconfigure(1, weight=1)
         self._file_row(
             tools,
@@ -204,7 +235,7 @@ class SIGeneratorApp:
         ttk.Button(tools, text="Apply patch", command=self._start_patch).grid(row=4, column=2, sticky="e", padx=(8, 0), pady=4)
 
         log_frame = ttk.LabelFrame(outer, text="Run Log", padding=8)
-        log_frame.grid(row=5, column=0, sticky="nsew")
+        log_frame.grid(row=6, column=0, sticky="nsew")
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
 
@@ -407,6 +438,9 @@ class SIGeneratorApp:
             style_config_text=self.style_config.get(),
             journal_profile_text=self.journal_profile.get(),
             references_text=self.references_file.get(),
+            loadings_schema_text=self.loadings_schema_docx.get(),
+            loadings_scope_text=self.loadings_scope_docx.get(),
+            loadings_template_text=self.loadings_template_docx.get(),
             mnova_exe_text=self.mnova_exe.get(),
             insert_spectra_as=self.insert_spectra_as.get(),
             peak_threshold_1h_percent_text=self.peak_threshold_1h_percent.get(),
@@ -584,6 +618,9 @@ class SIGeneratorApp:
             "style_config": self.style_config,
             "journal_profile": self.journal_profile,
             "references_file": self.references_file,
+            "loadings_schema_docx": self.loadings_schema_docx,
+            "loadings_scope_docx": self.loadings_scope_docx,
+            "loadings_template_docx": self.loadings_template_docx,
             "mnova_exe": self.mnova_exe,
             "output_docx": self.output_docx,
             "peak_threshold_1h_percent": self.peak_threshold_1h_percent,
@@ -699,6 +736,9 @@ def _build_generate_request(
     style_config_text: str = "",
     journal_profile_text: str = "",
     references_text: str = "",
+    loadings_schema_text: str = "",
+    loadings_scope_text: str = "",
+    loadings_template_text: str = "",
     mnova_exe_text: str = "",
     insert_spectra_as: str = "png",
     peak_threshold_percent_text: str = "",
@@ -713,6 +753,13 @@ def _build_generate_request(
     if not output_docx.name.lower().endswith(".docx"):
         raise ValueError("Output file must be a .docx file.")
     shared_peak_threshold = _optional_peak_threshold_fraction(peak_threshold_percent_text)
+    loadings_schema = loadings_scope = loadings_template = None
+    if generate_loadings:
+        loadings_schema = _optional_existing_file(loadings_schema_text, "Reaction schema .docx", suffixes=(".docx",))
+        loadings_scope = _optional_existing_file(loadings_scope_text, "Scope .docx", suffixes=(".docx",))
+        loadings_template = _optional_existing_file(loadings_template_text, "Description template .docx", suffixes=(".docx",))
+        if any((loadings_schema, loadings_scope, loadings_template)) and not all((loadings_schema, loadings_scope, loadings_template)):
+            raise ValueError("Choose all three reagent loadings files or leave all three empty for auto-detect.")
 
     return GenerateSIRequest(
         input_path=input_path,
@@ -723,6 +770,9 @@ def _build_generate_request(
         style_config_path=_optional_existing_file(style_config_text, "Style config", suffixes=(".yml", ".yaml")),
         journal_profile=_optional_profile(journal_profile_text),
         references_path=_optional_existing_file(references_text, "References .yml", suffixes=(".yml", ".yaml")),
+        loadings_schema_docx=loadings_schema,
+        loadings_scope_docx=loadings_scope,
+        loadings_template_docx=loadings_template,
         mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe", suffixes=(".exe",)),
         insert_spectra_as=_validated_spectrum_mode(insert_spectra_as),
         peak_threshold_fraction=shared_peak_threshold,
@@ -901,6 +951,9 @@ def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) ->
         "style_config": "",
         "journal_profile": "",
         "references_file": "",
+        "loadings_schema_docx": "",
+        "loadings_scope_docx": "",
+        "loadings_template_docx": "",
         "existing_manifest": "",
         "patch_output_docx": "",
         "patch_renumber": "",

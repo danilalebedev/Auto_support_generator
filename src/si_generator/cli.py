@@ -118,7 +118,19 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--generate-loadings",
         action="store_true",
-        help="Calculate reagent loadings from target_mmol/reagent_N_* input columns when present.",
+        help="Calculate reagent loadings from table columns or the loadings workflow files.",
+    )
+    parser.add_argument(
+        "--loadings-schema-docx",
+        help="Optional Reaction_schema.docx path for reagent loadings.",
+    )
+    parser.add_argument(
+        "--loadings-scope-docx",
+        help="Optional Scope.docx path for reagent loadings.",
+    )
+    parser.add_argument(
+        "--loadings-template-docx",
+        help="Optional Compound_characterization template.docx path for reagent loadings.",
     )
     parser.add_argument(
         "--extract-structure-metadata",

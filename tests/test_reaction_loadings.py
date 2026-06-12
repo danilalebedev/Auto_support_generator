@@ -6,6 +6,7 @@ from pathlib import Path
 
 from docx import Document
 
+from si_generator.cli import _build_parser
 from si_generator.docx_builder import build_document_from_model
 from si_generator.domain.loadings_workflow import apply_loadings_workflow, read_reaction_schema
 from si_generator.domain.requests import GenerateSIRequest
@@ -16,6 +17,7 @@ from si_generator.input_table import read_compounds
 from si_generator.models import Compound
 from si_generator.render.document_model import build_si_document_model
 from si_generator.structure_metadata import extract_structure_metadata_by_cell
+from si_generator.workflows.generate_si import request_from_args
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -158,6 +160,30 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertEqual(schema["AcOH"].density_g_mL, 1.049)
         self.assertEqual(schema["Solvent_MeCN"].concentration_M, 0.75)
 
+    def test_cli_args_accept_explicit_loadings_files(self) -> None:
+        args = _build_parser().parse_args(
+            [
+                "--word-input",
+                "input.docx",
+                "--output",
+                "support_information.docx",
+                "--generate-loadings",
+                "--loadings-schema-docx",
+                "Reaction_schema.docx",
+                "--loadings-scope-docx",
+                "Scope.docx",
+                "--loadings-template-docx",
+                "Compound_characterization template.docx",
+            ]
+        )
+
+        request = request_from_args(args)
+
+        self.assertTrue(request.generate_loadings)
+        self.assertEqual(request.loadings_schema_docx, Path("Reaction_schema.docx"))
+        self.assertEqual(request.loadings_scope_docx, Path("Scope.docx"))
+        self.assertEqual(request.loadings_template_docx, Path("Compound_characterization template.docx"))
+
     def test_loadings_workflow_generates_preparation_from_examples(self) -> None:
         compound = Compound(
             number="3a",
@@ -214,6 +240,42 @@ class ReactionLoadingsTests(unittest.TestCase):
         prepared = result["compounds"]["cmp_001"]
         self.assertIn("Alkene 3a was obtained", prepared.preparation)
         self.assertAlmostEqual(prepared.reaction["target_mmol"], 1.5679, places=4)
+        self.assertEqual(prepared.reaction["source"], "loadings_workflow")
+
+    def test_loadings_node_accepts_explicit_workflow_files(self) -> None:
+        compounds, order = make_compound_store(
+            [
+                Compound(
+                    number="3a",
+                    name="Example",
+                    color="white",
+                    state="solid",
+                    melting_point="82",
+                    rf="0.38 (petroleum ether : ethyl acetate = 7 : 1)",
+                )
+            ]
+        )
+        request = GenerateSIRequest(
+            input_path=Path("input.docx"),
+            input_kind="word",
+            output_path=Path("out.docx"),
+            loadings_schema_docx=LOADINGS_DIR / "Reaction_schema.docx",
+            loadings_scope_docx=LOADINGS_DIR / "Scope.docx",
+            loadings_template_docx=LOADINGS_DIR / "Compound_characterization template.docx",
+        )
+
+        result = calculate_loadings_node(
+            {
+                "request": request,
+                "compounds": compounds,
+                "order": order,
+                "generation_config": {"generate_loadings": True},
+                "issues": [],
+            }
+        )
+
+        prepared = result["compounds"]["cmp_001"]
+        self.assertIn("bromide 2a (400 mg, 1.57 mmol)", prepared.preparation)
         self.assertEqual(prepared.reaction["source"], "loadings_workflow")
 
     def test_loadings_workflow_does_not_depend_on_render_fallback(self) -> None:

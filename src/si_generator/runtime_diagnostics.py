@@ -24,6 +24,7 @@ def preflight_generate_request(
     issues: list[Issue] = []
     issues.extend(_check_input_path(request))
     issues.extend(_check_output_path(request.output_path))
+    issues.extend(_check_loadings_files(request))
     if request.spectra_zip:
         issues.extend(_check_spectra_zip(request.spectra_zip))
     else:
@@ -101,6 +102,35 @@ def _check_spectra_zip(spectra_zip: Path) -> list[Issue]:
     except OSError as exc:
         return [_issue("PREFLIGHT_SPECTRA_ZIP_INVALID", "error", f"Spectra zip cannot be read: {exc}", spectra_zip)]
     return []
+
+
+def _check_loadings_files(request: GenerateSIRequest) -> list[Issue]:
+    paths = {
+        "Reaction schema": request.loadings_schema_docx,
+        "Scope": request.loadings_scope_docx,
+        "Description template": request.loadings_template_docx,
+    }
+    selected = {label: path for label, path in paths.items() if path}
+    if not selected:
+        return []
+    if len(selected) != len(paths):
+        return [
+            _issue(
+                "PREFLIGHT_LOADINGS_FILES_INCOMPLETE",
+                "error",
+                "Choose all three reagent loadings files or leave all fields empty for auto-detect.",
+            )
+        ]
+
+    issues: list[Issue] = []
+    for label, path in selected.items():
+        if not path.exists():
+            issues.append(_issue("PREFLIGHT_LOADINGS_FILE_MISSING", "error", f"{label} file does not exist.", path))
+        elif not path.is_file():
+            issues.append(_issue("PREFLIGHT_LOADINGS_FILE_NOT_FILE", "error", f"{label} path must be a file.", path))
+        elif path.suffix.lower() != ".docx":
+            issues.append(_issue("PREFLIGHT_LOADINGS_FILE_EXTENSION", "error", f"{label} file must be a .docx file.", path))
+    return issues
 
 
 def _check_missing_spectra_zip(request: GenerateSIRequest) -> list[Issue]:
