@@ -150,8 +150,9 @@ spectra.zip
 соединение. В первой колонке обычно находится номер соединения и структура,
 вставленная как OLE-объект ChemDraw или ChemSketch.
 
-`spectra.zip` - zip-архив со спектрами ЯМР. Внутри архива должны быть папки с
-номерами соединений. Названия папок должны совпадать с номерами в таблице:
+`spectra.zip` - zip-архив со спектрами ЯМР. Вместо архива можно выбрать папку
+с такой же структурой. Внутри должны быть папки с номерами соединений. Названия
+папок должны совпадать с номерами в таблице:
 
 ```text
 spectra.zip
@@ -240,7 +241,8 @@ output/
      структуры ChemDraw/ChemSketch;
    - `CSV table` - простой вариант без OLE-структур.
 2. В `Compound table` выберите таблицу с веществами.
-3. В `Spectra zip` выберите zip-архив со спектрами.
+3. В `Spectra zip/folder` выберите zip-архив со спектрами или папку со
+   спектрами. Для папки используйте кнопку `Folder...`.
 4. В `Template .docx` можно выбрать Word-шаблон оформления. Это необязательно.
 5. В `Style config .yml` можно выбрать файл настроек оформления. Это
    необязательно.
@@ -320,7 +322,7 @@ examples/example_output/processed_spectra.zip
 
 - `Table type`: `Word table with ChemDraw objects`;
 - `Compound table`: `examples/test_input.docx`;
-- `Spectra zip`: `examples/test_input.zip`;
+- `Spectra zip/folder`: `examples/test_input.zip`;
 - `Output .docx`: любой удобный путь, например `output/support_information.docx`.
 
 После запуска программа должна создать рядом с выбранным output-файлом готовый
@@ -495,6 +497,11 @@ py -m si_generator ^
   --style-config style_config.example.yml ^
   --output output\support_information.docx
 ```
+
+Параметр `--spectra-zip` исторически называется так для совместимости, но в
+этой версии он принимает и `.zip`, и обычную папку. Внутри должны быть папки с
+номерами соединений, например `2a`, `2b`, `2c`, а уже в них - raw Bruker
+спектры с файлами `fid`.
 
 CSV workflow:
 

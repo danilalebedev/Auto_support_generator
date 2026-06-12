@@ -55,7 +55,15 @@ class SIGeneratorApp:
         ttk.Radiobutton(kind, text="CSV table", variable=self.input_kind, value="csv").pack(side="left", padx=(16, 0))
 
         self._file_row(files, 1, "Compound table", self.input_path, self._browse_input)
-        self._file_row(files, 2, "Spectra zip", self.spectra_zip, lambda: self._browse_file(self.spectra_zip, [("Zip archives", "*.zip"), ("All files", "*.*")]))
+        self._file_row(
+            files,
+            2,
+            "Spectra zip/folder",
+            self.spectra_zip,
+            lambda: self._browse_file(self.spectra_zip, [("Zip archives", "*.zip"), ("All files", "*.*")]),
+            optional=True,
+            extra_button=("Folder...", lambda: self._browse_folder(self.spectra_zip)),
+        )
         self._file_row(files, 3, "Template .docx", self.template_docx, lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
         self._file_row(files, 4, "Style config .yml", self.style_config, lambda: self._browse_file(self.style_config, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
         self._file_row(files, 5, "MestReNova .exe", self.mnova_exe, lambda: self._browse_file(self.mnova_exe, [("MestReNova", "*.exe"), ("All files", "*.*")]), optional=True)
@@ -88,10 +96,13 @@ class SIGeneratorApp:
         ttk.Button(actions, text="Open output folder", command=self._open_output_folder).pack(side="right", padx=(0, 8))
         ttk.Button(actions, text="Clear log", command=lambda: self.log.clear()).pack(side="right", padx=(0, 8))
 
-    def _file_row(self, parent, row: int, label: str, variable: StringVar, command, optional: bool = False) -> None:
+    def _file_row(self, parent, row: int, label: str, variable: StringVar, command, optional: bool = False, extra_button=None) -> None:
         ttk.Label(parent, text=f"{label}{' (optional)' if optional else ''}").grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
         ttk.Entry(parent, textvariable=variable).grid(row=row, column=1, sticky="ew", pady=4)
         ttk.Button(parent, text="Browse...", command=command).grid(row=row, column=2, sticky="e", padx=(8, 0), pady=4)
+        if extra_button:
+            text, callback = extra_button
+            ttk.Button(parent, text=text, command=callback).grid(row=row, column=3, sticky="e", padx=(8, 0), pady=4)
 
     def _browse_input(self) -> None:
         if self.input_kind.get() == "csv":
@@ -104,6 +115,11 @@ class SIGeneratorApp:
 
     def _browse_file(self, variable: StringVar, filetypes) -> None:
         path = filedialog.askopenfilename(filetypes=filetypes)
+        if path:
+            variable.set(path)
+
+    def _browse_folder(self, variable: StringVar) -> None:
+        path = filedialog.askdirectory()
         if path:
             variable.set(path)
 
@@ -155,7 +171,7 @@ class SIGeneratorApp:
         command += ["--output", str(output_docx)]
 
         optional_files = [
-            (self.spectra_zip.get(), "--spectra-zip", "Spectra zip"),
+            (self.spectra_zip.get(), "--spectra-zip", "Spectra zip/folder"),
             (self.template_docx.get(), "--template-docx", "Template .docx"),
             (self.style_config.get(), "--style-config", "Style config"),
             (self.mnova_exe.get(), "--mnova-exe", "MestReNova .exe"),

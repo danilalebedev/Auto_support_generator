@@ -10,7 +10,7 @@ from .input_validation import validate_compound_inputs
 from .input_table import read_compounds
 from .nmr_fill import fill_nmr_from_mnova
 from .nmr_validation import validate_support
-from .spectra_zip import assign_spectra_from_folder, prepare_spectra_zip
+from .spectra_zip import assign_spectra_from_folder, prepare_spectra_source
 from .style_config import config_get, load_style_config
 from .word_input import paste_word_structures, read_word_compounds
 
@@ -39,7 +39,7 @@ def _main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--spectra-zip",
-        help="Zip archive with compound-number folders containing NMR spectra.",
+        help="Zip archive or folder with compound-number folders containing NMR spectra.",
     )
     parser.add_argument(
         "--mnova-exe",
@@ -82,7 +82,7 @@ def _main(argv: list[str] | None = None) -> int:
         wanted = {item.strip() for item in args.only.split(",") if item.strip()}
         compounds = [compound for compound in compounds if compound.number in wanted]
     if args.spectra_zip:
-        spectra_root = prepare_spectra_zip(args.spectra_zip, Path(args.output).parent / "logs" / "_spectra_zip")
+        spectra_root = prepare_spectra_source(args.spectra_zip, Path(args.output).parent / "logs" / "_spectra_zip")
         assign_spectra_from_folder(compounds, spectra_root)
     for warning in validate_compound_inputs(compounds, require_structure=bool(args.word_input)):
         print(f"[Input warning] {warning}", flush=True)
