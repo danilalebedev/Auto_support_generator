@@ -1,0 +1,17 @@
+##TITLE= Parameter file, TOPSPIN		Version 2.1
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##NPOINTS= 5	$$ modification sequence number
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= nmr
+$$ 2024-11-13 13:37:49.978 +0300  nmr@AV600
+$$ /data/data/zhokhov/nmr/Winter25/92/scon2
+$$ process /opt/topspin218/prog/mod/go
+##$BLKTR= (0..15)
+3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3
+##$DE1= 4.5
+##$DEADC= 1.5
+##$DEPA= 3.5
+##$DERX= 2.5
+##$FILCOR= 0
+##END=

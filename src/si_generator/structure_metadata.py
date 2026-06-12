@@ -8,6 +8,7 @@ from xml.etree import ElementTree as ET
 
 import olefile
 from rdkit import Chem
+from rdkit.Chem import Descriptors
 from rdkit.Chem import rdMolDescriptors
 
 
@@ -23,6 +24,7 @@ class StructureMetadata:
     formula: str = ""
     smiles: str = ""
     name: str = ""
+    molecular_weight: float = 0.0
 
 
 def extract_structure_metadata_by_row(docx_path: str | Path) -> dict[int, StructureMetadata]:
@@ -46,6 +48,30 @@ def extract_structure_metadata_by_row(docx_path: str | Path) -> dict[int, Struct
             metadata = _metadata_from_embedding(archive.read(f"word/{target}"))
             if metadata.formula or metadata.smiles:
                 result[row_index] = metadata
+        return result
+
+
+def extract_structure_metadata_by_cell(docx_path: str | Path) -> dict[tuple[int, int, int], StructureMetadata]:
+    """Return metadata keyed by 1-based (table, row, cell) coordinates."""
+    docx_path = Path(docx_path)
+    with zipfile.ZipFile(docx_path, "r") as archive:
+        rels = _document_relationships(archive)
+        document = ET.fromstring(archive.read("word/document.xml"))
+
+        result: dict[tuple[int, int, int], StructureMetadata] = {}
+        for table_index, table in enumerate(document.findall(".//w:tbl", NS), start=1):
+            for row_index, row in enumerate(table.findall("w:tr", NS), start=1):
+                for cell_index, cell in enumerate(row.findall("w:tc", NS), start=1):
+                    ole = cell.find(".//o:OLEObject", NS)
+                    if ole is None:
+                        continue
+                    rel_id = ole.attrib.get(f"{{{NS['r']}}}id")
+                    target = rels.get(rel_id or "")
+                    if not target:
+                        continue
+                    metadata = _metadata_from_embedding(archive.read(f"word/{target}"))
+                    if metadata.formula or metadata.smiles:
+                        result[(table_index, row_index, cell_index)] = metadata
         return result
 
 
@@ -75,4 +101,5 @@ def _metadata_from_embedding(data: bytes) -> StructureMetadata:
     mol = mols[0]
     formula = rdMolDescriptors.CalcMolFormula(mol)
     smiles = Chem.MolToSmiles(mol, isomericSmiles=True)
-    return StructureMetadata(formula=formula, smiles=smiles)
+    molecular_weight = Descriptors.MolWt(mol)
+    return StructureMetadata(formula=formula, smiles=smiles, molecular_weight=molecular_weight)

@@ -18,6 +18,7 @@ mnova_reports/
 
 *.tmp
 *.log
+~$*.docx
 
 .DS_Store
 Thumbs.db

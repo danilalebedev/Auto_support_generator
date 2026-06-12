@@ -134,16 +134,17 @@ def _add_compound_block(document: Document, compound: Compound, style_config: di
     apply_run_style(number_run, style_config, "compound.number")
 
     summary_parts = []
+    preparation_includes_summary = bool(compound.reaction.get("preparation_includes_summary"))
     if compound.preparation:
         summary_parts.append(compound.preparation.rstrip("."))
-    if compound.yield_text:
+    if compound.yield_text and not preparation_includes_summary:
         summary_parts.append(f"Yield {compound.yield_text}")
     appearance = " ".join(part for part in [compound.color, compound.state] if part)
-    if appearance:
+    if appearance and not preparation_includes_summary:
         summary_parts.append(appearance)
-    if compound.melting_point:
+    if compound.melting_point and not preparation_includes_summary:
         summary_parts.append(f"mp {compound.melting_point}")
-    if compound.rf:
+    if compound.rf and not preparation_includes_summary:
         summary_parts.append(compound.rf)
 
     if compound.structure_path or compound.has_word_structure:
@@ -153,7 +154,7 @@ def _add_compound_block(document: Document, compound: Compound, style_config: di
         text = "; ".join(summary_parts) + "." if summary_parts else ""
         _add_summary_paragraph(document, text, style_config)
 
-    if compound.reaction:
+    if compound.reaction and not compound.reaction.get("hide_loadings_line"):
         _add_reaction_loadings_line(document, compound, style_config)
 
     if compound.h1_nmr:

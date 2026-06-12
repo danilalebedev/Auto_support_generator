@@ -7,12 +7,20 @@ from pathlib import Path
 from docx import Document
 
 from si_generator.docx_builder import build_document_from_model
+from si_generator.domain.loadings_workflow import apply_loadings_workflow, read_reaction_schema
+from si_generator.domain.requests import GenerateSIRequest
 from si_generator.domain.reactions import calculate_reaction_loadings, format_reagent_amount, reaction_from_fields
 from si_generator.graph.compound_store import make_compound_store
 from si_generator.graph.nodes.loadings import calculate_loadings_node
 from si_generator.input_table import read_compounds
 from si_generator.models import Compound
 from si_generator.render.document_model import build_si_document_model
+from si_generator.structure_metadata import extract_structure_metadata_by_cell
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+EXAMPLES_DIR = REPO_ROOT / "examples"
+LOADINGS_DIR = EXAMPLES_DIR / "loadings"
 
 
 class ReactionLoadingsTests(unittest.TestCase):
@@ -131,6 +139,110 @@ class ReactionLoadingsTests(unittest.TestCase):
             text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
 
         self.assertIn("Reaction loadings: NBS (195.78 mg, 1.1 mmol, 1.1 equiv).", text)
+
+    def test_extracts_scope_structure_metadata_by_cell(self) -> None:
+        metadata = extract_structure_metadata_by_cell(LOADINGS_DIR / "Scope.docx")
+
+        self.assertEqual(metadata[(1, 2, 1)].formula, "C11H11BrO2")
+        self.assertEqual(metadata[(1, 2, 3)].formula, "C6H8N2")
+        self.assertEqual(metadata[(1, 2, 4)].formula, "C17H18N2O2")
+        self.assertAlmostEqual(metadata[(1, 2, 1)].molecular_weight, 255.111, places=3)
+        self.assertEqual(metadata[(1, 6, 3)].formula, "C6H6Cl2N2")
+
+    def test_reaction_schema_reads_example_values(self) -> None:
+        schema = read_reaction_schema(LOADINGS_DIR / "Reaction_schema.docx")
+
+        self.assertEqual(schema["Reagent_1"].equivalents, 1.0)
+        self.assertEqual(schema["Reagent_2"].equivalents, 3.0)
+        self.assertEqual(schema["K2CO3"].mw, 138.21)
+        self.assertEqual(schema["AcOH"].density_g_mL, 1.049)
+        self.assertEqual(schema["Solvent_MeCN"].concentration_M, 0.75)
+
+    def test_loadings_workflow_generates_preparation_from_examples(self) -> None:
+        compound = Compound(
+            number="3a",
+            name="Example",
+            color="white",
+            state="solid",
+            melting_point="82",
+            rf="0.38 (petroleum ether : ethyl acetate = 7 : 1)",
+        )
+
+        issues = apply_loadings_workflow([compound], EXAMPLES_DIR)
+
+        self.assertTrue(compound.preparation)
+        self.assertNotIn("{", compound.preparation)
+        self.assertIn("bromide 2a (400 mg, 1.57 mmol)", compound.preparation)
+        self.assertIn("K2CO3 (217 mg, 1.57 mmol)", compound.preparation)
+        self.assertIn("AcOH (449 μL, 7.84 mmol)", compound.preparation)
+        self.assertIn("Rf = 0.38 (petroleum ether : ethyl acetate = 7 : 1)", compound.preparation)
+        self.assertEqual(compound.yield_text, "304 mg (69%)")
+        self.assertEqual(compound.formula, "C17H18N2O2")
+        self.assertTrue(compound.reaction["preparation_includes_summary"])
+        self.assertTrue(compound.reaction["hide_loadings_line"])
+        self.assertEqual([issue["code"] for issue in issues], [
+            "LOADINGS_COMPOUND_NOT_FOUND",
+            "LOADINGS_COMPOUND_NOT_FOUND",
+            "LOADINGS_COMPOUND_NOT_FOUND",
+            "LOADINGS_COMPOUND_NOT_FOUND",
+        ])
+
+    def test_loadings_node_uses_examples_dir_when_enabled(self) -> None:
+        compounds, order = make_compound_store(
+            [
+                Compound(number="3a", name="Example", color="white solid", melting_point="82", rf="0.38 (petroleum ether : ethyl acetate = 7 : 1)"),
+                Compound(number="3b", name="Example", color="white solid", melting_point="84", rf="0.63 (petroleum ether : ethyl acetate = 7 : 1)"),
+                Compound(number="3c", name="Example", color="white solid", melting_point="85", rf="0.56 (petroleum ether : ethyl acetate = 7 : 1)"),
+                Compound(number="3d", name="Example", color="white solid", melting_point="97", rf="0.48 (petroleum ether : ethyl acetate = 7 : 1)"),
+                Compound(number="3i", name="Example", color="Green oil", melting_point="98", rf="0.55 (petroleum ether : ethyl acetate = 7 : 1)"),
+            ]
+        )
+        request = GenerateSIRequest(input_path=EXAMPLES_DIR / "test_input_2.docx", input_kind="word", output_path=Path("out.docx"))
+
+        result = calculate_loadings_node(
+            {
+                "request": request,
+                "compounds": compounds,
+                "order": order,
+                "generation_config": {"generate_loadings": True},
+                "issues": [],
+            }
+        )
+
+        self.assertIn("compounds", result)
+        self.assertNotIn("issues", result)
+        prepared = result["compounds"]["cmp_001"]
+        self.assertIn("Alkene 3a was obtained", prepared.preparation)
+        self.assertAlmostEqual(prepared.reaction["target_mmol"], 1.5679, places=4)
+        self.assertEqual(prepared.reaction["source"], "loadings_workflow")
+
+    def test_loadings_workflow_does_not_depend_on_render_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            compound = Compound(
+                id="cmp_001",
+                number="3a",
+                name="Example",
+                color="white solid",
+                melting_point="82",
+                rf="0.38 (petroleum ether : ethyl acetate = 7 : 1)",
+            )
+            apply_loadings_workflow([compound], EXAMPLES_DIR)
+            output_path = Path(tmp) / "support_information.docx"
+            original = __import__("si_generator.docx_builder", fromlist=["calculate_reaction_loadings"]).calculate_reaction_loadings
+            try:
+                __import__("si_generator.docx_builder", fromlist=["calculate_reaction_loadings"]).calculate_reaction_loadings = _raise_render_fallback
+                build_document_from_model(build_si_document_model([compound]), output_path)
+            finally:
+                __import__("si_generator.docx_builder", fromlist=["calculate_reaction_loadings"]).calculate_reaction_loadings = original
+
+            text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
+
+        self.assertIn("Alkene 3a was obtained", text)
+        self.assertNotIn("Reaction loadings:", text)
+
+
+def _raise_render_fallback(_reaction):
+    raise AssertionError("loadings must be calculated before rendering")
 
 
 if __name__ == "__main__":
