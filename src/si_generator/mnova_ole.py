@@ -45,6 +45,7 @@ def insert_mnova_placeholders(docx_path: str | Path, placeholders: Mapping[str, 
     try:
         word = win32.DispatchEx("Word.Application")
         word.Visible = False
+        word.DisplayAlerts = 0
         doc = word.Documents.Open(docx_path, False, False, False)
         for marker, target in placeholders.items():
             _replace_marker_with_mnova_object(doc, marker, _coerce_target(target))

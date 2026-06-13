@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import zipfile
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 from docx import Document
 
@@ -51,6 +53,25 @@ class WordAndDocxSmokeTests(unittest.TestCase):
             text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
             self.assertIn("Methyl (E)-3-(2-(bromomethyl)phenyl)acrylate", text)
             self.assertNotIn("Compound 2a", text)
+            self.assertTrue(_all_structure_ole_objects_use_chemdraw(output_path))
+
+
+def _all_structure_ole_objects_use_chemdraw(path: Path) -> bool:
+    ns = {
+        "o": "urn:schemas-microsoft-com:office:office",
+        "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+    }
+    with zipfile.ZipFile(path) as archive:
+        document = ET.fromstring(archive.read("word/document.xml"))
+        prog_ids = [ole.attrib.get("ProgID", "") for ole in document.findall(".//o:OLEObject", ns)]
+        if not prog_ids or any(prog_id != "ChemDraw.Document" for prog_id in prog_ids):
+            return False
+        for name in archive.namelist():
+            if name.startswith("word/embeddings/si_structure_"):
+                data = archive.read(name)
+                if b"ACD.ChemSketchCDX" in data or b"ChemDraw.Document" not in data:
+                    return False
+    return True
 
 
 if __name__ == "__main__":

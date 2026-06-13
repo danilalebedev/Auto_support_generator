@@ -17,6 +17,7 @@ def insert_chemdraw_placeholders(docx_path: str | Path, structure_map: dict[str,
     pythoncom.CoInitialize()
     word = win32.DispatchEx("Word.Application")
     word.Visible = False
+    word.DisplayAlerts = 0
     doc = None
 
     try:

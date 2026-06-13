@@ -50,6 +50,7 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
     pythoncom.CoInitialize()
     word = win32.DispatchEx("Word.Application")
     word.Visible = False
+    word.DisplayAlerts = 0
     doc = None
 
     try:
@@ -546,6 +547,7 @@ def _paste_word_structures_in_package(
 
                     image_rel.set(f"{{{NS['r']}}}id", image_rid)
                     ole_rel.set(f"{{{NS['r']}}}id", ole_rid)
+                    _normalize_chemdraw_ole_object(object_xml)
                     _apply_object_layout(
                         object_xml,
                         source_object["width"],
@@ -560,7 +562,7 @@ def _paste_word_structures_in_package(
                     _ensure_default_content_type(content_types, ole_ext.lstrip("."), "application/vnd.openxmlformats-officedocument.oleObject")
 
                     extra_files[new_image_name] = source_zip.read("word/" + source_object["image_target"])
-                    extra_files[new_ole_name] = source_zip.read("word/" + source_object["ole_target"])
+                    extra_files[new_ole_name] = _normalize_chemdraw_ole_binary(source_zip.read("word/" + source_object["ole_target"]))
                     _replace_run_text_with_object(run, object_xml)
 
         with zipfile.ZipFile(tmp_name, "w", zipfile.ZIP_DEFLATED) as out_zip:
@@ -576,6 +578,23 @@ def _paste_word_structures_in_package(
                 out_zip.writestr(name, data)
 
     Path(tmp_name).replace(output_docx)
+
+
+def _normalize_chemdraw_ole_object(object_xml: ET.Element) -> None:
+    ole = object_xml.find(".//o:OLEObject", NS)
+    if ole is None:
+        return
+    prog_id = ole.attrib.get("ProgID", "")
+    if prog_id.startswith("ACD.ChemSketch"):
+        ole.set("ProgID", "ChemDraw.Document")
+
+
+def _normalize_chemdraw_ole_binary(data: bytes) -> bytes:
+    old = b"ACD.ChemSketchCDX\x00"
+    new = b"ChemDraw.Document\x00"
+    if old in data and b"ChemDraw" in data:
+        return data.replace(old, new)
+    return data
 
 
 def _source_structure_objects(input_docx: Path) -> dict[str, dict]:
