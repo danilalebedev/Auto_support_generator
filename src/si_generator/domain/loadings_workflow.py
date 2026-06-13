@@ -19,7 +19,7 @@ from .types import Issue, ReagentAmount
 class LoadingsWorkflowPaths:
     schema_docx: Path
     scope_docx: Path
-    template_docx: Path
+    template_docx: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -53,9 +53,8 @@ def discover_loadings_workflow(base_dir: str | Path) -> LoadingsWorkflowPaths | 
             continue
         schema = _find_docx(directory, "Reaction_schema.docx")
         scope = _find_docx(directory, "Scope.docx")
-        template = _find_docx(directory, "Compound_characterization template.docx")
-        if schema and scope and template:
-            return LoadingsWorkflowPaths(schema, scope, template)
+        if schema and scope:
+            return LoadingsWorkflowPaths(schema, scope)
     return None
 
 
@@ -63,6 +62,7 @@ def apply_loadings_workflow(
     compounds: list[Compound],
     base_dir: str | Path,
     paths: LoadingsWorkflowPaths | None = None,
+    template_docx: str | Path | None = None,
     structure_names_by_cell: dict[tuple[int, int, int], str] | None = None,
 ) -> list[Issue]:
     paths = paths or discover_loadings_workflow(base_dir)
@@ -71,7 +71,8 @@ def apply_loadings_workflow(
 
     issues: list[Issue] = []
     schema = read_reaction_schema(paths.schema_docx)
-    template = read_characterization_template(paths.template_docx)
+    template_path = Path(template_docx) if template_docx else paths.template_docx or _default_si_template_path()
+    template = read_characterization_template(template_path)
     if structure_names_by_cell is None:
         structure_names_by_cell, name_issues = _structure_names_for_template(paths.scope_docx, template)
         issues.extend(name_issues)
@@ -182,7 +183,9 @@ def read_scope(
 
 def read_characterization_template(path: str | Path) -> str:
     document = Document(str(path))
-    text = "\n".join(paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip())
+    paragraphs = [paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip()]
+    loadings_paragraph = next((text for text in paragraphs if _paragraph_has_loadings_placeholders(text)), "")
+    text = loadings_paragraph or "\n".join(paragraphs)
     return _repair_known_template_placeholders(text)
 
 
@@ -256,6 +259,7 @@ def _apply_scope_row(
         "target_mmol": round(target_mmol, 4),
         "limiting_reagent": "Reagent_1",
         "reagents": [_reaction_reagent(key, amount, schema.get(key)) for key, amount in reagent_amounts.items()],
+        "template_values": values,
         "preparation_includes_summary": True,
         "hide_loadings_line": True,
         "source": "loadings_workflow",
@@ -276,10 +280,15 @@ def _base_template_values(
         _token_key("number_Reagent_1"): _infer_precursor_number(row.product_number),
         _token_key("mg_yield_Product"): _format_mass(row.product_mass_mg),
         _token_key("percent_yield_Product"): _format_percent(percent_yield),
+        _token_key("yield.Product.mg"): _format_mass(row.product_mass_mg),
+        _token_key("yield.Product.percent"): _format_percent(percent_yield),
         _token_key("color"): _compound_appearance(compound),
+        _token_key("appearance"): _compound_appearance(compound),
         _token_key("mp"): _strip_temperature_unit(compound.melting_point),
         _token_key("Rf"): rf_value,
         _token_key("system_Rf"): rf_system,
+        _token_key("rf.value"): rf_value,
+        _token_key("rf.system"): rf_system,
         _token_key("target_mmol"): _format_mmol(target_mmol),
     }
 
@@ -385,6 +394,10 @@ def _find_docx(directory: Path, expected_name: str) -> Path | None:
     return None
 
 
+def _default_si_template_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "templates" / "SI_template.docx"
+
+
 def _structure_names_for_template(scope_path: Path, template: str) -> tuple[dict[tuple[int, int, int], str], list[Issue]]:
     if not _template_requests_structure_names(template):
         return {}, []
@@ -401,6 +414,15 @@ def _template_requests_structure_names(template: str) -> bool:
         if _token_key(match.group(1)).startswith("name"):
             return True
     return False
+
+
+def _paragraph_has_loadings_placeholders(text: str) -> bool:
+    keys = {_token_key(match.group(1)) for match in re.finditer(r"\{([^{}]+)\}", text)}
+    return any(
+        key.startswith(prefix)
+        for key in keys
+        for prefix in ("name.reagent", "mg.reagent", "mmol.reagent", "number.product", "mg.yield.product")
+    )
 
 
 def _chemdraw_names_for_cells(scope_path: Path, cells: list[tuple[int, int, int]], timeout: int = 240) -> tuple[dict[tuple[int, int, int], str], list[Issue]]:
@@ -480,7 +502,7 @@ def _schema_key(label: str) -> str:
 
 def _token_key(text: str) -> str:
     normalized = text.replace("\u03bc", "u")
-    return re.sub(r"[^a-z0-9]+", "", normalized.lower())
+    return re.sub(r"[^a-z0-9]+", ".", normalized.lower()).strip(".")
 
 
 def _display_schema_name(label: str) -> str:

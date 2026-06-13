@@ -287,6 +287,8 @@ def bookmark_order_for_compounds(manifest: dict[str, Any], compound_ids: list[st
 def _renumber_text(text: str, renumber: dict[str, str]) -> str:
     result = text
     for old, new in renumber.items():
+        if result == old:
+            result = new
         result = result.replace(f"({old})", f"({new})")
         result = result.replace(f"STRUCTURE:{old}", f"STRUCTURE:{new}")
         result = result.replace(f"SPECTRUM_STRUCTURE:{old}:", f"SPECTRUM_STRUCTURE:{new}:")

@@ -181,8 +181,6 @@ class ReactionLoadingsTests(unittest.TestCase):
                 "Reaction_schema.docx",
                 "--loadings-scope-docx",
                 "Scope.docx",
-                "--loadings-template-docx",
-                "Compound_characterization template.docx",
             ]
         )
 
@@ -191,7 +189,6 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertTrue(request.generate_loadings)
         self.assertEqual(request.loadings_schema_docx, Path("Reaction_schema.docx"))
         self.assertEqual(request.loadings_scope_docx, Path("Scope.docx"))
-        self.assertEqual(request.loadings_template_docx, Path("Compound_characterization template.docx"))
 
     def test_loadings_workflow_generates_preparation_from_examples(self) -> None:
         compound = Compound(
@@ -209,7 +206,7 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertNotIn("{", compound.preparation)
         self.assertIn("bromide 2a (400 mg, 1.57 mmol)", compound.preparation)
         self.assertIn("K2CO3 (217 mg, 1.57 mmol)", compound.preparation)
-        self.assertIn("AcOH (449 μL, 7.84 mmol)", compound.preparation)
+        self.assertIn("AcOH (449 µL, 7.84 mmol)", compound.preparation)
         self.assertIn("Rf = 0.38 (petroleum ether : ethyl acetate = 7 : 1)", compound.preparation)
         self.assertEqual(compound.yield_text, "304 mg (69%)")
         self.assertEqual(compound.formula, "C17H18N2O2")
@@ -224,9 +221,9 @@ class ReactionLoadingsTests(unittest.TestCase):
 
     def test_loadings_workflow_supports_name_reagent_placeholder(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            template_path = Path(tmp) / "Compound_characterization template.docx"
+            template_path = Path(tmp) / "SI_template.docx"
             document = Document()
-            document.add_paragraph("Alkene {number_Product} used {name_Reagent_2} ({mg_Reagent_2} mg, {mmol_Reagent_2} mmol).")
+            document.add_paragraph("Alkene {number.Product} used {name.Reagent.2} ({mg.Reagent.2} mg, {mmol.Reagent.2} mmol).")
             document.save(template_path)
             compound = Compound(number="3a", name="Example", color="white", state="solid")
             issues = apply_loadings_workflow(
@@ -296,7 +293,6 @@ class ReactionLoadingsTests(unittest.TestCase):
             output_path=Path("out.docx"),
             loadings_schema_docx=LOADINGS_DIR / "Reaction_schema.docx",
             loadings_scope_docx=LOADINGS_DIR / "Scope.docx",
-            loadings_template_docx=LOADINGS_DIR / "Compound_characterization template.docx",
         )
 
         result = calculate_loadings_node(
@@ -325,12 +321,13 @@ class ReactionLoadingsTests(unittest.TestCase):
             )
             apply_loadings_workflow([compound], EXAMPLES_DIR)
             output_path = Path(tmp) / "support_information.docx"
-            original = __import__("si_generator.docx_builder", fromlist=["calculate_reaction_loadings"]).calculate_reaction_loadings
+            renderer = __import__("si_generator.template_renderer", fromlist=["calculate_reaction_loadings"])
+            original = renderer.calculate_reaction_loadings
             try:
-                __import__("si_generator.docx_builder", fromlist=["calculate_reaction_loadings"]).calculate_reaction_loadings = _raise_render_fallback
+                renderer.calculate_reaction_loadings = _raise_render_fallback
                 build_document_from_model(build_si_document_model([compound]), output_path)
             finally:
-                __import__("si_generator.docx_builder", fromlist=["calculate_reaction_loadings"]).calculate_reaction_loadings = original
+                renderer.calculate_reaction_loadings = original
 
             text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
 

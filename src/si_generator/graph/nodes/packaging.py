@@ -45,7 +45,6 @@ def build_manifest(state: GenerateSIState) -> dict:
                 "compound_table": request.input_path,
                 "spectra_zip": request.spectra_zip,
                 "template_docx": request.template_docx,
-                "style_config": request.style_config_path,
                 "references": request.references_path,
             }
         ),
@@ -55,7 +54,6 @@ def build_manifest(state: GenerateSIState) -> dict:
             "spectra": state.get("spectra_config", {}),
             "generation": state.get("generation_config", {}),
             "runtime": state.get("runtime_config", {}),
-            "journal_profile": state.get("journal_profile", {}).get("id", "default"),
         },
         "artifacts": artifacts,
         "order": order,

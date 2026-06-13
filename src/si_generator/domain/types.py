@@ -200,19 +200,6 @@ class SpectraConfig(TypedDict, total=False):
 SpectraProcessingConfig = SpectraConfig
 
 
-class JournalProfile(TypedDict, total=False):
-    id: str
-    name: str
-    docx_template_path: str
-    section_order: list[str]
-    nmr_format_style: str
-    hrms_format_style: str
-    reference_style: str
-    use_subscripts_in_formulae: bool
-    use_superscript_isotopes: bool
-    use_italic_j: bool
-
-
 class GenerationConfig(TypedDict, total=False):
     generate_loadings: bool
     include_ir: bool
@@ -257,7 +244,6 @@ class SIState(TypedDict, total=False):
     spectra_config: SpectraConfig
     generation_config: GenerationConfig
     runtime_config: RuntimeConfig
-    journal_profile: JournalProfile
     reference_store: ReferenceStore
     input_paths: dict[str, str]
     output_paths: dict[str, str]

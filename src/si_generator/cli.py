@@ -64,15 +64,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--template-docx",
-        help="Optional Word file used as the visual template: margins, page setup, and named styles.",
-    )
-    parser.add_argument(
-        "--style-config",
-        help="Optional YAML file with semantic formatting rules for titles, NMR, HRMS, IR, and chemical notation.",
-    )
-    parser.add_argument(
-        "--journal-profile",
-        help="Optional built-in profile name (default, acs, rsc, wiley) or path to a journal profile YAML.",
+        help="Optional visual Word template used for SI text, spectra appendix, margins, fonts, and run formatting.",
     )
     parser.add_argument(
         "--references",
@@ -127,10 +119,6 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--loadings-scope-docx",
         help="Optional Scope.docx path for reagent loadings.",
-    )
-    parser.add_argument(
-        "--loadings-template-docx",
-        help="Optional Compound_characterization template.docx path for reagent loadings.",
     )
     parser.add_argument(
         "--extract-structure-metadata",

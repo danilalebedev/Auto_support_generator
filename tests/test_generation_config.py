@@ -16,22 +16,12 @@ class GenerationConfigTests(unittest.TestCase):
         self.assertTrue(config["include_references"])
         self.assertFalse(config["check_support"])
 
-    def test_style_generation_section_overrides_visibility_flags(self) -> None:
-        config = build_generation_config(
-            style_config={
-                "generation": {
-                    "include_ir": False,
-                    "include_elemental_analysis": False,
-                    "calculate_elemental_analysis": True,
-                    "include_references": True,
-                }
-            },
-            has_references=False,
-        )
+    def test_references_are_disabled_without_reference_file(self) -> None:
+        config = build_generation_config(has_references=False)
 
-        self.assertFalse(config["include_ir"])
-        self.assertFalse(config["include_elemental_analysis"])
-        self.assertTrue(config["calculate_elemental_analysis"])
+        self.assertTrue(config["include_ir"])
+        self.assertTrue(config["include_elemental_analysis"])
+        self.assertFalse(config["calculate_elemental_analysis"])
         self.assertFalse(config["include_references"])
 
 

@@ -8,7 +8,6 @@ from ..domain.requests import CheckSIRequest, GenerateSIRequest, InputKind, Patc
 from ..domain.types import (
     GenerationConfig,
     Issue,
-    JournalProfile,
     ReferenceStore,
     RuntimeConfig,
     SpectraConfig,
@@ -21,8 +20,6 @@ from ..render.si_document import SIDocument
 class GenerateSIState(TypedDict, total=False):
     run_id: str
     request: GenerateSIRequest
-    style_config: dict[str, Any]
-    journal_profile: JournalProfile
     reference_store: ReferenceStore
     spectra_config: SpectraConfig
     generation_config: GenerationConfig

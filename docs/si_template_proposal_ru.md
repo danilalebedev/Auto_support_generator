@@ -1,85 +1,66 @@
 # Единый DOCX-template для оформления SI
 
-## Цель
+Оформление SI задается одним Word-файлом `SI_template.docx`.
+Пользователь редактирует его как обычный будущий support: меняет шрифт,
+жирность, курсив, интервалы, поля, нижние и верхние индексы прямо в Word.
+Программа копирует это оформление и заменяет placeholder-ы на данные соединений.
 
-Текущие `style_config.yml` и `journal_profile` решают задачу, но для химика это неудобный технический слой. Более практичный интерфейс - один Word-файл `SI_template.docx`, где пользователь видит итоговое оформление и редактирует его как обычный документ.
+## Правила placeholder-ов
 
-Предлагаемый подход:
-
-- формат, поля, шрифты, жирность, курсив и интервалы берутся из `SI_template.docx`;
-- переменные задаются через `{placeholder}`;
-- если placeholder или группа placeholder-ов выделены жирным/курсивом в шаблоне, вставленный текст наследует это оформление;
-- квадратные скобки можно использовать как явный маркер форматируемой группы: `[{nmr.1h.label}]` вставляется без скобок, но с оформлением этой группы;
-- текущие `style_config.yml` и `journal_profile` остаются временно как backward-compatible режим и позже заменяются готовыми издательскими шаблонами.
-
-## Предлагаемая структура `SI_template.docx`
-
-Удобнее всего сделать в DOCX таблицу из двух колонок:
-
-| Block | Template |
-|---|---|
-| `compound.title` | `{compound.name} ({compound.number})` |
-| `compound.description` | `{compound.preparation}` |
-| `nmr.1h` | `[{nmr.1h.label}] ({nmr.1h.conditions}) δ = {nmr.1h.peaks}.` |
-| `nmr.13c` | `[{nmr.13c.label}] ({nmr.13c.conditions}) δ = {nmr.13c.peaks}.` |
-| `nmr.extra` | `{nmr.extra}` |
-| `hrms` | `[{hrms.label}] m/z: {hrms.adduct} calcd for {hrms.formula} {hrms.calculated}. Found {hrms.found}.` |
-| `elemental_analysis` | `[{anal.label}] Calcd for {anal.formula}: {anal.calculated}. Found: {anal.found}.` |
-| `ir` | `[{ir.label}] ({ir.method}, cm-1): {ir.peaks}.` |
-| `appendix.1h.title` | `{compound.name} ({compound.number})` + next line `[{nmr.1h.label}] ({nmr.1h.conditions})` |
-| `appendix.13c.title` | `{compound.name} ({compound.number})` + next line `[{nmr.13c.label}] ({nmr.13c.conditions})` |
-
-Причина выбора таблицы: ее легко редактировать в Word, легко парсить программно, и она не требует от пользователя YAML.
-
-## Текущий шаблон оформления
-
-Ниже шаблон, который соответствует текущей логике генератора для описания соединения:
+Публичный формат единый: в placeholder-ах используются точки.
 
 ```text
 {compound.name} ({compound.number})
 
 {compound.preparation}
 
+{reaction.loadings}
+
 [{nmr.1h.label}] ({nmr.1h.conditions}) δ = {nmr.1h.peaks}.
 
 [{nmr.13c.label}] ({nmr.13c.conditions}) δ = {nmr.13c.peaks}.
 
-{nmr.extra}
-
-[{hrms.label}] m/z: {hrms.adduct} calcd for {hrms.formula} {hrms.calculated}. Found {hrms.found}.
+[{hrms.label}]: {hrms.adduct} calcd for {hrms.formula} {hrms.calculated}. Found {hrms.found}.
 
 [{anal.label}] Calcd for {anal.formula}: {anal.calculated}. Found: {anal.found}.
 
 [{ir.label}] ({ir.method}, cm-1): {ir.peaks}.
 ```
 
-В Word-шаблоне пользователь должен выделить `[{nmr.1h.label}]`, `[{nmr.13c.label}]`, `[{hrms.label}]`, `[{anal.label}]`, `[{ir.label}]` жирным. При рендере квадратные скобки будут удаляться, а вставленный label останется жирным.
+Если placeholder или группа placeholder-ов выделены жирным или курсивом, вставленный
+текст наследует это форматирование. Квадратные скобки в `[{hrms.label}]` служат
+только маркером форматируемой группы: в итоговом SI они удаляются.
 
-## Шаблон для reagent loadings
+## Reagent loadings
 
-Текущий `Compound_characterization template.docx` можно заменить или расширить так:
+Отдельный `Compound_characterization` template больше не нужен. Текст загрузок
+берется из того же `SI_template.docx`, из параграфа с loadings-placeholder-ами.
+
+Пример:
 
 ```text
-Alkene {number_Product} was obtained from bromide {number_Reagent_1} ({mg_Reagent_1} mg, {mmol_Reagent_1} mmol), {name_Reagent_2} ({mg_Reagent_2} mg, {mmol_Reagent_2} mmol), K2CO3 ({mg_K2CO3} mg, {mmol_K2CO3} mmol), AcOH ({uL_AcOH} μL, {mmol_AcOH} mmol) and MeCN ({ml_Solvent_MeCN} mL) according to GP2. Yield {mg_yield_Product} mg ({percent_yield_Product}); {color}; mp {mp} °C. Rf = {Rf} ({system_Rf}).
+Alkene {number.Product} was obtained from bromide {number.Reagent.1} ({mg.Reagent.1} mg, {mmol.Reagent.1} mmol), {name.Reagent.2} ({mg.Reagent.2} mg, {mmol.Reagent.2} mmol), K2CO3 ({mg.K2CO3} mg, {mmol.K2CO3} mmol), AcOH ({uL.AcOH} µL, {mmol.AcOH} mmol) and MeCN ({mL.Solvent.MeCN} mL) according to GP2. Yield {yield.Product.mg} mg ({yield.Product.percent}); {appearance}; mp {mp} °C. Rf = {rf.value} ({rf.system}).
 ```
 
-Поддерживаемые важные поля:
+В самом Word-шаблоне формулы можно форматировать нормально: например, в `K2CO3`
+цифры `2` и `3` должны быть нижними индексами.
 
-- `{name_Reagent_1}`, `{name_Reagent_2}`, `{name_Product}` - номенклатурные названия, если ChemDraw смог их сгенерировать;
-- `{mg_Reagent_1}`, `{mmol_Reagent_1}`;
-- `{mg_Reagent_2}`, `{mmol_Reagent_2}`;
-- `{mg_K2CO3}`, `{mmol_K2CO3}`;
-- `{uL_AcOH}`, `{mmol_AcOH}`;
-- `{ml_Solvent_MeCN}`;
-- `{mg_yield_Product}`, `{percent_yield_Product}`;
-- `{color}`, `{mp}`, `{Rf}`, `{system_Rf}`.
+## Важные placeholder-ы
 
-Если ChemDraw недоступен, `{name_Reagent_2}` должен падать обратно на формулу, а генерация должна выдавать warning, но не останавливаться.
+- `{compound.name}`, `{compound.number}`, `{compound.preparation}`;
+- `{reaction.loadings}`;
+- `{number.Product}`, `{number.Reagent.1}`;
+- `{name.Reagent.2}`, `{mg.Reagent.2}`, `{mmol.Reagent.2}`;
+- `{mg.K2CO3}`, `{mmol.K2CO3}`;
+- `{uL.AcOH}`, `{mmol.AcOH}`;
+- `{mL.Solvent.MeCN}`;
+- `{yield.Product.mg}`, `{yield.Product.percent}`;
+- `{appearance}`, `{mp}`, `{rf.value}`, `{rf.system}`;
+- `{nmr.1h.label}`, `{nmr.1h.conditions}`, `{nmr.1h.peaks}`;
+- `{nmr.13c.label}`, `{nmr.13c.conditions}`, `{nmr.13c.peaks}`;
+- `{hrms.label}`, `{hrms.adduct}`, `{hrms.formula}`, `{hrms.calculated}`, `{hrms.found}`;
+- `{anal.label}`, `{anal.formula}`, `{anal.calculated}`, `{anal.found}`;
+- `{ir.label}`, `{ir.method}`, `{ir.peaks}`.
 
-## План внедрения
-
-1. Расширить текущий template renderer: сейчас он вставляет только plain text из `Compound_characterization template.docx`; нужно сохранять run-level форматирование Word.
-2. Добавить парсер block-таблицы `SI_template.docx`.
-3. Перевести рендер compound description, NMR, HRMS, elemental analysis, IR и spectra appendix на block templates.
-4. Оставить `style_config.yml` и `journal_profile` как deprecated fallback.
-5. Добавить готовые `SI_template.docx` для default/ACS/RSC/Wiley.
+Если ChemDraw недоступен для генерации `{name.Reagent.2}`, программа использует
+fallback по формуле и пишет warning, но генерацию SI не останавливает.

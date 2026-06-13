@@ -20,7 +20,6 @@ class GuiSettingsTests(unittest.TestCase):
                     "peak_threshold_13c_percent": "4",
                     "loadings_schema_docx": Path("Reaction_schema.docx"),
                     "loadings_scope_docx": Path("Scope.docx"),
-                    "loadings_template_docx": Path("Compound_characterization template.docx"),
                     "check_support": "false",
                     "generate_loadings": "yes",
                 }
@@ -33,7 +32,6 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(settings["peak_threshold_13c_percent"], "4")
         self.assertEqual(settings["loadings_schema_docx"], "Reaction_schema.docx")
         self.assertEqual(settings["loadings_scope_docx"], "Scope.docx")
-        self.assertEqual(settings["loadings_template_docx"], "Compound_characterization template.docx")
         self.assertNotIn("unknown", settings)
         self.assertNotIn("insert_spectra_as", settings)
         self.assertFalse(settings["check_support"])
@@ -53,7 +51,6 @@ class GuiSettingsTests(unittest.TestCase):
                     "peak_threshold_13c_percent": "4",
                     "loadings_schema_docx": "C:/data/loadings/Reaction_schema.docx",
                     "loadings_scope_docx": "C:/data/loadings/Scope.docx",
-                    "loadings_template_docx": "C:/data/loadings/Compound_characterization template.docx",
                     "check_support": True,
                     "generate_loadings": False,
                 },
@@ -70,7 +67,6 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(loaded["peak_threshold_13c_percent"], "4")
         self.assertEqual(loaded["loadings_schema_docx"], "C:/data/loadings/Reaction_schema.docx")
         self.assertEqual(loaded["loadings_scope_docx"], "C:/data/loadings/Scope.docx")
-        self.assertEqual(loaded["loadings_template_docx"], "C:/data/loadings/Compound_characterization template.docx")
         self.assertTrue(loaded["check_support"])
         self.assertFalse(loaded["generate_loadings"])
 

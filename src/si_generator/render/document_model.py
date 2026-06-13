@@ -4,7 +4,6 @@ from pathlib import Path
 
 from ..domain.bookmarks import bookmark_name_for_block_id
 from ..domain.references import select_references_for_compounds
-from ..domain.types import JournalProfile
 from ..domain.types import ReferenceStore
 from ..domain.types import SpectrumEmbedMode
 from ..domain.compound import Compound
@@ -13,7 +12,6 @@ from .si_document import DocumentBlock, SIDocument, SISection
 
 def build_si_document_model(
     compounds: list[Compound],
-    journal_profile: JournalProfile | None = None,
     reference_store: ReferenceStore | None = None,
     spectra_embed_mode: SpectrumEmbedMode = "png",
 ) -> SIDocument:
@@ -40,7 +38,7 @@ def build_si_document_model(
             "title": "References",
             "blocks": reference_blocks,
         }
-    section_order = _section_order(journal_profile)
+    section_order = ["compound_descriptions", "spectra_appendix", "references"]
     sections = [sections_by_id[section_id] for section_id in section_order if section_id in sections_by_id]
     sections.extend(section for section_id, section in sections_by_id.items() if section_id not in section_order)
 
@@ -51,14 +49,8 @@ def build_si_document_model(
             "compound_count": str(len(compounds)),
             "spectrum_count": str(len(spectra_blocks)),
             "references_count": str(len(reference_blocks)),
-            "journal_profile": (journal_profile or {}).get("id", "default"),
         },
     }
-
-
-def _section_order(journal_profile: JournalProfile | None) -> list[str]:
-    order = (journal_profile or {}).get("section_order", [])
-    return list(order) if isinstance(order, list) else ["compound_descriptions", "spectra_appendix", "references"]
 
 
 def _compound_description_block(compound: Compound) -> DocumentBlock:

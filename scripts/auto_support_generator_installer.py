@@ -45,7 +45,6 @@ def _install_payload(app_dir: Path) -> None:
 
     copies = {
         "AutoSupportGenerator.exe": app_dir / "AutoSupportGenerator.exe",
-        "style_config.example.yml": app_dir / "style_config.example.yml",
         "README.md": app_dir / "README.md",
         "INSTALL_RU.md": app_dir / "INSTALL_RU.md",
     }

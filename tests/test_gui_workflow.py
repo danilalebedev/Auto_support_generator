@@ -30,24 +30,20 @@ class GuiWorkflowTests(unittest.TestCase):
             spectra = root / "spectra.zip"
             schema = root / "Reaction_schema.docx"
             scope = root / "Scope.docx"
-            loadings_template = root / "Compound_characterization template.docx"
             output = root / "support_information.docx"
             table.write_text("placeholder", encoding="utf-8")
             spectra.write_text("placeholder", encoding="utf-8")
             schema.write_text("placeholder", encoding="utf-8")
             scope.write_text("placeholder", encoding="utf-8")
-            loadings_template.write_text("placeholder", encoding="utf-8")
 
             request = _build_generate_request(
                 input_kind="word",
                 input_path_text=str(table),
                 output_docx_text=str(output),
                 spectra_zip_text=str(spectra),
-                journal_profile_text="acs",
                 references_text="",
                 loadings_schema_text=str(schema),
                 loadings_scope_text=str(scope),
-                loadings_template_text=str(loadings_template),
                 peak_threshold_1h_percent_text="8",
                 peak_threshold_13c_percent_text="3,5",
                 generate_loadings=True,
@@ -58,10 +54,8 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(request.input_kind, "word")
         self.assertEqual(request.output_path, output)
         self.assertEqual(request.spectra_zip, spectra)
-        self.assertEqual(request.journal_profile, "acs")
         self.assertEqual(request.loadings_schema_docx, schema)
         self.assertEqual(request.loadings_scope_docx, scope)
-        self.assertEqual(request.loadings_template_docx, loadings_template)
         self.assertEqual(request.peak_threshold_fraction_1h, 0.08)
         self.assertEqual(request.peak_threshold_fraction_13c, 0.035)
         self.assertTrue(request.generate_loadings)
@@ -141,7 +135,7 @@ class GuiWorkflowTests(unittest.TestCase):
             table.write_text("placeholder", encoding="utf-8")
             schema.write_text("placeholder", encoding="utf-8")
 
-            with self.assertRaisesRegex(ValueError, "all three reagent loadings files"):
+            with self.assertRaisesRegex(ValueError, "both reagent loadings files"):
                 _build_generate_request(
                     input_kind="word",
                     input_path_text=str(table),
@@ -376,12 +370,9 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(updates["spectra_zip"], str(Path("examples/test_input.zip")))
         self.assertEqual(updates["output_docx"], str(Path("output/support_information.docx")))
         self.assertEqual(updates["template_docx"], "")
-        self.assertEqual(updates["style_config"], "")
-        self.assertEqual(updates["journal_profile"], "")
         self.assertEqual(updates["references_file"], "")
         self.assertEqual(updates["loadings_schema_docx"], "")
         self.assertEqual(updates["loadings_scope_docx"], "")
-        self.assertEqual(updates["loadings_template_docx"], "")
         self.assertEqual(updates["existing_manifest"], "")
         self.assertEqual(updates["patch_renumber"], "")
         self.assertNotIn("mnova_exe", updates)

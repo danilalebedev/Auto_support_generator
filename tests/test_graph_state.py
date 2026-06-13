@@ -84,33 +84,23 @@ class GraphStateTests(unittest.TestCase):
         self.assertFalse(result["generation_config"]["calculate_elemental_analysis"])
         self.assertFalse(result["runtime_config"]["dry_run"])
 
-    def test_settings_node_merges_generation_flags_from_style_config(self) -> None:
+    def test_settings_node_enables_references_when_reference_file_is_present(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            style_path = Path(tmp) / "style_config.yml"
             references_path = Path(tmp) / "references.yml"
-            style_path.write_text(
-                "generation:\n"
-                "  include_ir: false\n"
-                "  include_elemental_analysis: false\n"
-                "  calculate_elemental_analysis: true\n"
-                "  include_references: false\n",
-                encoding="utf-8",
-            )
             references_path.write_text("references:\norder: []\n", encoding="utf-8")
             request = GenerateSIRequest(
                 input_path=Path("examples/test_input.docx"),
                 input_kind="word",
                 output_path=Path("output/support_information.docx"),
-                style_config_path=style_path,
                 references_path=references_path,
             )
 
             result = load_settings_node({"request": request})
 
-        self.assertFalse(result["generation_config"]["include_ir"])
-        self.assertFalse(result["generation_config"]["include_elemental_analysis"])
-        self.assertTrue(result["generation_config"]["calculate_elemental_analysis"])
-        self.assertFalse(result["generation_config"]["include_references"])
+        self.assertTrue(result["generation_config"]["include_ir"])
+        self.assertTrue(result["generation_config"]["include_elemental_analysis"])
+        self.assertFalse(result["generation_config"]["calculate_elemental_analysis"])
+        self.assertTrue(result["generation_config"]["include_references"])
 
     def test_document_model_node_honors_generation_visibility_flags(self) -> None:
         compound = Compound(

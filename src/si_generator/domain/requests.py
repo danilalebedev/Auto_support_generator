@@ -16,13 +16,10 @@ class GenerateSIRequest:
     input_kind: InputKind
     output_path: Path
     template_docx: Path | None = None
-    style_config_path: Path | None = None
-    journal_profile: str | Path | None = None
     references_path: Path | None = None
     spectra_zip: Path | None = None
     loadings_schema_docx: Path | None = None
     loadings_scope_docx: Path | None = None
-    loadings_template_docx: Path | None = None
     mnova_exe: Path | None = None
     no_extract_nmr: bool = False
     insert_spectra_as: SpectrumEmbedMode = "png"

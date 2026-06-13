@@ -108,7 +108,6 @@ def _check_loadings_files(request: GenerateSIRequest) -> list[Issue]:
     paths = {
         "Reaction schema": request.loadings_schema_docx,
         "Scope": request.loadings_scope_docx,
-        "Description template": request.loadings_template_docx,
     }
     selected = {label: path for label, path in paths.items() if path}
     if not selected:
@@ -118,7 +117,7 @@ def _check_loadings_files(request: GenerateSIRequest) -> list[Issue]:
             _issue(
                 "PREFLIGHT_LOADINGS_FILES_INCOMPLETE",
                 "error",
-                "Choose all three reagent loadings files or leave all fields empty for auto-detect.",
+                "Choose both reagent loadings files or leave both fields empty for auto-detect.",
             )
         ]
 

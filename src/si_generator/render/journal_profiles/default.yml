@@ -1,6 +1,0 @@
-id: default
-name: Default Supporting Information
-section_order: [compound_descriptions, spectra_appendix, references]
-use_subscripts_in_formulae: true
-use_superscript_isotopes: true
-use_italic_j: false

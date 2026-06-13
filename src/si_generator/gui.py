@@ -37,12 +37,9 @@ class SIGeneratorApp:
         self.input_path = StringVar()
         self.spectra_zip = StringVar()
         self.template_docx = StringVar()
-        self.style_config = StringVar()
-        self.journal_profile = StringVar()
         self.references_file = StringVar()
         self.loadings_schema_docx = StringVar()
         self.loadings_scope_docx = StringVar()
-        self.loadings_template_docx = StringVar()
         self.mnova_exe = StringVar()
         self.output_docx = StringVar(value=str(default_output_path()))
         self.input_kind = StringVar(value="word")
@@ -119,20 +116,18 @@ class SIGeneratorApp:
 
         self._file_row(files, 1, "Compound table", self.input_path, self._browse_input)
         self._file_row(files, 2, "Spectra zip", self.spectra_zip, lambda: self._browse_file(self.spectra_zip, [("Zip archives", "*.zip"), ("All files", "*.*")]))
-        self._file_row(files, 3, "Template .docx", self.template_docx, lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
-        self._file_row(files, 4, "Style config .yml", self.style_config, lambda: self._browse_file(self.style_config, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
-        self._file_row(files, 5, "Journal profile", self.journal_profile, lambda: self._browse_file(self.journal_profile, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
-        self._file_row(files, 6, "References .yml", self.references_file, lambda: self._browse_file(self.references_file, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
+        self._file_row(files, 3, "SI template .docx", self.template_docx, lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
+        self._file_row(files, 4, "References .yml", self.references_file, lambda: self._browse_file(self.references_file, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
         self._file_row(
             files,
-            7,
+            5,
             "MestReNova .exe",
             self.mnova_exe,
             lambda: self._browse_file(self.mnova_exe, [("MestReNova", "*.exe"), ("All files", "*.*")]),
             optional=True,
             extra_button=("Detect", self._detect_mnova),
         )
-        self._file_row(files, 8, "Output .docx", self.output_docx, self._browse_output)
+        self._file_row(files, 6, "Output .docx", self.output_docx, self._browse_output)
 
         loadings = ttk.LabelFrame(outer, text="Reagent Loadings", padding=12)
         loadings.grid(row=2, column=0, sticky="ew", pady=(12, 12))
@@ -158,15 +153,6 @@ class SIGeneratorApp:
             lambda: self._browse_file(self.loadings_scope_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
             optional=True,
         )
-        self._file_row(
-            loadings,
-            3,
-            "Description template .docx",
-            self.loadings_template_docx,
-            lambda: self._browse_file(self.loadings_template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
-            optional=True,
-        )
-
         options = ttk.LabelFrame(outer, text="Options", padding=12)
         options.grid(row=3, column=0, sticky="ew", pady=(0, 12))
         options.columnconfigure(5, weight=1)
@@ -435,12 +421,9 @@ class SIGeneratorApp:
             output_docx_text=self.output_docx.get(),
             spectra_zip_text=self.spectra_zip.get(),
             template_docx_text=self.template_docx.get(),
-            style_config_text=self.style_config.get(),
-            journal_profile_text=self.journal_profile.get(),
             references_text=self.references_file.get(),
             loadings_schema_text=self.loadings_schema_docx.get(),
             loadings_scope_text=self.loadings_scope_docx.get(),
-            loadings_template_text=self.loadings_template_docx.get(),
             mnova_exe_text=self.mnova_exe.get(),
             insert_spectra_as=self.insert_spectra_as.get(),
             peak_threshold_1h_percent_text=self.peak_threshold_1h_percent.get(),
@@ -615,12 +598,9 @@ class SIGeneratorApp:
             "input_path": self.input_path,
             "spectra_zip": self.spectra_zip,
             "template_docx": self.template_docx,
-            "style_config": self.style_config,
-            "journal_profile": self.journal_profile,
             "references_file": self.references_file,
             "loadings_schema_docx": self.loadings_schema_docx,
             "loadings_scope_docx": self.loadings_scope_docx,
-            "loadings_template_docx": self.loadings_template_docx,
             "mnova_exe": self.mnova_exe,
             "output_docx": self.output_docx,
             "peak_threshold_1h_percent": self.peak_threshold_1h_percent,
@@ -733,12 +713,9 @@ def _build_generate_request(
     output_docx_text: str,
     spectra_zip_text: str = "",
     template_docx_text: str = "",
-    style_config_text: str = "",
-    journal_profile_text: str = "",
     references_text: str = "",
     loadings_schema_text: str = "",
     loadings_scope_text: str = "",
-    loadings_template_text: str = "",
     mnova_exe_text: str = "",
     insert_spectra_as: str = "png",
     peak_threshold_percent_text: str = "",
@@ -753,26 +730,22 @@ def _build_generate_request(
     if not output_docx.name.lower().endswith(".docx"):
         raise ValueError("Output file must be a .docx file.")
     shared_peak_threshold = _optional_peak_threshold_fraction(peak_threshold_percent_text)
-    loadings_schema = loadings_scope = loadings_template = None
+    loadings_schema = loadings_scope = None
     if generate_loadings:
         loadings_schema = _optional_existing_file(loadings_schema_text, "Reaction schema .docx", suffixes=(".docx",))
         loadings_scope = _optional_existing_file(loadings_scope_text, "Scope .docx", suffixes=(".docx",))
-        loadings_template = _optional_existing_file(loadings_template_text, "Description template .docx", suffixes=(".docx",))
-        if any((loadings_schema, loadings_scope, loadings_template)) and not all((loadings_schema, loadings_scope, loadings_template)):
-            raise ValueError("Choose all three reagent loadings files or leave all three empty for auto-detect.")
+        if any((loadings_schema, loadings_scope)) and not all((loadings_schema, loadings_scope)):
+            raise ValueError("Choose both reagent loadings files or leave both empty for auto-detect.")
 
     return GenerateSIRequest(
         input_path=input_path,
         input_kind="csv" if input_kind == "csv" else "word",
         output_path=output_docx,
         spectra_zip=_optional_existing_file(spectra_zip_text, "Spectra zip", suffixes=(".zip",)),
-        template_docx=_optional_existing_file(template_docx_text, "Template .docx", suffixes=(".docx",)),
-        style_config_path=_optional_existing_file(style_config_text, "Style config", suffixes=(".yml", ".yaml")),
-        journal_profile=_optional_profile(journal_profile_text),
+        template_docx=_optional_existing_file(template_docx_text, "SI template .docx", suffixes=(".docx",)),
         references_path=_optional_existing_file(references_text, "References .yml", suffixes=(".yml", ".yaml")),
         loadings_schema_docx=loadings_schema,
         loadings_scope_docx=loadings_scope,
-        loadings_template_docx=loadings_template,
         mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe", suffixes=(".exe",)),
         insert_spectra_as=_validated_spectrum_mode(insert_spectra_as),
         peak_threshold_fraction=shared_peak_threshold,
@@ -948,12 +921,9 @@ def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) ->
         "spectra_zip": str(spectra_zip),
         "output_docx": str(output_docx),
         "template_docx": "",
-        "style_config": "",
-        "journal_profile": "",
         "references_file": "",
         "loadings_schema_docx": "",
         "loadings_scope_docx": "",
-        "loadings_template_docx": "",
         "existing_manifest": "",
         "patch_output_docx": "",
         "patch_renumber": "",
@@ -997,14 +967,6 @@ def _optional_output_docx(raw_path: str) -> Path | None:
     if not path.name.lower().endswith(".docx"):
         raise ValueError("Patched output file must be a .docx file.")
     return path
-
-
-def _optional_profile(raw_value: str) -> str | Path | None:
-    raw_value = raw_value.strip().strip('"')
-    if not raw_value:
-        return None
-    path = Path(raw_value).expanduser()
-    return path if path.exists() else raw_value
 
 
 def _validated_spectrum_mode(value: str) -> SpectrumEmbedMode:

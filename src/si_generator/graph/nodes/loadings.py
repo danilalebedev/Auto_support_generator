@@ -22,7 +22,7 @@ def calculate_loadings_node(state: GenerateSIState) -> dict:
                 state.setdefault("issues", []).extend(path_issues)
                 issues = []
             else:
-                issues = apply_loadings_workflow(compounds, request.input_base_dir, paths=paths)
+                issues = apply_loadings_workflow(compounds, request.input_base_dir, paths=paths, template_docx=request.template_docx)
             if issues:
                 state.setdefault("issues", []).extend(issues)
             changed = bool(issues) or any(compound.reaction.get("source") == "loadings_workflow" for compound in compounds)
@@ -44,7 +44,7 @@ def calculate_loadings_node(state: GenerateSIState) -> dict:
 
 
 def _loadings_paths_from_request(request: GenerateSIRequest) -> tuple[LoadingsWorkflowPaths | None, list[Issue]]:
-    paths = [request.loadings_schema_docx, request.loadings_scope_docx, request.loadings_template_docx]
+    paths = [request.loadings_schema_docx, request.loadings_scope_docx]
     if not any(paths):
         return None, []
     if not all(paths):
@@ -54,8 +54,8 @@ def _loadings_paths_from_request(request: GenerateSIRequest) -> tuple[LoadingsWo
                 {
                     "code": "LOADINGS_FILES_INCOMPLETE",
                     "severity": "error",
-                    "message": "Choose all three reagent loadings files or leave all fields empty for auto-detect.",
+                    "message": "Choose both reagent loadings files or leave both fields empty for auto-detect.",
                 }
             ],
         )
-    return LoadingsWorkflowPaths(paths[0], paths[1], paths[2]), []
+    return LoadingsWorkflowPaths(paths[0], paths[1]), []

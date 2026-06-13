@@ -55,7 +55,6 @@ class PackagingTests(unittest.TestCase):
                 "spectra_config": {"extract_nmr": False},
                 "generation_config": {"check_support": False},
                 "runtime_config": {"dry_run": False},
-                "journal_profile": {"id": "default"},
                 "issues": [{"code": "INPUT_WARNING", "severity": "warning", "message": "2a: missing HRMS", "compound_id": "cmp_001"}],
             }
 

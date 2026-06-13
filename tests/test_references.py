@@ -95,8 +95,6 @@ class ReferenceTests(unittest.TestCase):
             input=None,
             output="out.docx",
             template_docx=None,
-            style_config=None,
-            journal_profile=None,
             references="references.yml",
             spectra_zip=None,
             mnova_exe=None,

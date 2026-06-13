@@ -1,9 +1,0 @@
-id: rsc
-name: RSC Supporting Information
-section_order: [compound_descriptions, spectra_appendix, references]
-nmr_format_style: rsc
-hrms_format_style: rsc
-reference_style: rsc
-use_subscripts_in_formulae: true
-use_superscript_isotopes: true
-use_italic_j: true

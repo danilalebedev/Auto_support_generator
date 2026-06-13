@@ -21,8 +21,7 @@ si-generator = "si_generator.cli:main"
 si-generator-gui = "si_generator.gui:main"
 
 [tool.setuptools.package-data]
-"si_generator" = ["resources/scripts/*.qs"]
-"si_generator.render" = ["journal_profiles/*.yml"]
+"si_generator" = ["resources/scripts/*.qs", "templates/*.docx"]
 
 [build-system]
 requires = ["setuptools>=68"]
