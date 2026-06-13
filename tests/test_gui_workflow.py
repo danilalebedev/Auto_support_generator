@@ -15,6 +15,7 @@ from si_generator.gui import (
     _example_field_updates,
     _existing_result_path,
     _mousewheel_units,
+    _next_available_docx_path,
     _format_peak_threshold_percent,
     _report_overview,
     _validated_peak_threshold_fraction,
@@ -325,6 +326,18 @@ class GuiWorkflowTests(unittest.TestCase):
             _existing_result_path("", "Manifest")
         with self.assertRaisesRegex(ValueError, "does not exist"):
             _existing_result_path("missing.manifest.json", "Manifest")
+
+    def test_next_available_docx_path_skips_existing_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "support_information.docx"
+            first = root / "support_information_1.docx"
+            output.write_text("open in Word", encoding="utf-8")
+            first.write_text("existing", encoding="utf-8")
+
+            result = _next_available_docx_path(output)
+
+        self.assertEqual(result, (root / "support_information_2.docx").resolve())
 
     def test_dialog_initialdir_uses_existing_file_parent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -344,6 +344,16 @@ class SIGeneratorApp:
             return
 
         preflight_issues = preflight_generate_request(request)
+        if _has_preflight_code(preflight_issues, "PREFLIGHT_OUTPUT_LOCKED"):
+            original_output = request.output_path
+            request.output_path = _next_available_docx_path(original_output)
+            self.output_docx.set(str(request.output_path))
+            self.log.write(
+                "\n> Output file is open in Word\n"
+                f"Locked: {original_output}\n"
+                f"Using:  {request.output_path}\n"
+            )
+            preflight_issues = preflight_generate_request(request)
         if preflight_issues:
             self.log.write("\n> Preflight checks\n" + format_preflight_issues(preflight_issues) + "\n")
         if issue_has_errors(preflight_issues):
@@ -895,6 +905,19 @@ def _existing_result_path(raw_path: str, label: str) -> Path:
     if not path.exists():
         raise ValueError(f"{label} does not exist: {path}")
     return path.resolve()
+
+
+def _has_preflight_code(issues: list[dict[str, Any]], code: str) -> bool:
+    return any(issue.get("code") == code for issue in issues)
+
+
+def _next_available_docx_path(path: Path) -> Path:
+    path = path.resolve()
+    for index in range(1, 1000):
+        candidate = path.with_name(f"{path.stem}_{index}{path.suffix}")
+        if not candidate.exists():
+            return candidate
+    raise ValueError(f"Cannot find a free output file name near: {path}")
 
 
 def _dialog_initialdir(*candidates: str | Path | None) -> str | None:
