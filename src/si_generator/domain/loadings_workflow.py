@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import re
-from dataclasses import dataclass
+import subprocess
+import sys
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +40,9 @@ class ScopeRow:
     reagent_1: StructureMetadata
     reagent_2: StructureMetadata
     product: StructureMetadata
+    reagent_1_cell: tuple[int, int, int] = (0, 0, 0)
+    reagent_2_cell: tuple[int, int, int] = (0, 0, 0)
+    product_cell: tuple[int, int, int] = (0, 0, 0)
 
 
 def discover_loadings_workflow(base_dir: str | Path) -> LoadingsWorkflowPaths | None:
@@ -57,6 +63,7 @@ def apply_loadings_workflow(
     compounds: list[Compound],
     base_dir: str | Path,
     paths: LoadingsWorkflowPaths | None = None,
+    structure_names_by_cell: dict[tuple[int, int, int], str] | None = None,
 ) -> list[Issue]:
     paths = paths or discover_loadings_workflow(base_dir)
     if paths is None:
@@ -64,8 +71,11 @@ def apply_loadings_workflow(
 
     issues: list[Issue] = []
     schema = read_reaction_schema(paths.schema_docx)
-    scope_rows = read_scope(paths.scope_docx)
     template = read_characterization_template(paths.template_docx)
+    if structure_names_by_cell is None:
+        structure_names_by_cell, name_issues = _structure_names_for_template(paths.scope_docx, template)
+        issues.extend(name_issues)
+    scope_rows = read_scope(paths.scope_docx, structure_names_by_cell=structure_names_by_cell)
     compounds_by_number = {compound.number.strip(): compound for compound in compounds if compound.number.strip()}
 
     for row in scope_rows:
@@ -118,7 +128,10 @@ def read_reaction_schema(path: str | Path) -> dict[str, SchemaEntry]:
     return entries
 
 
-def read_scope(path: str | Path) -> list[ScopeRow]:
+def read_scope(
+    path: str | Path,
+    structure_names_by_cell: dict[tuple[int, int, int], str] | None = None,
+) -> list[ScopeRow]:
     document = Document(str(path))
     if not document.tables:
         return []
@@ -144,9 +157,24 @@ def read_scope(path: str | Path) -> list[ScopeRow]:
                 product_number=product_number,
                 reagent_1_mass_mg=_float_or_none(_cell_text(cells, reagent_1_mass_col)),
                 product_mass_mg=_float_or_none(_cell_text(cells, product_mass_col)),
-                reagent_1=metadata_by_cell.get((1, row_index, reagent_1_col + 1), StructureMetadata()),
-                reagent_2=metadata_by_cell.get((1, row_index, reagent_2_col + 1), StructureMetadata()),
-                product=metadata_by_cell.get((1, row_index, product_col + 1), StructureMetadata()),
+                reagent_1=_metadata_with_name(
+                    metadata_by_cell.get((1, row_index, reagent_1_col + 1), StructureMetadata()),
+                    structure_names_by_cell,
+                    (1, row_index, reagent_1_col + 1),
+                ),
+                reagent_2=_metadata_with_name(
+                    metadata_by_cell.get((1, row_index, reagent_2_col + 1), StructureMetadata()),
+                    structure_names_by_cell,
+                    (1, row_index, reagent_2_col + 1),
+                ),
+                product=_metadata_with_name(
+                    metadata_by_cell.get((1, row_index, product_col + 1), StructureMetadata()),
+                    structure_names_by_cell,
+                    (1, row_index, product_col + 1),
+                ),
+                reagent_1_cell=(1, row_index, reagent_1_col + 1),
+                reagent_2_cell=(1, row_index, reagent_2_col + 1),
+                product_cell=(1, row_index, product_col + 1),
             )
         )
     return rows
@@ -258,6 +286,7 @@ def _base_template_values(
 
 def _amount_template_values(name: str, amount: dict[str, Any]) -> dict[str, str]:
     keys = {
+        _token_key(f"name_{name}"): str(amount.get("name") or ""),
         _token_key(f"mg_{name}"): _format_mass(amount.get("mass_mg")),
         _token_key(f"mol_{name}"): _format_mmol(amount.get("mmol")),
         _token_key(f"mmol_{name}"): _format_mmol(amount.get("mmol")),
@@ -354,6 +383,76 @@ def _find_docx(directory: Path, expected_name: str) -> Path | None:
         if path.name.lower() == expected:
             return path
     return None
+
+
+def _structure_names_for_template(scope_path: Path, template: str) -> tuple[dict[tuple[int, int, int], str], list[Issue]]:
+    if not _template_requests_structure_names(template):
+        return {}, []
+    rows = read_scope(scope_path)
+    cells = sorted({row.reagent_1_cell for row in rows} | {row.reagent_2_cell for row in rows} | {row.product_cell for row in rows})
+    cells = [cell for cell in cells if cell != (0, 0, 0)]
+    if not cells:
+        return {}, []
+    return _chemdraw_names_for_cells(scope_path, cells)
+
+
+def _template_requests_structure_names(template: str) -> bool:
+    for match in re.finditer(r"\{([^{}]+)\}", template):
+        if _token_key(match.group(1)).startswith("name"):
+            return True
+    return False
+
+
+def _chemdraw_names_for_cells(scope_path: Path, cells: list[tuple[int, int, int]], timeout: int = 240) -> tuple[dict[tuple[int, int, int], str], list[Issue]]:
+    cell_arg = ",".join(_format_cell_coordinate(cell) for cell in cells)
+    if getattr(sys, "frozen", False):
+        command = [sys.executable, "--si-generator-chemdraw-names", str(scope_path), "--cells", cell_arg]
+    else:
+        command = [sys.executable, "-m", "si_generator.chemdraw_names", str(scope_path), "--cells", cell_arg]
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
+    except Exception as exc:
+        return {}, [_loadings_name_issue(scope_path, str(exc))]
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "ChemDraw name generation failed.").strip()
+        return {}, [_loadings_name_issue(scope_path, detail)]
+    try:
+        raw = json.loads(completed.stdout or "{}")
+    except json.JSONDecodeError as exc:
+        return {}, [_loadings_name_issue(scope_path, f"Cannot parse ChemDraw name output: {exc}")]
+    return {_parse_cell_coordinate(key): str(value).strip() for key, value in raw.items() if str(value).strip()}, []
+
+
+def _loadings_name_issue(scope_path: Path, detail: str) -> Issue:
+    return {
+        "code": "LOADINGS_NAME_GENERATION_FAILED",
+        "severity": "warning",
+        "message": "Could not generate reagent/product names with ChemDraw. Formula fallback will be used.",
+        "path": str(scope_path),
+        "detail": detail,
+    }
+
+
+def _format_cell_coordinate(cell: tuple[int, int, int]) -> str:
+    return f"{cell[0]}:{cell[1]}:{cell[2]}"
+
+
+def _parse_cell_coordinate(value: str) -> tuple[int, int, int]:
+    parts = [int(part.strip()) for part in value.split(":")]
+    if len(parts) != 3:
+        raise ValueError(f"Invalid cell coordinate: {value}")
+    return parts[0], parts[1], parts[2]
+
+
+def _metadata_with_name(
+    metadata: StructureMetadata,
+    structure_names_by_cell: dict[tuple[int, int, int], str] | None,
+    cell: tuple[int, int, int],
+) -> StructureMetadata:
+    name = (structure_names_by_cell or {}).get(cell, "").strip()
+    if not name:
+        return metadata
+    return replace(metadata, name=name)
 
 
 def _cell_text(cells: Any, index: int) -> str:

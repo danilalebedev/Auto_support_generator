@@ -8,7 +8,7 @@ from docx import Document
 
 from si_generator.cli import _build_parser
 from si_generator.docx_builder import build_document_from_model
-from si_generator.domain.loadings_workflow import apply_loadings_workflow, read_reaction_schema
+from si_generator.domain.loadings_workflow import LoadingsWorkflowPaths, apply_loadings_workflow, read_reaction_schema, read_scope
 from si_generator.domain.requests import GenerateSIRequest
 from si_generator.domain.reactions import calculate_reaction_loadings, format_reagent_amount, reaction_from_fields
 from si_generator.graph.compound_store import make_compound_store
@@ -160,6 +160,15 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertEqual(schema["AcOH"].density_g_mL, 1.049)
         self.assertEqual(schema["Solvent_MeCN"].concentration_M, 0.75)
 
+    def test_scope_can_attach_generated_names_by_cell(self) -> None:
+        rows = read_scope(
+            LOADINGS_DIR / "Scope.docx",
+            structure_names_by_cell={(1, 2, 3): "benzene-1,2-diamine"},
+        )
+
+        self.assertEqual(rows[0].reagent_2.name, "benzene-1,2-diamine")
+        self.assertEqual(rows[0].reagent_2.formula, "C6H8N2")
+
     def test_cli_args_accept_explicit_loadings_files(self) -> None:
         args = _build_parser().parse_args(
             [
@@ -206,6 +215,32 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertEqual(compound.formula, "C17H18N2O2")
         self.assertTrue(compound.reaction["preparation_includes_summary"])
         self.assertTrue(compound.reaction["hide_loadings_line"])
+        self.assertEqual([issue["code"] for issue in issues], [
+            "LOADINGS_COMPOUND_NOT_FOUND",
+            "LOADINGS_COMPOUND_NOT_FOUND",
+            "LOADINGS_COMPOUND_NOT_FOUND",
+            "LOADINGS_COMPOUND_NOT_FOUND",
+        ])
+
+    def test_loadings_workflow_supports_name_reagent_placeholder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            template_path = Path(tmp) / "Compound_characterization template.docx"
+            document = Document()
+            document.add_paragraph("Alkene {number_Product} used {name_Reagent_2} ({mg_Reagent_2} mg, {mmol_Reagent_2} mmol).")
+            document.save(template_path)
+            compound = Compound(number="3a", name="Example", color="white", state="solid")
+            issues = apply_loadings_workflow(
+                [compound],
+                EXAMPLES_DIR,
+                paths=LoadingsWorkflowPaths(
+                    LOADINGS_DIR / "Reaction_schema.docx",
+                    LOADINGS_DIR / "Scope.docx",
+                    template_path,
+                ),
+                structure_names_by_cell={(1, 2, 3): "benzene-1,2-diamine"},
+            )
+
+        self.assertIn("benzene-1,2-diamine (509 mg, 4.7 mmol)", compound.preparation)
         self.assertEqual([issue["code"] for issue in issues], [
             "LOADINGS_COMPOUND_NOT_FOUND",
             "LOADINGS_COMPOUND_NOT_FOUND",

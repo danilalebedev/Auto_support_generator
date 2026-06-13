@@ -7,6 +7,7 @@ import shutil
 import sys
 import zipfile
 from pathlib import Path
+from typing import TypeVar
 from xml.etree import ElementTree as ET
 
 import olefile
@@ -23,11 +24,24 @@ NS = {
 }
 
 
+T = TypeVar("T")
+
+
 def extract_chemdraw_names_by_row(docx_path: str | Path, rows: list[int] | None = None) -> dict[int, str]:
     cdx_by_row = _extract_cdx_by_row(Path(docx_path), set(rows or []))
     if not cdx_by_row:
         return {}
     return _names_from_cdx_with_chemdraw(cdx_by_row)
+
+
+def extract_chemdraw_names_by_cell(
+    docx_path: str | Path,
+    cells: list[tuple[int, int, int]] | None = None,
+) -> dict[tuple[int, int, int], str]:
+    cdx_by_cell = _extract_cdx_by_cell(Path(docx_path), set(cells or []))
+    if not cdx_by_cell:
+        return {}
+    return _names_from_cdx_with_chemdraw(cdx_by_cell)
 
 
 def _extract_cdx_by_row(docx_path: Path, rows: set[int]) -> dict[int, bytes]:
@@ -57,6 +71,33 @@ def _extract_cdx_by_row(docx_path: Path, rows: set[int]) -> dict[int, bytes]:
         return result
 
 
+def _extract_cdx_by_cell(docx_path: Path, cells: set[tuple[int, int, int]]) -> dict[tuple[int, int, int], bytes]:
+    with zipfile.ZipFile(docx_path, "r") as archive:
+        rels = _document_relationships(archive)
+        document = ET.fromstring(archive.read("word/document.xml"))
+
+        result: dict[tuple[int, int, int], bytes] = {}
+        for table_index, table in enumerate(document.findall(".//w:tbl", NS), start=1):
+            for row_index, row in enumerate(table.findall("w:tr", NS), start=1):
+                for cell_index, cell in enumerate(row.findall("w:tc", NS), start=1):
+                    key = (table_index, row_index, cell_index)
+                    if cells and key not in cells:
+                        continue
+                    ole = cell.find(".//o:OLEObject", NS)
+                    if ole is None:
+                        continue
+                    rel_id = ole.attrib.get(f"{{{NS['r']}}}id")
+                    target = rels.get(rel_id or "")
+                    if not target:
+                        continue
+                    try:
+                        with olefile.OleFileIO(io.BytesIO(archive.read(f"word/{target}"))) as ole_file:
+                            result[key] = ole_file.openstream("CONTENTS").read()
+                    except Exception:
+                        continue
+        return result
+
+
 def _document_relationships(archive: zipfile.ZipFile) -> dict[str, str]:
     rels_xml = ET.fromstring(archive.read("word/_rels/document.xml.rels"))
     rels: dict[str, str] = {}
@@ -68,21 +109,21 @@ def _document_relationships(archive: zipfile.ZipFile) -> dict[str, str]:
     return rels
 
 
-def _names_from_cdx_with_chemdraw(cdx_by_row: dict[int, bytes]) -> dict[int, str]:
+def _names_from_cdx_with_chemdraw(cdx_by_key: dict[T, bytes]) -> dict[T, str]:
     pythoncom.CoInitialize()
     app = _dispatch_chemdraw()
     app.Visible = False
-    result: dict[int, str] = {}
+    result: dict[T, str] = {}
     temp_root = make_ascii_work_dir("chemdraw")
     try:
-        for row, cdx in cdx_by_row.items():
-            temp_path = _write_temp_cdx(temp_root, row, cdx)
+        for index, (key, cdx) in enumerate(cdx_by_key.items(), start=1):
+            temp_path = _write_temp_cdx(temp_root, index, cdx)
             doc = None
             try:
                 doc = app.Documents.Open(str(temp_path))
                 name = str(doc.Objects.GetData("chemical/x-name")).strip()
                 if name:
-                    result[row] = name
+                    result[key] = name
             except Exception:
                 pass
             finally:
@@ -125,16 +166,33 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Extract generated ChemDraw names from Word OLE structures.")
     parser.add_argument("docx")
     parser.add_argument("--rows", default="", help="Comma-separated 1-based Word table row numbers.")
+    parser.add_argument("--cells", default="", help="Comma-separated 1-based table:row:cell coordinates.")
     args = parser.parse_args(argv)
 
-    rows = [int(item) for item in args.rows.split(",") if item.strip()]
     try:
-        result = extract_chemdraw_names_by_row(args.docx, rows=rows)
+        if args.cells.strip():
+            cells = [_parse_cell_coordinate(item) for item in args.cells.split(",") if item.strip()]
+            cell_result = extract_chemdraw_names_by_cell(args.docx, cells=cells)
+            result = {_format_cell_coordinate(cell): name for cell, name in cell_result.items()}
+        else:
+            rows = [int(item) for item in args.rows.split(",") if item.strip()]
+            result = extract_chemdraw_names_by_row(args.docx, rows=rows)
     except Exception as exc:
         print(str(exc), file=sys.stderr)
         return 1
     json.dump(result, sys.stdout, ensure_ascii=False)
     return 0
+
+
+def _parse_cell_coordinate(value: str) -> tuple[int, int, int]:
+    parts = [int(part.strip()) for part in value.split(":")]
+    if len(parts) != 3:
+        raise ValueError(f"Invalid cell coordinate: {value}")
+    return parts[0], parts[1], parts[2]
+
+
+def _format_cell_coordinate(cell: tuple[int, int, int]) -> str:
+    return f"{cell[0]}:{cell[1]}:{cell[2]}"
 
 
 if __name__ == "__main__":
