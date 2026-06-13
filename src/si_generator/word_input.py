@@ -23,6 +23,7 @@ from .domain.references import parse_reference_keys
 from .domain.reactions import reaction_from_fields
 from .domain.compound import Compound
 from .structure_metadata import extract_structure_metadata_by_row
+from .word_ole_trace import trace_word_ole_event
 
 
 NS = {
@@ -221,6 +222,7 @@ def paste_word_structures(
     appendix_top_offset_pt: float = 0,
 ) -> None:
     """Copy OLE structures from the first column of the input table into output placeholders."""
+    trace_word_ole_event(output_docx, "word_structures.package_insert.start", input_docx=input_docx, output_docx=output_docx)
     _paste_word_structures_in_package(
         Path(input_docx),
         Path(output_docx),
@@ -228,6 +230,7 @@ def paste_word_structures(
         main_top_offset_pt=main_top_offset_pt,
         appendix_top_offset_pt=appendix_top_offset_pt,
     )
+    trace_word_ole_event(output_docx, "word_structures.package_insert.end", input_docx=input_docx, output_docx=output_docx)
 
 
 def _paste_word_structures_with_word(input_docx: str | Path, output_docx: str | Path, compounds: list[Compound]) -> None:
@@ -563,6 +566,14 @@ def _paste_word_structures_in_package(
 
                     extra_files[new_image_name] = source_zip.read("word/" + source_object["image_target"])
                     extra_files[new_ole_name] = _normalize_chemdraw_ole_binary(source_zip.read("word/" + source_object["ole_target"]))
+                    trace_word_ole_event(
+                        output_docx,
+                        "word_structures.object_copied",
+                        number=number,
+                        marker=marker,
+                        image=new_image_name,
+                        ole=new_ole_name,
+                    )
                     _replace_run_text_with_object(run, object_xml)
 
         with zipfile.ZipFile(tmp_name, "w", zipfile.ZIP_DEFLATED) as out_zip:
