@@ -42,17 +42,18 @@ class MnovaOleTests(unittest.TestCase):
 
         self.assertEqual(mnova_placeholder_map([compound]), {})
 
-    def test_registered_mnova_ole_class_skips_shell_only_file_association(self) -> None:
+    def test_registered_mnova_ole_class_uses_mestrenova_when_extension_is_shell_only(self) -> None:
         def fake_hkcr_default(subkey: str) -> str:
             values = {
                 ".mnova": "MNova.Document",
                 "MNova.Document\\CLSID": "",
-                "MestReNova.Document\\CLSID": "{registered-but-not-extension-default}",
+                "MestReNova.Document.1\\CLSID": "{registered-versioned}",
+                "MestReNova.Document\\CLSID": "{registered}",
             }
             return values.get(subkey, "")
 
-        with patch("si_generator.mnova_ole._hkcr_default", fake_hkcr_default), patch.dict("os.environ", {}, clear=True):
-            self.assertIsNone(_registered_mnova_ole_class_type())
+        with patch("si_generator.mnova_ole._hkcr_default", fake_hkcr_default):
+            self.assertEqual(_registered_mnova_ole_class_type(), "MestReNova.Document.1")
 
     def test_registered_mnova_ole_class_accepts_real_ole_file_association(self) -> None:
         def fake_hkcr_default(subkey: str) -> str:
@@ -62,20 +63,21 @@ class MnovaOleTests(unittest.TestCase):
             }
             return values.get(subkey, "")
 
-        with patch("si_generator.mnova_ole._hkcr_default", fake_hkcr_default), patch.dict("os.environ", {}, clear=True):
+        with patch("si_generator.mnova_ole._hkcr_default", fake_hkcr_default):
             self.assertEqual(_registered_mnova_ole_class_type(), "MestReNova.Document")
 
-    def test_registered_mnova_ole_class_can_be_forced(self) -> None:
+    def test_registered_mnova_ole_class_returns_none_without_ole_server(self) -> None:
         def fake_hkcr_default(subkey: str) -> str:
             values = {
                 ".mnova": "MNova.Document",
                 "MNova.Document\\CLSID": "",
-                "MestReNova.Document\\CLSID": "{registered}",
+                "MestReNova.Document.1\\CLSID": "",
+                "MestReNova.Document\\CLSID": "",
             }
             return values.get(subkey, "")
 
-        with patch("si_generator.mnova_ole._hkcr_default", fake_hkcr_default), patch.dict("os.environ", {"AUTO_SUPPORT_FORCE_MNOVA_OLE": "1"}):
-            self.assertEqual(_registered_mnova_ole_class_type(), "MestReNova.Document")
+        with patch("si_generator.mnova_ole._hkcr_default", fake_hkcr_default):
+            self.assertIsNone(_registered_mnova_ole_class_type())
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ from typing import Literal, TypedDict
 IssueSeverity = Literal["info", "warning", "error"]
 ArtifactKind = Literal["docx", "png", "mnova", "txt", "zip", "cif", "json"]
 PeakPickingPolicy = Literal["minimal", "normal", "dense", "manual"]
-SpectrumEmbedMode = Literal["png", "mnova", "both", "none"]
+SpectrumEmbedMode = Literal["png", "mnova", "none"]
 
 
 class Issue(TypedDict, total=False):

@@ -45,7 +45,7 @@ def postprocess_word_objects_node(state: GenerateSIState) -> dict:
         if structure_map:
             insert_chemdraw_placeholders(output_path, structure_map)
 
-    if state.get("spectra_config", {}).get("insert_spectra_as", "png") in {"mnova", "both"}:
+    if state.get("spectra_config", {}).get("insert_spectra_as", "png") == "mnova":
         mnova_map = mnova_placeholder_map(compounds)
         if mnova_map:
             insert_mnova_placeholders(output_path, mnova_map)

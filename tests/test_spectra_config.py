@@ -35,14 +35,14 @@ class SpectraConfigTests(unittest.TestCase):
     def test_builds_spectra_processing_config_from_runtime_flags(self) -> None:
         config = build_spectra_config(
             extract_nmr=False,
-            insert_spectra_as="both",
+            insert_spectra_as="mnova",
             mnova_executable_path="C:/Tools/MestReNova.exe",
             peak_threshold_fraction_1h=0.08,
             peak_threshold_fraction_13c=0.035,
         )
 
         self.assertFalse(config["extract_nmr"])
-        self.assertEqual(config["insert_spectra_as"], "both")
+        self.assertEqual(config["insert_spectra_as"], "mnova")
         self.assertEqual(config["mnova_executable_path"], "C:/Tools/MestReNova.exe")
         self.assertEqual(config["peak_threshold_fraction_1h"], 0.08)
         self.assertEqual(config["peak_threshold_fraction_13c"], 0.035)

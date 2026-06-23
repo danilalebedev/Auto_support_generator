@@ -165,7 +165,7 @@ class SIGeneratorApp:
         ttk.Combobox(
             options,
             textvariable=self.insert_spectra_as,
-            values=("png", "mnova", "both", "none"),
+            values=("png", "mnova", "none"),
             state="readonly",
             width=8,
         ).grid(row=0, column=2, sticky="w")
@@ -994,7 +994,7 @@ def _optional_output_docx(raw_path: str) -> Path | None:
 
 def _validated_spectrum_mode(value: str) -> SpectrumEmbedMode:
     value = value.strip().lower()
-    if value in {"png", "mnova", "both", "none"}:
+    if value in {"png", "mnova", "none"}:
         return value
     return "png"
 

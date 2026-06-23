@@ -51,7 +51,7 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
 
 
 def _spectrum_embed_mode(value: str | None) -> SpectrumEmbedMode:
-    if value in {"png", "mnova", "both", "none"}:
+    if value in {"png", "mnova", "none"}:
         return value
     return "png"
 

@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from argparse import Namespace
 from pathlib import Path
+from zipfile import ZipFile
 
 from docx import Document
 
@@ -47,7 +48,7 @@ class SpectrumEmbedModeTests(unittest.TestCase):
         self.assertEqual(spectra["blocks"][0]["embed_mode"], "mnova")
         self.assertEqual(spectra["blocks"][0]["mnova_path"], str(mnova))
 
-    def test_docx_renderer_writes_mnova_placeholder_and_png_in_both_mode(self) -> None:
+    def test_docx_renderer_writes_mnova_placeholder_without_png_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             image = root / "2a_1H.png"
@@ -64,12 +65,15 @@ class SpectrumEmbedModeTests(unittest.TestCase):
                 mnova_path=str(mnova),
             )
 
-            model = build_si_document_model([compound], spectra_embed_mode="both")
+            model = build_si_document_model([compound], spectra_embed_mode="mnova")
             build_document_from_model(model, output)
             text = "\n".join(paragraph.text for paragraph in Document(output).paragraphs)
+            with ZipFile(output) as archive:
+                media_files = [name for name in archive.namelist() if name.startswith("word/media/")]
 
         self.assertIn("[[MNOVA:2a:1H]]", text)
         self.assertIn("[[SPECTRUM_STRUCTURE:2a:1H]]", text)
+        self.assertEqual(media_files, [])
 
     def test_request_and_settings_carry_insert_spectra_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -81,12 +85,12 @@ class SpectrumEmbedModeTests(unittest.TestCase):
                 input_kind="word",
                 input_path_text=str(table),
                 output_docx_text=str(output),
-                insert_spectra_as="both",
+                insert_spectra_as="mnova",
             )
 
-        self.assertEqual(request.insert_spectra_as, "both")
+        self.assertEqual(request.insert_spectra_as, "mnova")
         state = load_settings_node({"request": request, "run_id": "run", "artifacts": {}, "issues": []})
-        self.assertEqual(state["spectra_config"]["insert_spectra_as"], "both")
+        self.assertEqual(state["spectra_config"]["insert_spectra_as"], "mnova")
 
     def test_cli_args_accept_insert_spectra_mode(self) -> None:
         args = Namespace(

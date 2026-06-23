@@ -46,7 +46,7 @@ class GuiSettingsTests(unittest.TestCase):
                     "input_path": "C:/data/input.docx",
                     "spectra_zip": "C:/data/spectra.zip",
                     "input_kind": "csv",
-                    "insert_spectra_as": "both",
+                    "insert_spectra_as": "mnova",
                     "peak_threshold_1h_percent": "6",
                     "peak_threshold_13c_percent": "4",
                     "loadings_schema_docx": "C:/data/loadings/Reaction_schema.docx",
@@ -62,7 +62,7 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(loaded["input_path"], "C:/data/input.docx")
         self.assertEqual(loaded["spectra_zip"], "C:/data/spectra.zip")
         self.assertEqual(loaded["input_kind"], "csv")
-        self.assertEqual(loaded["insert_spectra_as"], "both")
+        self.assertEqual(loaded["insert_spectra_as"], "mnova")
         self.assertEqual(loaded["peak_threshold_1h_percent"], "6")
         self.assertEqual(loaded["peak_threshold_13c_percent"], "4")
         self.assertEqual(loaded["loadings_schema_docx"], "C:/data/loadings/Reaction_schema.docx")

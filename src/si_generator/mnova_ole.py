@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -99,9 +98,11 @@ def _replace_marker_with_mnova_object(doc, marker: str, target: MnovaOleTarget, 
         rng = finder.Parent
         rng.Text = ""
         if not ole_class_type:
-            trace_word_ole_event(trace_anchor, "mnova.add_ole.skip_no_registered_server", marker=marker, mnova_path=target.mnova_path)
-            _replace_range_with_clickable_preview(doc, rng, target, trace_anchor)
-            continue
+            trace_word_ole_event(trace_anchor, "mnova.add_ole.no_registered_server", marker=marker, mnova_path=target.mnova_path)
+            raise RuntimeError(
+                "MestReNova OLE server is not registered. Reinstall MestReNova with Word/OLE integration "
+                "or repair the MestReNova installation, then choose spectra appendix mode 'mnova' again."
+            )
         try:
             trace_word_ole_event(
                 trace_anchor,
@@ -119,9 +120,9 @@ def _replace_marker_with_mnova_object(doc, marker: str, target: MnovaOleTarget, 
             )
             _fit_inline_shape_to_page(doc, shape)
             trace_word_ole_event(trace_anchor, "mnova.add_ole.end", marker=marker, mnova_path=target.mnova_path, class_type=ole_class_type)
-        except Exception:
-            trace_word_ole_event(trace_anchor, "mnova.add_ole.error", marker=marker, mnova_path=target.mnova_path)
-            _replace_range_with_clickable_preview(doc, rng, target, trace_anchor)
+        except Exception as exc:
+            trace_word_ole_event(trace_anchor, "mnova.add_ole.error", marker=marker, mnova_path=target.mnova_path, error=repr(exc))
+            raise RuntimeError(f"Could not insert Mnova OLE object for {target.mnova_path}: {exc}") from exc
 
 
 def _replace_range_with_clickable_preview(doc, rng, target: MnovaOleTarget, trace_anchor: Path) -> None:
@@ -170,14 +171,11 @@ def _registered_mnova_ole_class_type() -> str | None:
     extension_prog_id = _hkcr_default(".mnova")
     if extension_prog_id and _hkcr_default(fr"{extension_prog_id}\CLSID"):
         return extension_prog_id
-
-    if os.environ.get("AUTO_SUPPORT_FORCE_MNOVA_OLE", "").strip().lower() in {"1", "true", "yes", "on"}:
-        return _registered_mestrenova_class_type()
-    return None
+    return _registered_mestrenova_class_type()
 
 
 def _registered_mestrenova_class_type() -> str | None:
-    for prog_id in ("MestReNova.Document", "MestReNova.Document.1"):
+    for prog_id in ("MestReNova.Document.1", "MestReNova.Document"):
         if _hkcr_default(fr"{prog_id}\CLSID"):
             return prog_id
     return None

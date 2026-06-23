@@ -31,7 +31,7 @@ STRING_FIELDS = (
 BOOL_FIELDS = ("check_support", "generate_loadings")
 CHOICE_FIELDS = {
     "input_kind": {"word", "csv"},
-    "insert_spectra_as": {"png", "mnova", "both", "none"},
+    "insert_spectra_as": {"png", "mnova", "none"},
 }
 
 
