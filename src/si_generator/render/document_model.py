@@ -88,7 +88,7 @@ def _should_include_spectrum(compound: Compound, nucleus: str, embed_mode: Spect
     if embed_mode == "png":
         return has_png
     if embed_mode == "mnova":
-        return has_mnova and has_png and _has_spectrum_source(compound, nucleus)
+        return has_mnova and _has_spectrum_source(compound, nucleus)
     return False
 
 
@@ -109,7 +109,7 @@ def _spectrum_block(compound: Compound, nucleus: str, embed_mode: SpectrumEmbedM
         "embed_mode": embed_mode,
         "image_path": image_path,
         "mnova_path": compound.mnova_path,
-        "expected_artifact_path": image_path if embed_mode in {"png", "mnova"} and image_path else compound.mnova_path,
+        "expected_artifact_path": image_path if embed_mode == "png" and image_path else compound.mnova_path,
     }
 
 

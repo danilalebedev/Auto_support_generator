@@ -9,6 +9,7 @@ from .domain.requests import GenerateSIRequest
 from .domain.types import Issue
 from .external_tools import find_mnova_executable
 from .mnova import SCRIPT_PATH
+from .mnova_clipboard import SCRIPT_PATH as MNOVA_CLIPBOARD_SCRIPT_PATH
 
 
 MnovaFinder = Callable[[str | Path | None], Path]
@@ -19,6 +20,7 @@ def preflight_generate_request(
     *,
     mnova_finder: MnovaFinder = find_mnova_executable,
     mnova_script_path: str | Path = SCRIPT_PATH,
+    mnova_clipboard_script_path: str | Path = MNOVA_CLIPBOARD_SCRIPT_PATH,
 ) -> list[Issue]:
     """Run cheap checks that catch common setup failures before a long run."""
     issues: list[Issue] = []
@@ -29,8 +31,11 @@ def preflight_generate_request(
         issues.extend(_check_spectra_zip(request.spectra_zip))
     else:
         issues.extend(_check_missing_spectra_zip(request))
-    if _mnova_required(request):
+    if _mnova_processing_required(request):
         issues.extend(_check_mnova_script(Path(mnova_script_path)))
+    if _mnova_clipboard_required(request):
+        issues.extend(_check_mnova_script(Path(mnova_clipboard_script_path)))
+    if _mnova_required(request):
         issues.extend(_check_mnova(request, mnova_finder))
     return issues
 
@@ -152,7 +157,7 @@ def _check_mnova(request: GenerateSIRequest, mnova_finder: MnovaFinder) -> list[
             _issue(
                 "PREFLIGHT_MNOVA_NOT_FOUND",
                 "error",
-                "MestReNova is required for spectra extraction but was not found. Choose MestReNova.exe in the GUI or set AUTO_SUPPORT_MNOVA_EXE.",
+                "MestReNova is required for spectra processing or Mnova appendix insertion but was not found. Choose MestReNova.exe in the GUI or set AUTO_SUPPORT_MNOVA_EXE.",
                 request.mnova_exe,
                 detail=str(exc),
             )
@@ -173,8 +178,16 @@ def _check_mnova_script(script_path: Path) -> list[Issue]:
     ]
 
 
-def _mnova_required(request: GenerateSIRequest) -> bool:
+def _mnova_processing_required(request: GenerateSIRequest) -> bool:
     return bool(request.spectra_zip and not request.no_extract_nmr)
+
+
+def _mnova_clipboard_required(request: GenerateSIRequest) -> bool:
+    return request.insert_spectra_as == "mnova"
+
+
+def _mnova_required(request: GenerateSIRequest) -> bool:
+    return _mnova_processing_required(request) or _mnova_clipboard_required(request)
 
 
 def _issue(code: str, severity: str, message: str, path: str | Path | None = None, *, detail: str = "") -> Issue:
