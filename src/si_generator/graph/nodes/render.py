@@ -6,7 +6,6 @@ from ..compound_store import ordered_compounds
 from ..state import GenerateSIState
 from ...chemdraw_ole import insert_chemdraw_placeholders
 from ...docx_builder import build_document_from_model
-from ...mnova_clipboard import mnova_clipboard_placeholder_map, paste_mnova_clipboard_pages
 from ...render.document_model import build_si_document_model
 from ...word_input import paste_word_structures
 
@@ -44,16 +43,6 @@ def postprocess_word_objects_node(state: GenerateSIState) -> dict:
         structure_map = {compound.number: compound.structure_path for compound in compounds if compound.structure_path}
         if structure_map:
             insert_chemdraw_placeholders(output_path, structure_map)
-
-    if state.get("spectra_config", {}).get("insert_spectra_as", "png") == "mnova":
-        mnova_map = mnova_clipboard_placeholder_map(compounds)
-        if mnova_map:
-            paste_mnova_clipboard_pages(
-                output_path,
-                mnova_map,
-                mnova_exe=request.mnova_exe,
-                log_dir=request.output_dir / "logs" / "mnova_clipboard",
-            )
 
     return {"output_path": output_path}
 

@@ -184,12 +184,7 @@ def _render_spectrum_artifact(document: DocumentObject, block: DocumentBlock | N
     image_path = str(block.get("image_path") or "")
     mnova_path = str(block.get("mnova_path") or "")
 
-    if embed_mode == "mnova" and mnova_path:
-        paragraph = document.add_paragraph()
-        paragraph.paragraph_format.space_after = Pt(0)
-        paragraph.add_run(f"[[MNOVA_PAGE:{compound.number}:{nucleus}]]")
-
-    if embed_mode == "png" and image_path:
+    if embed_mode in {"png", "mnova"} and image_path:
         paragraph = document.add_paragraph()
         paragraph.paragraph_format.space_after = Pt(0)
         section = document.sections[-1]

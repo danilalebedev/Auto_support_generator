@@ -11,7 +11,7 @@ from .types import Issue
 
 REQUIRED_TOP_LEVEL_KEYS = ("run_id", "order", "compounds")
 REQUIRED_COMPOUND_KEYS = ("number", "docx_block_id")
-UNRESOLVED_DOCX_PLACEHOLDERS = ("[[STRUCTURE:", "[[SPECTRUM_STRUCTURE:", "[[MNOVA:", "[[MNOVA_PAGE:")
+UNRESOLVED_DOCX_PLACEHOLDERS = ("[[STRUCTURE:", "[[SPECTRUM_STRUCTURE:", "[[MNOVA:")
 
 
 def load_manifest(path: str | Path) -> dict[str, Any]:

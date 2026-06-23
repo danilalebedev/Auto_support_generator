@@ -22,7 +22,6 @@ $specDir = Join-Path $root "build\pyinstaller-spec"
 $entryPoint = Join-Path $root "scripts\auto_support_generator_app.py"
 $installerEntryPoint = Join-Path $root "scripts\auto_support_generator_installer.py"
 $mnovaScript = Join-Path $root "scripts\extract_nmr_report.qs"
-$mnovaCopyScript = Join-Path $root "scripts\copy_mnova_page.qs"
 $templates = Join-Path $root "src\si_generator\templates"
 $setupExe = Join-Path $distDir "AutoSupportGeneratorSetup.exe"
 $sedPath = Join-Path $distDir "AutoSupportGeneratorSetup.sed"
@@ -43,7 +42,6 @@ Write-Host "Building AutoSupportGenerator.exe..."
     --name AutoSupportGenerator `
     --paths (Join-Path $root "src") `
     --add-data "$mnovaScript;scripts" `
-    --add-data "$mnovaCopyScript;scripts" `
     --add-data "$templates;si_generator/templates" `
     --distpath $distDir `
     --workpath $buildDir `

@@ -12,7 +12,6 @@ from si_generator.docx_builder import build_document_from_model
 from si_generator.graph.state import GenerateSIRequest
 from si_generator.graph.nodes.settings import load_settings_node
 from si_generator.gui import _build_generate_request
-from si_generator.mnova_clipboard import MnovaClipboardTarget, mnova_clipboard_placeholder_map
 from si_generator.models import Compound
 from si_generator.render.document_model import build_si_document_model
 from si_generator.workflows.generate_si import request_from_args
@@ -30,16 +29,19 @@ class SpectrumEmbedModeTests(unittest.TestCase):
         self.assertEqual([section["id"] for section in model["sections"]], ["compound_descriptions"])
         self.assertEqual(model["metadata"]["spectrum_count"], "0")
 
-    def test_document_model_uses_mnova_blocks_without_requiring_png_preview(self) -> None:
+    def test_document_model_uses_mnova_blocks_with_page_image(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             mnova = Path(tmp) / "2a.mnova"
+            image = Path(tmp) / "2a_1H.png"
             mnova.write_bytes(b"mnova")
+            image.write_bytes(_tiny_png())
             compound = Compound(
                 id="cmp_001",
                 number="2a",
                 name="Example",
                 h1_spectrum_path="fid",
                 mnova_path=str(mnova),
+                h1_image_path=str(image),
             )
 
             model = build_si_document_model([compound], spectra_embed_mode="mnova")
@@ -49,7 +51,7 @@ class SpectrumEmbedModeTests(unittest.TestCase):
         self.assertEqual(spectra["blocks"][0]["embed_mode"], "mnova")
         self.assertEqual(spectra["blocks"][0]["mnova_path"], str(mnova))
 
-    def test_docx_renderer_writes_mnova_clipboard_placeholder_in_mnova_mode(self) -> None:
+    def test_docx_renderer_writes_mnova_page_image_without_mnova_marker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             image = root / "2a_1H.png"
@@ -74,34 +76,11 @@ class SpectrumEmbedModeTests(unittest.TestCase):
                 embeddings = [name for name in archive.namelist() if name.startswith("word/embeddings/")]
                 document_xml = archive.read("word/document.xml").decode("utf-8")
 
-        self.assertIn("[[MNOVA_PAGE:2a:1H]]", text)
+        self.assertNotIn("[[MNOVA_PAGE:2a:1H]]", text)
         self.assertIn("[[SPECTRUM_STRUCTURE:2a:1H]]", text)
-        self.assertEqual(media_files, [])
+        self.assertEqual(len(media_files), 1)
         self.assertEqual(embeddings, [])
-        self.assertIn("[[MNOVA_PAGE:2a:1H]]", document_xml)
-
-    def test_mnova_clipboard_map_assigns_pages_in_nucleus_order(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            mnova = Path(tmp) / "2a.mnova"
-            mnova.write_bytes(b"mnova")
-            compound = Compound(
-                id="cmp_001",
-                number="2a",
-                name="Example",
-                h1_spectrum_path="h1/fid",
-                c13_spectrum_path="c13/fid",
-                mnova_path=str(mnova),
-            )
-
-            result = mnova_clipboard_placeholder_map([compound])
-
-        self.assertEqual(
-            result,
-            {
-                "[[MNOVA_PAGE:2a:1H]]": MnovaClipboardTarget(mnova_path=mnova, page_index=0, nucleus="1H"),
-                "[[MNOVA_PAGE:2a:13C]]": MnovaClipboardTarget(mnova_path=mnova, page_index=1, nucleus="13C"),
-            },
-        )
+        self.assertNotIn("[[MNOVA_PAGE:2a:1H]]", document_xml)
 
     def test_request_and_settings_carry_insert_spectra_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

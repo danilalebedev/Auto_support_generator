@@ -167,24 +167,6 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         self.assertEqual(issues, [])
 
-    def test_preflight_requires_mnova_for_mnova_appendix_even_without_extraction(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            input_docx = root / "input.docx"
-            input_docx.write_bytes(b"placeholder")
-            request = GenerateSIRequest(
-                input_path=input_docx,
-                input_kind="word",
-                output_path=root / "support_information.docx",
-                no_extract_nmr=True,
-                insert_spectra_as="mnova",
-            )
-
-            issues = preflight_generate_request(request, mnova_finder=_raising_mnova_finder)
-
-        self.assertTrue(issue_has_errors(issues))
-        self.assertIn("PREFLIGHT_MNOVA_NOT_FOUND", {issue["code"] for issue in issues})
-
     def test_format_preflight_issues_is_log_friendly(self) -> None:
         issues = [
             {
