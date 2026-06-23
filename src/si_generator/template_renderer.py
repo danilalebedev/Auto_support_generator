@@ -10,8 +10,10 @@ from docx import Document
 from docx.document import Document as DocumentObject
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.shared import Pt, RGBColor
 from docx.text.paragraph import Paragraph
+from docx.text.run import Run
 
 from .domain.compound import Compound
 from .domain.elemental_analysis import calculate_elemental_analysis_block, found_from_block
@@ -184,10 +186,14 @@ def _render_spectrum_artifact(document: DocumentObject, block: DocumentBlock | N
     image_path = str(block.get("image_path") or "")
     mnova_path = str(block.get("mnova_path") or "")
 
-    if embed_mode == "mnova" and mnova_path:
+    if embed_mode == "mnova" and mnova_path and image_path:
         paragraph = document.add_paragraph()
         paragraph.paragraph_format.space_after = Pt(0)
-        paragraph.add_run(f"[[MNOVA:{compound.number}:{nucleus}]]")
+        section = document.sections[-1]
+        picture_width = section.page_width - section.left_margin - section.right_margin
+        run = paragraph.add_run()
+        run.add_picture(image_path, width=picture_width)
+        _wrap_run_in_hyperlink(paragraph, run, _file_hyperlink_target(mnova_path))
 
     if embed_mode == "png" and image_path:
         paragraph = document.add_paragraph()
@@ -195,6 +201,26 @@ def _render_spectrum_artifact(document: DocumentObject, block: DocumentBlock | N
         section = document.sections[-1]
         picture_width = section.page_width - section.left_margin - section.right_margin
         paragraph.add_run().add_picture(image_path, width=picture_width)
+
+
+def _wrap_run_in_hyperlink(paragraph: Paragraph, run: Run, target: str) -> None:
+    r_id = paragraph.part.relate_to(target, RT.HYPERLINK, is_external=True)
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("r:id"), r_id)
+    run_element = run._r
+    parent = run_element.getparent()
+    index = parent.index(run_element)
+    parent.remove(run_element)
+    hyperlink.append(run_element)
+    parent.insert(index, hyperlink)
+
+
+def _file_hyperlink_target(path: str) -> str:
+    resolved = Path(path).resolve()
+    try:
+        return resolved.as_uri()
+    except ValueError:
+        return str(resolved)
 
 
 def _should_skip_paragraph(text: str, values: dict[str, str]) -> bool:
