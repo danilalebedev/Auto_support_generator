@@ -7,6 +7,7 @@ from pathlib import Path
 from ...domain.bookmarks import bookmark_name_for_block_id
 from ...domain.compound import compound_to_domain_dict
 from ...domain.issues import compound_issue_counts, count_issues, generation_status, issue_code_counts, issues_by_compound
+from ...output_layout import output_dirs, output_root_for
 from ..state import GenerateSIState
 
 
@@ -37,6 +38,7 @@ def build_manifest(state: GenerateSIState) -> dict:
     output_path = Path(state["output_path"])
     artifacts = collect_output_artifacts(state)
     output_paths = _output_paths(output_path, artifacts)
+    output_root = output_root_for(output_path)
 
     manifest = {
         "run_id": state.get("run_id", ""),
@@ -49,7 +51,7 @@ def build_manifest(state: GenerateSIState) -> dict:
             }
         ),
         "output_paths": output_paths,
-        "relative_paths": _relative_paths(output_path.parent, artifacts),
+        "relative_paths": _relative_paths(output_root, artifacts),
         "configs": {
             "spectra": state.get("spectra_config", {}),
             "generation": state.get("generation_config", {}),
@@ -82,7 +84,7 @@ def build_manifest(state: GenerateSIState) -> dict:
             "docx_bookmark": bookmark_name_for_block_id(f"compound:{compound_id}"),
             "references": list(compound.references),
             "artifacts": compound_artifacts,
-            "relative_artifacts": _relative_paths(output_path.parent, compound_artifacts),
+            "relative_artifacts": _relative_paths(output_root, compound_artifacts),
         }
 
     return manifest
@@ -126,17 +128,20 @@ def build_run_summary(state: GenerateSIState, manifest: dict | None = None) -> d
 
 def collect_output_artifacts(state: GenerateSIState) -> dict[str, str]:
     output_path = Path(state["output_path"])
-    output_dir = output_path.parent
     artifacts = {key: str(path) for key, path in state.get("artifacts", {}).items()}
     artifacts.setdefault("support_docx", str(output_path))
     artifacts.setdefault("manifest", str(output_path.with_suffix(".manifest.json")))
+    dirs = output_dirs(output_path)
 
     for key, path in {
-        "processed_spectra_zip": output_dir / "processed_spectra.zip",
-        "processed_spectra_dir": output_dir / "processed_spectra",
-        "processed_mnova_dir": output_dir / "processed_mnova",
-        "mnova_reports_dir": output_dir / "mnova_reports",
-        "logs_dir": output_dir / "logs",
+        "docx_dir": dirs["docx_dir"],
+        "input_dir": dirs["input_dir"],
+        "logs_dir": dirs["logs_dir"],
+        "spectra_dir": dirs["spectra_dir"],
+        "processed_spectra_zip": dirs["processed_spectra_zip"],
+        "processed_spectra_dir": dirs["processed_spectra_dir"],
+        "processed_mnova_dir": dirs["processed_mnova_dir"],
+        "mnova_reports_dir": dirs["mnova_reports_dir"],
     }.items():
         if Path(path).exists():
             artifacts[key] = str(path)
@@ -150,6 +155,9 @@ def _output_paths(output_path: Path, artifacts: dict[str, str]) -> dict[str, str
         "run_summary": artifacts.get("run_summary", str(output_path.with_suffix(".run_summary.json"))),
     }
     for key in [
+        "docx_dir",
+        "input_dir",
+        "spectra_dir",
         "processed_spectra_zip",
         "processed_spectra_dir",
         "processed_mnova_dir",

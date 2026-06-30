@@ -56,7 +56,7 @@ class RuntimePathsTests(unittest.TestCase):
         self.assertEqual(gui_settings_path(environ=env), Path("C:/Users/test/AppData/Local") / "AutoSupportGenerator" / "gui_settings.json")
         self.assertEqual(
             default_output_path(frozen=True, environ=env),
-            Path("C:/Users/test/AppData/Local") / "AutoSupportGenerator" / "output" / "support_information.docx",
+            Path("C:/Users/test/AppData/Local") / "AutoSupportGenerator" / "output" / "docx" / "support_information.docx",
         )
 
 

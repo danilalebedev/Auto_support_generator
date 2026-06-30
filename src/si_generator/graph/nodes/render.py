@@ -6,6 +6,7 @@ from ..compound_store import ordered_compounds
 from ..state import GenerateSIState
 from ...chemdraw_ole import insert_chemdraw_placeholders
 from ...docx_builder import build_document_from_model
+from ...output_layout import support_docx_path
 from ...render.document_model import build_si_document_model
 from ...word_input import paste_word_structures
 
@@ -17,9 +18,10 @@ def build_document_model_node(state: GenerateSIState) -> dict:
 def render_docx_node(state: GenerateSIState) -> dict:
     request = state["request"]
     document_model = state.get("document_model") or _build_document_model_from_state(state)
+    target_path = support_docx_path(request.output_path)
     output_path = build_document_from_model(
         document_model,
-        request.output_path,
+        target_path,
         template_path=request.template_docx,
     )
     artifacts = {**state.get("artifacts", {}), "support_docx": str(output_path)}

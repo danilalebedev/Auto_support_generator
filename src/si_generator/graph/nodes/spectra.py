@@ -7,18 +7,27 @@ from ..state import GenerateSIState
 from ...domain.spectra_config import build_spectrum_render_spec
 from ...domain.types import SpectrumRenderSpec
 from ...nmr_fill import fill_nmr_from_mnova
+from ...output_layout import prepare_output_layout
 from ...spectra_zip import assign_spectra_from_folder, prepare_spectra_zip
 
 
 def prepare_spectra_zip_node(state: GenerateSIState) -> dict:
     request = state["request"]
     compounds = ordered_compounds(state)
+    dirs = prepare_output_layout(request.output_path)
+    artifacts = {
+        **state.get("artifacts", {}),
+        "docx_dir": str(dirs["docx_dir"]),
+        "input_dir": str(dirs["input_dir"]),
+        "logs_dir": str(dirs["logs_dir"]),
+        "spectra_dir": str(dirs["spectra_dir"]),
+    }
     if not request.spectra_zip:
-        return {}
+        return {"artifacts": artifacts}
 
-    spectra_root = prepare_spectra_zip(request.spectra_zip, request.output_dir / "logs" / "_spectra_zip")
+    spectra_root = prepare_spectra_zip(request.spectra_zip, dirs["input_dir"] / "spectra")
     assign_spectra_from_folder(compounds, spectra_root)
-    return {"compounds": state.get("compounds", {}), "artifacts": {**state.get("artifacts", {}), "spectra_root": str(spectra_root)}}
+    return {"compounds": state.get("compounds", {}), "artifacts": {**artifacts, "spectra_root": str(spectra_root)}}
 
 
 def plan_nmr_processing_node(state: GenerateSIState) -> dict:

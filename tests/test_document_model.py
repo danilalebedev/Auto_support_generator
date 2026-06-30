@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 import zipfile
+from xml.etree import ElementTree
 from pathlib import Path
 
 from docx import Document
@@ -91,9 +92,11 @@ class DocumentModelTests(unittest.TestCase):
             build_document_from_model(model, output_path)
 
             text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
+            runs = _document_runs(output_path)
 
         self.assertIn("79Br", text)
         self.assertIn("272.9921", text)
+        self.assertTrue(_has_run(runs, "79", vert_align="superscript"))
 
     def test_renders_hrms_from_structured_block(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -190,6 +193,82 @@ class DocumentModelTests(unittest.TestCase):
 
         self.assertIn("IR (ATR, cm-1): 3038, 2957, 1711.", text)
         self.assertNotIn("IR (KBr, cm-1): IR", text)
+
+    def test_renders_chemical_inline_word_formatting(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "support_information.docx"
+            compound = Compound(
+                id="cmp_001",
+                number="3a",
+                name="Formatting example",
+                preparation="Bromide 3a was obtained according to GP2. Rf = 0.4 in CDCl3",
+                h1_conditions="CDCl3, 600 MHz",
+                h1_nmr="δ = δ = 7.26 (s, 1H).",
+                c13_conditions="CDCl3, 150 MHz",
+                c13_nmr="δ = 167.2 (CO2Me).",
+                formula="C17H18FN2O2",
+                hrms={"adduct": "[M+H]+", "found_text": "302.1290"},
+            )
+            model = build_si_document_model([compound])
+
+            build_document_from_model(model, output_path)
+
+            text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
+            runs = _document_runs(output_path)
+
+        self.assertIn("1H NMR (CDCl3, 600 MHz) δ = 7.26 (s, 1H).", text)
+        self.assertNotIn("δ = δ =", text)
+        self.assertNotIn("..", text)
+        self.assertTrue(_has_run(runs, "3a", bold=True))
+        self.assertTrue(_has_run(runs, "GP2", bold=True))
+        self.assertTrue(_has_run(runs, "f", vert_align="subscript"))
+        self.assertTrue(_has_run(runs, "13", vert_align="superscript"))
+        self.assertTrue(_has_run(runs, "1", vert_align="superscript"))
+        self.assertTrue(_has_run(runs, "3", vert_align="subscript"))
+        self.assertTrue(_has_run(runs, "17", vert_align="subscript"))
+        self.assertTrue(_has_run(runs, "+", vert_align="superscript"))
+
+W_NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+W_VAL = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val"
+
+
+def _document_runs(path: Path) -> list[dict[str, str | bool]]:
+    with zipfile.ZipFile(path) as archive:
+        xml = archive.read("word/document.xml")
+    root = ElementTree.fromstring(xml)
+    runs = []
+    for run in root.findall(".//w:r", W_NS):
+        text = "".join(node.text or "" for node in run.findall("w:t", W_NS))
+        if not text:
+            continue
+        properties = run.find("w:rPr", W_NS)
+        vert_align = ""
+        bold = False
+        if properties is not None:
+            bold = properties.find("w:b", W_NS) is not None
+            vert = properties.find("w:vertAlign", W_NS)
+            if vert is not None:
+                vert_align = str(vert.attrib.get(W_VAL, ""))
+        runs.append({"text": text, "bold": bold, "vert_align": vert_align})
+    return runs
+
+
+def _has_run(
+    runs: list[dict[str, str | bool]],
+    text: str,
+    *,
+    bold: bool | None = None,
+    vert_align: str | None = None,
+) -> bool:
+    for run in runs:
+        if run["text"] != text:
+            continue
+        if bold is not None and run["bold"] != bold:
+            continue
+        if vert_align is not None and run["vert_align"] != vert_align:
+            continue
+        return True
+    return False
 
 
 if __name__ == "__main__":

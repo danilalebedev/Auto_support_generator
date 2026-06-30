@@ -10,6 +10,7 @@ from .chemistry import parse_formula
 from .mnova import MnovaTask, extract_reports_batch
 from .domain.compound import Compound
 from .nmr_validation import count_c_from_13c_nmr
+from .output_layout import output_dirs
 
 
 def fill_nmr_from_mnova(
@@ -23,12 +24,12 @@ def fill_nmr_from_mnova(
     base_dir = Path(base_dir).resolve()
     output_dir = Path(output_dir).resolve()
     output_root = Path(output_root).resolve() if output_root else output_dir.parent
-    logs_root = output_root / "logs"
+    dirs = output_dirs(output_root / "support_information.docx")
 
     tasks: list[MnovaTask] = []
-    image_root = logs_root / "spectrum_images"
-    processed_root = output_root / "processed_mnova"
-    reports_root = output_root / "mnova_reports"
+    image_root = dirs["spectra_dir"] / "images"
+    processed_root = dirs["processed_mnova_dir"]
+    reports_root = dirs["mnova_reports_dir"]
     for compound in compounds:
         compound_specs = (render_specs_by_compound or {}).get(compound.id or compound.number, {})
         mnova_path = processed_root / compound.number / f"{compound.number}.mnova"
@@ -120,8 +121,9 @@ def _write_report(reports_root: Path, compound_number: str, nucleus: str, report
 
 
 def _build_processed_spectra_package(compounds: list[Compound], output_root: Path) -> Path:
-    package_root = output_root / "processed_spectra"
-    zip_path = output_root / "processed_spectra.zip"
+    dirs = output_dirs(output_root / "support_information.docx")
+    package_root = dirs["processed_spectra_dir"]
+    zip_path = dirs["processed_spectra_zip"]
 
     if package_root.exists():
         shutil.rmtree(package_root)
@@ -151,6 +153,7 @@ def _build_processed_spectra_package(compounds: list[Compound], output_root: Pat
 
     if zip_path.exists():
         zip_path.unlink()
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(package_root.rglob("*")):
             if path.is_file():

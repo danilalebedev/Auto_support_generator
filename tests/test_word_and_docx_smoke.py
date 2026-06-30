@@ -30,7 +30,8 @@ class WordAndDocxSmokeTests(unittest.TestCase):
 
     def test_cli_generates_docx_without_mnova(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            output_path = Path(tmp) / "support_information.docx"
+            requested_output_path = Path(tmp) / "support_information.docx"
+            output_path = Path(tmp) / "docx" / "support_information.docx"
             stdout = StringIO()
             with redirect_stdout(stdout), redirect_stderr(StringIO()):
                 exit_code = cli_main(
@@ -42,7 +43,7 @@ class WordAndDocxSmokeTests(unittest.TestCase):
                         "--no-extract-nmr",
                         "--no-check-support",
                         "--output",
-                        str(output_path),
+                        str(requested_output_path),
                     ]
                 )
 

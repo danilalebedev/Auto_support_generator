@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Literal
 
 from .types import SpectrumEmbedMode
+from ..output_layout import output_root_for
 
 
 InputKind = Literal["csv", "word"]
@@ -38,7 +39,7 @@ class GenerateSIRequest:
 
     @property
     def output_dir(self) -> Path:
-        return self.output_path.parent
+        return output_root_for(self.output_path)
 
 
 @dataclass(slots=True)

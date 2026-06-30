@@ -375,13 +375,13 @@ class GuiWorkflowTests(unittest.TestCase):
         updates = _example_field_updates(
             Path("examples/test_input.docx"),
             Path("examples/test_input.zip"),
-            Path("output/support_information.docx"),
+            Path("output/docx/support_information.docx"),
         )
 
         self.assertEqual(updates["input_kind"], "word")
         self.assertEqual(updates["input_path"], str(Path("examples/test_input.docx")))
         self.assertEqual(updates["spectra_zip"], str(Path("examples/test_input.zip")))
-        self.assertEqual(updates["output_docx"], str(Path("output/support_information.docx")))
+        self.assertEqual(updates["output_docx"], str(Path("output/docx/support_information.docx")))
         self.assertEqual(updates["template_docx"], "")
         self.assertEqual(updates["references_file"], "")
         self.assertEqual(updates["loadings_schema_docx"], "")

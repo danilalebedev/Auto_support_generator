@@ -12,6 +12,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor
 from docx.text.paragraph import Paragraph
+from docx.text.run import Run
 
 from .domain.compound import Compound
 from .domain.elemental_analysis import calculate_elemental_analysis_block, found_from_block
@@ -27,6 +28,12 @@ from .runtime_paths import bundled_resource_path
 DEFAULT_TEMPLATE_RESOURCE = Path("si_generator/templates/SI_template.docx")
 
 PLACEHOLDER_RE = re.compile(r"\[\{([^{}]+)\}\]|\{([^{}]+)\}")
+NMR_LABEL_RE = re.compile(r"13C\{1H\}|1H(?=\s*NMR\b)")
+RF_RE = re.compile(r"\bRf\b")
+GP_RE = re.compile(r"\bGP\d+\b")
+COMPOUND_NUMBER_RE = re.compile(r"(?<![A-Za-z0-9.])\d+[a-z](?![A-Za-z0-9])")
+CHEM_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9])(?:\[[A-Za-z0-9+\-]+\][+\-]|[A-Z][A-Za-z0-9]*[+\-]?)(?![A-Za-z0-9])")
+KNOWN_ISOTOPE_LABELS = ("13", "15", "18", "29", "31", "35", "37", "79", "81", "2")
 
 
 def default_template_path() -> Path:
@@ -165,6 +172,7 @@ def _render_template_paragraphs(
 
         paragraph = _clone_paragraph(document, template_paragraph)
         _replace_placeholders(paragraph, values)
+        _apply_inline_formatting(paragraph)
         if compound.nmr_check_warning and "{compound.support_warning}" in text:
             _style_warning_paragraph(paragraph)
 
@@ -190,6 +198,155 @@ def _replace_placeholders(paragraph: Paragraph, values: dict[str, str]) -> None:
             return values.get(_key(key), "")
 
         run.text = PLACEHOLDER_RE.sub(replace, run.text)
+
+
+def _apply_inline_formatting(paragraph: Paragraph) -> None:
+    if "[[" in paragraph.text:
+        return
+    for run in list(paragraph.runs):
+        text = run.text
+        if not text:
+            continue
+        segments = _inline_format_segments(text)
+        if not any(segment[1] for segment in segments):
+            continue
+        _replace_run_with_segments(paragraph, run, segments)
+
+
+def _inline_format_segments(text: str) -> list[tuple[str, dict[str, bool]]]:
+    patterns = [
+        ("nmr", NMR_LABEL_RE),
+        ("rf", RF_RE),
+        ("gp", GP_RE),
+        ("compound_number", COMPOUND_NUMBER_RE),
+        ("chem", CHEM_TOKEN_RE),
+    ]
+    segments: list[tuple[str, dict[str, bool]]] = []
+    position = 0
+    while position < len(text):
+        best: tuple[int, int, int, str, re.Match[str]] | None = None
+        for priority, (kind, pattern) in enumerate(patterns):
+            match = pattern.search(text, position)
+            if not match:
+                continue
+            candidate = (match.start(), priority, match.end(), kind, match)
+            if best is None or candidate[:2] < best[:2]:
+                best = candidate
+        if best is None:
+            segments.append((text[position:], {}))
+            break
+
+        start, _priority, end, kind, match = best
+        if start > position:
+            segments.append((text[position:start], {}))
+
+        token = match.group(0)
+        if kind == "nmr":
+            segments.extend(_nmr_label_segments(token))
+        elif kind == "rf":
+            segments.extend([("R", {}), ("f", {"subscript": True})])
+        elif kind in {"gp", "compound_number"}:
+            segments.append((token, {"bold": True}))
+        else:
+            chemical_segments = _chemical_token_segments(token)
+            if chemical_segments:
+                segments.extend(chemical_segments)
+            else:
+                segments.append((token, {}))
+        position = end
+    return _merge_adjacent_segments(segments)
+
+
+def _nmr_label_segments(token: str) -> list[tuple[str, dict[str, bool]]]:
+    if token == "1H":
+        return [("1", {"superscript": True}), ("H", {})]
+    return [("13", {"superscript": True}), ("C{", {}), ("1", {"superscript": True}), ("H}", {})]
+
+
+def _chemical_token_segments(token: str) -> list[tuple[str, dict[str, bool]]] | None:
+    if token.startswith("[") and token[-1:] in {"+", "-"}:
+        return [(token[:-1], {}), (token[-1], {"superscript": True})]
+    if not any(char.isdigit() for char in token) and token[-1:] not in {"+", "-"}:
+        return None
+    if not re.fullmatch(r"[A-Z][A-Za-z0-9]*[+\-]?", token):
+        return None
+
+    body = token
+    charge = ""
+    if body[-1:] in {"+", "-"}:
+        charge = body[-1]
+        body = body[:-1]
+
+    segments: list[tuple[str, dict[str, bool]]] = []
+    index = 0
+    while index < len(body):
+        char = body[index]
+        if char.isdigit():
+            end = index + 1
+            while end < len(body) and body[end].isdigit():
+                end += 1
+            segments.extend(_formula_digit_segments(body[index:end], next_char=body[end : end + 1]))
+            index = end
+            continue
+        end = index + 1
+        while end < len(body) and not body[end].isdigit():
+            end += 1
+        segments.append((body[index:end], {}))
+        index = end
+    if charge:
+        segments.append((charge, {"superscript": True}))
+    return segments
+
+
+def _formula_digit_segments(digits: str, *, next_char: str) -> list[tuple[str, dict[str, bool]]]:
+    if next_char.isupper():
+        for label in sorted(KNOWN_ISOTOPE_LABELS, key=len, reverse=True):
+            if digits.endswith(label) and len(digits) > len(label):
+                return [
+                    (digits[: -len(label)], {"subscript": True}),
+                    (label, {"superscript": True}),
+                ]
+    return [(digits, {"subscript": True})]
+
+
+def _merge_adjacent_segments(segments: list[tuple[str, dict[str, bool]]]) -> list[tuple[str, dict[str, bool]]]:
+    merged: list[tuple[str, dict[str, bool]]] = []
+    for text, formatting in segments:
+        if not text:
+            continue
+        if merged and merged[-1][1] == formatting:
+            merged[-1] = (merged[-1][0] + text, formatting)
+        else:
+            merged.append((text, formatting))
+    return merged or [("", {})]
+
+
+def _replace_run_with_segments(paragraph: Paragraph, run: Run, segments: list[tuple[str, dict[str, bool]]]) -> None:
+    parent = run._r.getparent()
+    if parent is None:
+        return
+    index = parent.index(run._r)
+    run_properties = deepcopy(run._r.rPr)
+    parent.remove(run._r)
+    for offset, (text, formatting) in enumerate(segments):
+        new_r = OxmlElement("w:r")
+        if run_properties is not None:
+            new_r.append(deepcopy(run_properties))
+        text_element = OxmlElement("w:t")
+        if text[:1].isspace() or text[-1:].isspace():
+            text_element.set(qn("xml:space"), "preserve")
+        text_element.text = text
+        new_r.append(text_element)
+        parent.insert(index + offset, new_r)
+        new_run = Run(new_r, paragraph)
+        if formatting.get("bold"):
+            new_run.bold = True
+        if formatting.get("subscript"):
+            new_run.font.superscript = False
+            new_run.font.subscript = True
+        if formatting.get("superscript"):
+            new_run.font.subscript = False
+            new_run.font.superscript = True
 
 
 def _render_spectrum_artifact(
@@ -274,10 +431,10 @@ def _compound_values(compound: Compound) -> dict[str, str]:
         "reaction.loadings": _reaction_loadings_text(compound),
         "nmr.1h.label": "1H NMR",
         "nmr.1h.conditions": compound.h1_conditions,
-        "nmr.1h.peaks": compound.h1_nmr.strip(),
+        "nmr.1h.peaks": _nmr_peaks_text(compound.h1_nmr),
         "nmr.13c.label": "13C{1H} NMR",
         "nmr.13c.conditions": compound.c13_conditions,
-        "nmr.13c.peaks": compound.c13_nmr.strip(),
+        "nmr.13c.peaks": _nmr_peaks_text(compound.c13_nmr),
         "nmr.extra": compound.extra_nmr.strip(),
     }
     values.update(_hrms_values(compound))
@@ -331,6 +488,20 @@ def _reaction_loadings_text(compound: Compound) -> str:
     if not text:
         return ""
     return f"Reaction loadings: {text.rstrip('.')}."
+
+
+def _nmr_peaks_text(value: str) -> str:
+    text = " ".join(str(value or "").strip().split())
+    if not text:
+        return ""
+    if "\u03b4" in text:
+        text = text.split("\u03b4", 1)[1].strip()
+    previous = None
+    while text and text != previous:
+        previous = text
+        text = re.sub(r"^\s*\u03b4\s*", "", text)
+        text = re.sub(r"^\s*=\s*", "", text)
+    return text.rstrip(" .")
 
 
 def _hrms_values(compound: Compound) -> dict[str, str]:

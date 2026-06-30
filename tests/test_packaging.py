@@ -16,20 +16,22 @@ class PackagingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             input_path = root / "input.docx"
-            output_path = root / "output" / "support_information.docx"
+            output_path = root / "output" / "docx" / "support_information.docx"
+            output_root = root / "output"
             input_path.write_text("input", encoding="utf-8")
-            output_path.parent.mkdir()
+            output_path.parent.mkdir(parents=True)
             output_path.write_text("docx placeholder", encoding="utf-8")
-            (output_path.parent / "processed_spectra.zip").write_bytes(b"zip")
-            for folder in ["processed_spectra", "processed_mnova", "mnova_reports", "logs"]:
-                (output_path.parent / folder).mkdir()
-            input_warnings = output_path.parent / "logs" / "input_warnings.txt"
+            (output_root / "spectra").mkdir()
+            (output_root / "spectra" / "processed_spectra.zip").write_bytes(b"zip")
+            for folder in ["spectra/processed_spectra", "mnova/processed", "logs/mnova_reports", "logs", "input"]:
+                (output_root / folder).mkdir(parents=True, exist_ok=True)
+            input_warnings = output_root / "logs" / "input_warnings.txt"
             input_warnings.write_text("warning", encoding="utf-8")
-            support_warnings = output_path.parent / "logs" / "support_warnings.txt"
+            support_warnings = output_root / "logs" / "support_warnings.txt"
             support_warnings.write_text("warning", encoding="utf-8")
-            h1_image = output_path.parent / "processed_spectra" / "2a" / "2a_1H.png"
+            h1_image = output_root / "spectra" / "processed_spectra" / "2a" / "2a_1H.png"
             h1_image.parent.mkdir(parents=True)
-            h1_mnova = output_path.parent / "processed_spectra" / "2a" / "2a_1H.mnova"
+            h1_mnova = output_root / "spectra" / "processed_spectra" / "2a" / "2a_1H.mnova"
 
             structure_path = root / "structures" / "2a.cdx"
             compound = Compound(
@@ -73,8 +75,8 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(manifest["output_paths"]["logs_dir"], artifacts["logs_dir"])
         self.assertEqual(manifest["output_paths"]["run_summary"], str(output_path.with_suffix(".run_summary.json")))
         self.assertEqual(manifest["artifacts"]["support_docx"], str(output_path))
-        self.assertEqual(manifest["relative_paths"]["support_docx"], "support_information.docx")
-        self.assertEqual(manifest["relative_paths"]["processed_spectra_zip"], "processed_spectra.zip")
+        self.assertEqual(manifest["relative_paths"]["support_docx"], str(Path("docx") / "support_information.docx"))
+        self.assertEqual(manifest["relative_paths"]["processed_spectra_zip"], str(Path("spectra") / "processed_spectra.zip"))
         self.assertEqual(manifest["relative_paths"]["input_warnings"], str(Path("logs") / "input_warnings.txt"))
         self.assertEqual(manifest["relative_paths"]["support_warnings"], str(Path("logs") / "support_warnings.txt"))
         self.assertEqual(manifest["compounds"]["cmp_001"]["name"], "Example")
@@ -101,8 +103,8 @@ class PackagingTests(unittest.TestCase):
                 "elemental_analysis": False,
             },
         )
-        self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_png"], str(Path("processed_spectra") / "2a" / "2a_1H.png"))
-        self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_mnova"], str(Path("processed_spectra") / "2a" / "2a_1H.mnova"))
+        self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_png"], str(Path("spectra") / "processed_spectra" / "2a" / "2a_1H.png"))
+        self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_mnova"], str(Path("spectra") / "processed_spectra" / "2a" / "2a_1H.mnova"))
         self.assertEqual(manifest["configs"]["spectra"]["extract_nmr"], False)
         self.assertEqual(
             manifest["compounds"]["cmp_001"]["docx_bookmark"],
