@@ -23,6 +23,7 @@ class MnovaTask:
     image_path: Path | None = None
     mnova_path: Path | None = None
     render_spec: dict[str, object] | None = None
+    single_mnova_path: Path | None = None
 
 
 def extract_report(input_path: Path, output_path: Path, nucleus: str, timeout: int = 120) -> Path:
@@ -70,6 +71,11 @@ def extract_reports_batch(
             staged_input = _stage_spectrum_input(_resolve_spectrum_input(task.input_path), run_dir / "inputs", index)
             staged_image = run_dir / "images" / f"{_safe_token(task.compound)}_{task.nucleus}.png" if task.image_path else None
             staged_mnova = run_dir / "mnova" / _safe_token(task.compound) / f"{_safe_token(task.compound)}.mnova" if task.mnova_path else None
+            staged_single_mnova = (
+                run_dir / "single_mnova" / _safe_token(task.compound) / f"{_safe_token(task.compound)}_{task.nucleus}.mnova"
+                if task.single_mnova_path
+                else None
+            )
             output_map[key] = {}
             if task.image_path and staged_image:
                 task.image_path.parent.mkdir(parents=True, exist_ok=True)
@@ -79,8 +85,13 @@ def extract_reports_batch(
                 task.mnova_path.parent.mkdir(parents=True, exist_ok=True)
                 staged_mnova.parent.mkdir(parents=True, exist_ok=True)
                 output_map[key]["mnova"] = task.mnova_path
+            if task.single_mnova_path and staged_single_mnova:
+                task.single_mnova_path.parent.mkdir(parents=True, exist_ok=True)
+                staged_single_mnova.parent.mkdir(parents=True, exist_ok=True)
+                output_map[key]["single_mnova"] = task.single_mnova_path
             image_path = _mnova_arg(staged_image) if staged_image else ""
             mnova_path = _mnova_arg(staged_mnova) if staged_mnova else ""
+            single_mnova_path = _mnova_arg(staged_single_mnova) if staged_single_mnova else ""
             lines.append(
                 _format_task_line(
                     task.compound,
@@ -89,6 +100,7 @@ def extract_reports_batch(
                     image_path=image_path,
                     mnova_path=mnova_path,
                     render_spec=task.render_spec,
+                    single_mnova_path=single_mnova_path,
                 )
             )
         run_tasks_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -129,11 +141,13 @@ def extract_reports_batch(
             image = _copy_mnova_output(str(item.get("image", "")), destinations.get("image"))
             reference_offset = str(item.get("referenceOffset", "0"))
             mnova = _copy_mnova_output(str(item.get("mnova", "")), destinations.get("mnova"))
+            single_mnova = _copy_mnova_output(str(item.get("singleMnova", "")), destinations.get("single_mnova"))
             reports[key] = {
                 "report": report,
                 "peak_report": peak_report,
                 "image": image,
                 "mnova": mnova,
+                "single_mnova": single_mnova,
                 "reference_offset": reference_offset,
                 "error": error,
             }
@@ -215,6 +229,7 @@ def _format_task_line(
     image_path: str = "",
     mnova_path: str = "",
     render_spec: dict[str, object] | None = None,
+    single_mnova_path: str = "",
 ) -> str:
     return "\t".join(
         [
@@ -224,6 +239,7 @@ def _format_task_line(
             image_path,
             mnova_path,
             _render_spec_arg(render_spec),
+            single_mnova_path,
         ]
     )
 

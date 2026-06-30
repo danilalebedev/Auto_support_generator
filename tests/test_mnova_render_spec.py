@@ -31,15 +31,17 @@ class MnovaRenderSpecTests(unittest.TestCase):
             image_path="C:/ascii/out/2a_1H.png",
             mnova_path="C:/ascii/out/2a.mnova",
             render_spec=render_spec,
+            single_mnova_path="C:/ascii/out/2a_1H.mnova",
         )
         parts = line.split("\t")
 
-        self.assertEqual(len(parts), 6)
+        self.assertEqual(len(parts), 7)
         parsed = json.loads(parts[5])
         self.assertEqual(parsed["target_signal_height_fraction"], 0.72)
         self.assertEqual(parsed["peak_threshold_fraction"], 0.08)
         self.assertEqual(parsed["ignore_regions_ppm"], [[7.2, 7.35]])
         self.assertEqual(parsed["peak_picking"], "minimal")
+        self.assertEqual(parts[6], "C:/ascii/out/2a_1H.mnova")
 
     def test_empty_render_spec_is_empty_json_object(self) -> None:
         self.assertEqual(_render_spec_arg(None), "{}")
@@ -75,6 +77,8 @@ class MnovaRenderSpecTests(unittest.TestCase):
         script = (REPO_ROOT / "scripts" / "extract_nmr_report.qs").read_text(encoding="utf-8")
 
         self.assertIn("var renderSpec = parts.length >= 6 ? _parseRenderSpec(parts[5]) : {};", script)
+        self.assertIn("var singleMnovaPath = parts.length >= 7 ? parts[6] : \"\";", script)
+        self.assertIn("_saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath", script)
         self.assertIn("x_range_ppm", script)
         self.assertIn("_targetSignalHeightFraction(renderSpec", script)
         self.assertIn("_peakThresholdFraction(nucleus, renderSpec", script)

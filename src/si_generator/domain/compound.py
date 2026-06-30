@@ -32,10 +32,12 @@ class Compound:
     h1_conditions: str = ""
     h1_spectrum_path: str = ""
     h1_image_path: str = ""
+    h1_mnova_path: str = ""
     c13_nmr: str = ""
     c13_conditions: str = ""
     c13_spectrum_path: str = ""
     c13_image_path: str = ""
+    c13_mnova_path: str = ""
     nmr_spectra: dict[str, NMRSpectrumBlock] = field(default_factory=dict)
     mnova_path: str = ""
     extra_nmr: str = ""
@@ -104,7 +106,7 @@ def _spectra_block(compound: Compound) -> dict[str, dict[str, str]]:
         {
             "source_path": compound.h1_spectrum_path,
             "image_path": compound.h1_image_path,
-            "mnova_path": compound.mnova_path if compound.h1_spectrum_path or compound.h1_image_path else "",
+            "mnova_path": compound.h1_mnova_path or (compound.mnova_path if compound.h1_spectrum_path or compound.h1_image_path else ""),
         }
     )
     if h1:
@@ -113,7 +115,7 @@ def _spectra_block(compound: Compound) -> dict[str, dict[str, str]]:
         {
             "source_path": compound.c13_spectrum_path,
             "image_path": compound.c13_image_path,
-            "mnova_path": compound.mnova_path if compound.c13_spectrum_path or compound.c13_image_path else "",
+            "mnova_path": compound.c13_mnova_path or (compound.mnova_path if compound.c13_spectrum_path or compound.c13_image_path else ""),
         }
     )
     if c13:

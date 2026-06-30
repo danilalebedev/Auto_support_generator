@@ -29,6 +29,7 @@ class PackagingTests(unittest.TestCase):
             support_warnings.write_text("warning", encoding="utf-8")
             h1_image = output_path.parent / "processed_spectra" / "2a" / "2a_1H.png"
             h1_image.parent.mkdir(parents=True)
+            h1_mnova = output_path.parent / "processed_spectra" / "2a" / "2a_1H.mnova"
 
             structure_path = root / "structures" / "2a.cdx"
             compound = Compound(
@@ -44,6 +45,7 @@ class PackagingTests(unittest.TestCase):
             compound.structure_path = str(structure_path)
             compound.has_word_structure = True
             compound.h1_image_path = str(h1_image)
+            compound.h1_mnova_path = str(h1_mnova)
             compounds, order = make_compound_store([compound])
             state = {
                 "run_id": "run",
@@ -100,6 +102,7 @@ class PackagingTests(unittest.TestCase):
             },
         )
         self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_png"], str(Path("processed_spectra") / "2a" / "2a_1H.png"))
+        self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_mnova"], str(Path("processed_spectra") / "2a" / "2a_1H.mnova"))
         self.assertEqual(manifest["configs"]["spectra"]["extract_nmr"], False)
         self.assertEqual(
             manifest["compounds"]["cmp_001"]["docx_bookmark"],

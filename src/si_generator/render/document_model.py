@@ -83,8 +83,9 @@ def _spectrum_blocks(compounds: list[Compound], embed_mode: SpectrumEmbedMode) -
 
 def _should_include_spectrum(compound: Compound, nucleus: str, embed_mode: SpectrumEmbedMode) -> bool:
     image_path = _spectrum_image_path(compound, nucleus)
+    mnova_path = _spectrum_mnova_path(compound, nucleus)
     has_png = bool(image_path and Path(image_path).exists())
-    has_mnova = bool(compound.mnova_path and Path(compound.mnova_path).exists())
+    has_mnova = bool(mnova_path and Path(mnova_path).exists())
     if embed_mode == "png":
         return has_png
     if embed_mode == "mnova":
@@ -95,6 +96,7 @@ def _should_include_spectrum(compound: Compound, nucleus: str, embed_mode: Spect
 def _spectrum_block(compound: Compound, nucleus: str, embed_mode: SpectrumEmbedMode) -> DocumentBlock:
     compound_id = _compound_id(compound)
     image_path = _spectrum_image_path(compound, nucleus)
+    mnova_path = _spectrum_mnova_path(compound, nucleus)
     block_id = f"spectrum:{compound_id}:{nucleus}"
     return {
         "kind": "spectrum_page",
@@ -108,13 +110,19 @@ def _spectrum_block(compound: Compound, nucleus: str, embed_mode: SpectrumEmbedM
         "nucleus": nucleus,
         "embed_mode": embed_mode,
         "image_path": image_path,
-        "mnova_path": compound.mnova_path,
-        "expected_artifact_path": image_path if embed_mode in {"png", "mnova"} and image_path else compound.mnova_path,
+        "mnova_path": mnova_path,
+        "expected_artifact_path": image_path if embed_mode in {"png", "mnova"} and image_path else mnova_path,
     }
 
 
 def _spectrum_image_path(compound: Compound, nucleus: str) -> str:
     return compound.h1_image_path if nucleus == "1H" else compound.c13_image_path
+
+
+def _spectrum_mnova_path(compound: Compound, nucleus: str) -> str:
+    if nucleus == "1H":
+        return compound.h1_mnova_path or compound.mnova_path
+    return compound.c13_mnova_path or compound.mnova_path
 
 
 def _has_spectrum_source(compound: Compound, nucleus: str) -> bool:

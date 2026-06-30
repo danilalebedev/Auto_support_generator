@@ -687,7 +687,8 @@ function extractSpectrumReportsBatch(tasksPath, outputJsonPath, statusPath)
             var imagePath = parts.length >= 4 ? parts[3] : "";
             var mnovaPath = parts.length >= 5 ? parts[4] : "";
             var renderSpec = parts.length >= 6 ? _parseRenderSpec(parts[5]) : {};
-            tasks.push({compound: compound, nucleus: nucleus, inputPath: inputPath, imagePath: imagePath, mnovaPath: mnovaPath, renderSpec: renderSpec});
+            var singleMnovaPath = parts.length >= 7 ? parts[6] : "";
+            tasks.push({compound: compound, nucleus: nucleus, inputPath: inputPath, imagePath: imagePath, mnovaPath: mnovaPath, renderSpec: renderSpec, singleMnovaPath: singleMnovaPath});
             _appendText(statusPath, "TASK " + compound + " " + nucleus + " " + inputPath + "\n");
 
             var dw = mainWindow.newWindow();
@@ -695,6 +696,7 @@ function extractSpectrumReportsBatch(tasksPath, outputJsonPath, statusPath)
             var peakReport = "";
             var image = "";
             var mnova = mnovaPath;
+            var singleMnova = "";
             var referenceOffset = 0;
             var error = "";
 
@@ -717,6 +719,7 @@ function extractSpectrumReportsBatch(tasksPath, outputJsonPath, statusPath)
                             peakReport = _plainPeakReport(spectrum, nucleus, renderSpec);
                         }
                         image = _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec);
+                        singleMnova = _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath, renderSpec, statusPath);
                     }
                 }
             } catch (taskError) {
@@ -735,6 +738,7 @@ function extractSpectrumReportsBatch(tasksPath, outputJsonPath, statusPath)
             json += "\"peakReport\": \"" + _jsonEscape(peakReport) + "\", ";
             json += "\"image\": \"" + _jsonEscape(image) + "\", ";
             json += "\"mnova\": \"" + _jsonEscape(mnova) + "\", ";
+            json += "\"singleMnova\": \"" + _jsonEscape(singleMnova) + "\", ";
             json += "\"referenceOffset\": \"" + _jsonEscape(referenceOffset) + "\", ";
             json += "\"error\": \"" + _jsonEscape(error) + "\"";
             json += "}";
@@ -763,6 +767,25 @@ function _importableNmrPath(path)
 {
     var text = String(path);
     return text.replace(/\/fid$/i, "");
+}
+
+function _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath, renderSpec, statusPath)
+{
+    if (!singleMnovaPath) {
+        return "";
+    }
+
+    try {
+        _appendText(statusPath, "SAVE_SINGLE_MNOVA " + compound + " " + nucleus + " " + singleMnovaPath + "\n");
+        _prepareSpectrumForExport(spectrum, nucleus, renderSpec || {});
+        mainWindow.activeWindow().update();
+        serialization.save(singleMnovaPath, "mnova");
+        _appendText(statusPath, "OK_SINGLE_MNOVA " + compound + " " + nucleus + "\n");
+        return singleMnovaPath;
+    } catch (e) {
+        _appendText(statusPath, "ERROR_SINGLE_MNOVA " + compound + " " + nucleus + ": " + e + "\n");
+        return "";
+    }
 }
 
 function _saveProcessedMnovaFiles(tasks, statusPath)

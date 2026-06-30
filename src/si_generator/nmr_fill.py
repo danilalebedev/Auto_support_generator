@@ -35,7 +35,9 @@ def fill_nmr_from_mnova(
         compound.mnova_path = str(mnova_path)
         if compound.h1_spectrum_path:
             image_path = image_root / f"{compound.number}_1H" / f"{compound.number}_1H.png"
+            single_mnova_path = processed_root / compound.number / f"{compound.number}_1H.mnova"
             compound.h1_image_path = str(image_path)
+            compound.h1_mnova_path = str(single_mnova_path)
             tasks.append(
                 MnovaTask(
                     compound.number,
@@ -44,11 +46,14 @@ def fill_nmr_from_mnova(
                     image_path,
                     mnova_path,
                     dict(compound_specs.get("1H", {})),
+                    single_mnova_path,
                 )
             )
         if compound.c13_spectrum_path:
             image_path = image_root / f"{compound.number}_13C" / f"{compound.number}_13C.png"
+            single_mnova_path = processed_root / compound.number / f"{compound.number}_13C.mnova"
             compound.c13_image_path = str(image_path)
+            compound.c13_mnova_path = str(single_mnova_path)
             tasks.append(
                 MnovaTask(
                     compound.number,
@@ -57,6 +62,7 @@ def fill_nmr_from_mnova(
                     image_path,
                     mnova_path,
                     dict(compound_specs.get("13C", {})),
+                    single_mnova_path,
                 )
             )
 
@@ -77,6 +83,8 @@ def fill_nmr_from_mnova(
                 compound.h1_conditions, compound.h1_nmr = _parse_mnova_report(report, "1H")
                 if h1.get("image"):
                     compound.h1_image_path = h1["image"]
+                if h1.get("single_mnova"):
+                    compound.h1_mnova_path = h1["single_mnova"]
                 _write_report(reports_root, compound.number, "1H", report)
 
         c13 = reports.get((compound.number, "13C"))
@@ -90,6 +98,8 @@ def fill_nmr_from_mnova(
                 compound.c13_conditions, compound.c13_nmr = _parse_mnova_report(report, "13C")
                 if c13.get("image"):
                     compound.c13_image_path = c13["image"]
+                if c13.get("single_mnova"):
+                    compound.c13_mnova_path = c13["single_mnova"]
                 _write_report(reports_root, compound.number, "13C", report)
 
         report_mnova = next(
@@ -123,6 +133,8 @@ def _build_processed_spectra_package(compounds: list[Compound], output_root: Pat
         for source, suffix in [
             (compound.h1_image_path, "1H.png"),
             (compound.c13_image_path, "13C.png"),
+            (compound.h1_mnova_path, "1H.mnova"),
+            (compound.c13_mnova_path, "13C.mnova"),
             (compound.mnova_path, "mnova"),
         ]:
             if not source:

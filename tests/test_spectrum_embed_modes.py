@@ -52,6 +52,37 @@ class SpectrumEmbedModeTests(unittest.TestCase):
         self.assertEqual(spectra["blocks"][0]["embed_mode"], "mnova")
         self.assertEqual(spectra["blocks"][0]["mnova_path"], str(mnova))
 
+    def test_document_model_uses_nucleus_specific_mnova_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            h1_image = root / "2a_1H.png"
+            c13_image = root / "2a_13C.png"
+            h1_mnova = root / "2a_1H.mnova"
+            c13_mnova = root / "2a_13C.mnova"
+            combined_mnova = root / "2a.mnova"
+            for path in [h1_image, c13_image]:
+                path.write_bytes(_tiny_png())
+            for path in [h1_mnova, c13_mnova, combined_mnova]:
+                path.write_bytes(b"mnova")
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="Example",
+                h1_spectrum_path="h1/fid",
+                c13_spectrum_path="c13/fid",
+                h1_image_path=str(h1_image),
+                c13_image_path=str(c13_image),
+                h1_mnova_path=str(h1_mnova),
+                c13_mnova_path=str(c13_mnova),
+                mnova_path=str(combined_mnova),
+            )
+
+            model = build_si_document_model([compound], spectra_embed_mode="mnova")
+
+        spectra = next(section for section in model["sections"] if section["id"] == "spectra_appendix")
+        paths_by_nucleus = {block["nucleus"]: block["mnova_path"] for block in spectra["blocks"]}
+        self.assertEqual(paths_by_nucleus, {"1H": str(h1_mnova), "13C": str(c13_mnova)})
+
     @unittest.skipIf(sys.platform != "win32", "Mnova OLE storage generation uses Windows COM storage APIs")
     def test_docx_renderer_writes_native_mnova_ole_object(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

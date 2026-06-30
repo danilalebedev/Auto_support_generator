@@ -183,6 +183,10 @@ def _compound_artifacts(compound) -> dict[str, str]:
         artifacts["h1_png"] = compound.h1_image_path
     if compound.c13_image_path:
         artifacts["c13_png"] = compound.c13_image_path
+    if getattr(compound, "h1_mnova_path", ""):
+        artifacts["h1_mnova"] = compound.h1_mnova_path
+    if getattr(compound, "c13_mnova_path", ""):
+        artifacts["c13_mnova"] = compound.c13_mnova_path
     if compound.mnova_path:
         artifacts["mnova"] = compound.mnova_path
     return artifacts
