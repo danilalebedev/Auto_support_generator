@@ -87,7 +87,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--insert-spectra-as",
         choices=["png", "mnova", "none"],
         default="png",
-        help="How to place processed spectra in the appendix: PNG images, Mnova-rendered page images, or no appendix.",
+        help="How to place processed spectra in the appendix: PNG images, native clickable Mnova OLE previews, or no appendix.",
     )
     parser.add_argument(
         "--peak-threshold",

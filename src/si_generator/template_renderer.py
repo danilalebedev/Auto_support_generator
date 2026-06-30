@@ -19,6 +19,7 @@ from .domain.ir import parse_ir_block
 from .domain.massspec import build_hrms_block, hrms_adduct_text, hrms_found_text, hrms_label_text
 from .domain.references import format_reference
 from .domain.reactions import calculate_reaction_loadings
+from .mnova_ole import MnovaOleTarget, embed_mnova_ole_objects, preview_size_pt
 from .render.si_document import DocumentBlock, SIDocument
 from .runtime_paths import bundled_resource_path
 
@@ -53,17 +54,20 @@ def render_document_from_template(
     segments = _split_template_segments(template_document)
     output_document = Document(str(template))
     output_document._body.clear_content()
+    mnova_ole_targets: list[MnovaOleTarget] = []
 
     for section in document_model.get("sections", []):
         blocks = section.get("blocks", [])
         if section.get("id") == "compound_descriptions":
             _render_compound_blocks(output_document, segments["compound"], blocks)
         elif section.get("id") == "spectra_appendix" and blocks:
-            _render_spectrum_blocks(output_document, segments, blocks)
+            _render_spectrum_blocks(output_document, segments, blocks, mnova_ole_targets)
         elif section.get("id") == "references" and blocks:
             _render_reference_blocks(output_document, blocks)
 
     output_document.save(output_path)
+    if mnova_ole_targets:
+        embed_mnova_ole_objects(output_path, mnova_ole_targets)
     return output_path
 
 
@@ -97,7 +101,12 @@ def _render_compound_blocks(document: DocumentObject, template_paragraphs: list[
         _add_bookmark_range(document.paragraphs[first_index], document.paragraphs[-1], block.get("bookmark", ""))
 
 
-def _render_spectrum_blocks(document: DocumentObject, segments: dict[str, list[Paragraph]], blocks: list[DocumentBlock]) -> None:
+def _render_spectrum_blocks(
+    document: DocumentObject,
+    segments: dict[str, list[Paragraph]],
+    blocks: list[DocumentBlock],
+    mnova_ole_targets: list[MnovaOleTarget],
+) -> None:
     first = True
     for block in blocks:
         if first:
@@ -111,7 +120,14 @@ def _render_spectrum_blocks(document: DocumentObject, segments: dict[str, list[P
         template_paragraphs = segments["appendix_1h"] if nucleus == "1H" else segments["appendix_13c"]
         values = _compound_values(compound)
         values.update(_spectrum_values(compound, nucleus))
-        _render_template_paragraphs(document, template_paragraphs, values, compound=compound, spectrum_block=block)
+        _render_template_paragraphs(
+            document,
+            template_paragraphs,
+            values,
+            compound=compound,
+            spectrum_block=block,
+            mnova_ole_targets=mnova_ole_targets,
+        )
         _add_bookmark_range(document.paragraphs[first_index], document.paragraphs[-1], block.get("bookmark", ""))
 
 
@@ -135,6 +151,7 @@ def _render_template_paragraphs(
     *,
     compound: Compound,
     spectrum_block: DocumentBlock | None = None,
+    mnova_ole_targets: list[MnovaOleTarget] | None = None,
 ) -> None:
     for template_paragraph in template_paragraphs:
         text = template_paragraph.text
@@ -143,7 +160,7 @@ def _render_template_paragraphs(
         if _should_skip_paragraph(text, values):
             continue
         if "[[SPECTRUM:" in text:
-            _render_spectrum_artifact(document, spectrum_block)
+            _render_spectrum_artifact(document, spectrum_block, mnova_ole_targets)
             continue
 
         paragraph = _clone_paragraph(document, template_paragraph)
@@ -175,7 +192,11 @@ def _replace_placeholders(paragraph: Paragraph, values: dict[str, str]) -> None:
         run.text = PLACEHOLDER_RE.sub(replace, run.text)
 
 
-def _render_spectrum_artifact(document: DocumentObject, block: DocumentBlock | None) -> None:
+def _render_spectrum_artifact(
+    document: DocumentObject,
+    block: DocumentBlock | None,
+    mnova_ole_targets: list[MnovaOleTarget] | None = None,
+) -> None:
     if not block:
         return
     compound: Compound = block["content"]
@@ -183,6 +204,25 @@ def _render_spectrum_artifact(document: DocumentObject, block: DocumentBlock | N
     embed_mode = str(block.get("embed_mode") or "png")
     image_path = str(block.get("image_path") or "")
     mnova_path = str(block.get("mnova_path") or "")
+
+    if embed_mode == "mnova" and image_path and mnova_path and mnova_ole_targets is not None:
+        paragraph = document.add_paragraph()
+        paragraph.paragraph_format.space_after = Pt(0)
+        section = document.sections[-1]
+        picture_width = section.page_width - section.left_margin - section.right_margin
+        width_pt, height_pt = preview_size_pt(image_path, _emu_to_pt(picture_width))
+        marker = f"[[MNOVA_OLE:{len(mnova_ole_targets) + 1}:{compound.number}:{nucleus}]]"
+        paragraph.add_run(marker)
+        mnova_ole_targets.append(
+            MnovaOleTarget(
+                marker=marker,
+                mnova_path=Path(mnova_path),
+                preview_path=Path(image_path),
+                width_pt=width_pt,
+                height_pt=height_pt,
+            )
+        )
+        return
 
     if embed_mode in {"png", "mnova"} and image_path:
         paragraph = document.add_paragraph()
@@ -217,6 +257,10 @@ def _should_skip_paragraph(text: str, values: dict[str, str]) -> bool:
     if "compound.support_warning" in keys and not values.get("compound.support_warning"):
         return True
     return False
+
+
+def _emu_to_pt(value: int) -> float:
+    return float(value) / 12700
 
 
 def _compound_values(compound: Compound) -> dict[str, str]:

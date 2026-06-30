@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import sys
 from argparse import Namespace
 from pathlib import Path
 from zipfile import ZipFile
@@ -51,13 +52,14 @@ class SpectrumEmbedModeTests(unittest.TestCase):
         self.assertEqual(spectra["blocks"][0]["embed_mode"], "mnova")
         self.assertEqual(spectra["blocks"][0]["mnova_path"], str(mnova))
 
-    def test_docx_renderer_writes_mnova_page_image_without_mnova_marker(self) -> None:
+    @unittest.skipIf(sys.platform != "win32", "Mnova OLE storage generation uses Windows COM storage APIs")
+    def test_docx_renderer_writes_native_mnova_ole_object(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             image = root / "2a_1H.png"
             image.write_bytes(_tiny_png())
             mnova = root / "2a.mnova"
-            mnova.write_bytes(b"mnova")
+            mnova.write_bytes(b"mnova-native-content")
             output = root / "support_information.docx"
             compound = Compound(
                 id="cmp_001",
@@ -75,12 +77,17 @@ class SpectrumEmbedModeTests(unittest.TestCase):
                 media_files = [name for name in archive.namelist() if name.startswith("word/media/")]
                 embeddings = [name for name in archive.namelist() if name.startswith("word/embeddings/")]
                 document_xml = archive.read("word/document.xml").decode("utf-8")
+                ole_bytes = archive.read(embeddings[0])
 
         self.assertNotIn("[[MNOVA_PAGE:2a:1H]]", text)
+        self.assertNotIn("[[MNOVA_OLE:", text)
         self.assertIn("[[SPECTRUM_STRUCTURE:2a:1H]]", text)
         self.assertEqual(len(media_files), 1)
-        self.assertEqual(embeddings, [])
+        self.assertEqual(len(embeddings), 1)
+        self.assertIn('ProgID="MestReNova.Document.1"', document_xml)
         self.assertNotIn("[[MNOVA_PAGE:2a:1H]]", document_xml)
+        self.assertNotIn("[[MNOVA_OLE:", document_xml)
+        self.assertTrue(_mnova_ole_storage_is_native(ole_bytes))
 
     def test_request_and_settings_carry_insert_spectra_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -134,6 +141,24 @@ def _tiny_png() -> bytes:
         b"\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05"
         b"\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
     )
+
+
+def _mnova_ole_storage_is_native(data: bytes) -> bool:
+    import olefile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ole_path = Path(tmp) / "oleObject.bin"
+        ole_path.write_bytes(data)
+        ole = olefile.OleFileIO(ole_path)
+        try:
+            return (
+                str(ole.root.clsid).lower() == "24279019-4929-4f35-a663-68eb78a1d139"
+                and ole.exists("MNOVA-CONTENTS")
+                and ole.openstream("MNOVA-CONTENTS").read() == b"mnova-native-content"
+                and not ole.exists("\x01Ole10Native")
+            )
+        finally:
+            ole.close()
 
 
 if __name__ == "__main__":
