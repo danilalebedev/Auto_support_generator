@@ -41,6 +41,10 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
         mnova_graphics_profile=Path(args.mnova_graphics_profile) if getattr(args, "mnova_graphics_profile", None) else None,
         no_extract_nmr=bool(args.no_extract_nmr),
         insert_spectra_as=_spectrum_embed_mode(getattr(args, "insert_spectra_as", "png")),
+        target_signal_height_fraction=_fraction_arg(
+            getattr(args, "target_signal_height", None),
+            default=0.80,
+        ),
         peak_threshold_fraction=_peak_threshold_arg(getattr(args, "peak_threshold", None)),
         peak_threshold_fraction_1h=_peak_threshold_arg(getattr(args, "peak_threshold_1h", None)),
         peak_threshold_fraction_13c=_peak_threshold_arg(getattr(args, "peak_threshold_13c", None)),
@@ -68,4 +72,10 @@ def _spectrum_embed_mode(value: str | None) -> SpectrumEmbedMode:
 def _peak_threshold_arg(value: float | None) -> float | None:
     if value is None:
         return None
+    return value / 100 if value > 1 else value
+
+
+def _fraction_arg(value: float | None, *, default: float) -> float:
+    if value is None:
+        return default
     return value / 100 if value > 1 else value

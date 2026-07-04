@@ -90,7 +90,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--spectra-zip",
-        help="Deprecated alias for --spectra-source. Zip archive with compound-number folders containing NMR spectra.",
+        help="Alias for --spectra-source. Zip archive with compound-number folders containing NMR spectra.",
     )
     parser.add_argument(
         "--mnova-exe",
@@ -110,6 +110,12 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["png", "mnova", "none"],
         default="png",
         help="How to place processed spectra in the appendix: PNG images, native clickable Mnova OLE previews, or no appendix.",
+    )
+    parser.add_argument(
+        "--target-signal-height",
+        type=float,
+        default=None,
+        help="Visible spectrum signal height. Use 80 or 0.8 for 80%% of the exported spectrum page height.",
     )
     parser.add_argument(
         "--peak-threshold",

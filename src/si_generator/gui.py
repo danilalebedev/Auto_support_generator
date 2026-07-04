@@ -21,6 +21,7 @@ from .domain.spectra_config import (
     DEFAULT_BASELINE_POLY_ORDER,
     DEFAULT_C13_PEAK_THRESHOLD_FRACTION,
     DEFAULT_H1_PEAK_THRESHOLD_FRACTION,
+    DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION,
     DEFAULT_WHITTAKER_ASYMMETRY,
     DEFAULT_WHITTAKER_LAMBDA,
 )
@@ -56,6 +57,7 @@ class SIGeneratorApp:
         self.output_folder = StringVar(value=str(default_output_path().parent))
         self.input_kind = StringVar(value="word")
         self.insert_spectra_as = StringVar(value="png")
+        self.target_signal_height_percent = StringVar(value=_format_fraction_percent(DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION))
         self.peak_threshold_1h_percent = StringVar(value=_format_peak_threshold_percent(DEFAULT_H1_PEAK_THRESHOLD_FRACTION))
         self.peak_threshold_13c_percent = StringVar(value=_format_peak_threshold_percent(DEFAULT_C13_PEAK_THRESHOLD_FRACTION))
         self.baseline_mode = StringVar(value=DEFAULT_BASELINE_MODE)
@@ -220,6 +222,8 @@ class SIGeneratorApp:
         ttk.Entry(options, textvariable=self.peak_threshold_1h_percent, width=8).grid(row=3, column=1, sticky="w", pady=4)
         ttk.Label(options, text="13C threshold (%)").grid(row=3, column=2, sticky="e", padx=(12, 8), pady=4)
         ttk.Entry(options, textvariable=self.peak_threshold_13c_percent, width=8).grid(row=3, column=3, sticky="w", pady=4)
+        ttk.Label(options, text="Signal height (%)").grid(row=4, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(options, textvariable=self.target_signal_height_percent, width=8).grid(row=4, column=1, sticky="w", pady=4)
 
         baseline = ttk.LabelFrame(advanced, text="Baseline correction", padding=12)
         baseline.grid(row=2, column=0, sticky="ew", pady=(10, 0))
@@ -619,6 +623,7 @@ class SIGeneratorApp:
                 mnova_exe_text=self.mnova_exe.get(),
                 mnova_graphics_profile_text=self.mnova_graphics_profile.get(),
                 insert_spectra_as=self.insert_spectra_as.get(),
+                target_signal_height_percent_text=self.target_signal_height_percent.get(),
                 peak_threshold_1h_percent_text=self.peak_threshold_1h_percent.get(),
                 peak_threshold_13c_percent_text=self.peak_threshold_13c_percent.get(),
                 baseline_mode_text=self.baseline_mode.get(),
@@ -673,6 +678,7 @@ class SIGeneratorApp:
             mnova_exe_text=self.mnova_exe.get(),
             mnova_graphics_profile_text=self.mnova_graphics_profile.get(),
             insert_spectra_as=self.insert_spectra_as.get(),
+            target_signal_height_percent_text=self.target_signal_height_percent.get(),
             peak_threshold_1h_percent_text=self.peak_threshold_1h_percent.get(),
             peak_threshold_13c_percent_text=self.peak_threshold_13c_percent.get(),
             baseline_mode_text=self.baseline_mode.get(),
@@ -846,12 +852,12 @@ class SIGeneratorApp:
             self._sync_output_folder_from_docx()
         else:
             self._sync_output_docx_from_folder()
-        legacy_threshold = settings.get("peak_threshold_percent")
-        if isinstance(legacy_threshold, str):
+        saved_shared_threshold = settings.get("peak_threshold_percent")
+        if isinstance(saved_shared_threshold, str):
             if not isinstance(settings.get("peak_threshold_1h_percent"), str):
-                self.peak_threshold_1h_percent.set(legacy_threshold)
+                self.peak_threshold_1h_percent.set(saved_shared_threshold)
             if not isinstance(settings.get("peak_threshold_13c_percent"), str):
-                self.peak_threshold_13c_percent.set(legacy_threshold)
+                self.peak_threshold_13c_percent.set(saved_shared_threshold)
         for key, variable in self._bool_settings_variables().items():
             value = settings.get(key)
             if isinstance(value, bool):
@@ -884,6 +890,7 @@ class SIGeneratorApp:
             "output_folder": self.output_folder,
             "peak_threshold_1h_percent": self.peak_threshold_1h_percent,
             "peak_threshold_13c_percent": self.peak_threshold_13c_percent,
+            "target_signal_height_percent": self.target_signal_height_percent,
             "baseline_mode": self.baseline_mode,
             "baseline_poly_order": self.baseline_poly_order,
             "whittaker_lambda": self.whittaker_lambda,
@@ -1032,6 +1039,7 @@ def _build_generate_request(
     peak_threshold_percent_text: str = "",
     peak_threshold_1h_percent_text: str = "",
     peak_threshold_13c_percent_text: str = "",
+    target_signal_height_percent_text: str = f"{DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION * 100:g}",
     baseline_mode_text: str = DEFAULT_BASELINE_MODE,
     baseline_apply_1h: bool = DEFAULT_BASELINE_APPLY_1H,
     baseline_apply_13c: bool = DEFAULT_BASELINE_APPLY_13C,
@@ -1080,6 +1088,7 @@ def _build_generate_request(
             peak_threshold_13c_percent_text,
             shared_peak_threshold if shared_peak_threshold is not None else DEFAULT_C13_PEAK_THRESHOLD_FRACTION,
         ),
+        target_signal_height_fraction=_validated_target_signal_height_fraction(target_signal_height_percent_text),
         baseline_mode=_validated_baseline_mode(baseline_mode_text),
         baseline_apply_1h=bool(baseline_apply_1h),
         baseline_apply_13c=bool(baseline_apply_13c),
@@ -1116,6 +1125,7 @@ def _build_add_compounds_request(
     peak_threshold_percent_text: str = "",
     peak_threshold_1h_percent_text: str = "",
     peak_threshold_13c_percent_text: str = "",
+    target_signal_height_percent_text: str = f"{DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION * 100:g}",
     baseline_mode_text: str = DEFAULT_BASELINE_MODE,
     baseline_apply_1h: bool = DEFAULT_BASELINE_APPLY_1H,
     baseline_apply_13c: bool = DEFAULT_BASELINE_APPLY_13C,
@@ -1157,6 +1167,7 @@ def _build_add_compounds_request(
             peak_threshold_13c_percent_text,
             shared_peak_threshold if shared_peak_threshold is not None else DEFAULT_C13_PEAK_THRESHOLD_FRACTION,
         ),
+        target_signal_height_fraction=_validated_target_signal_height_fraction(target_signal_height_percent_text),
         baseline_mode=_validated_baseline_mode(baseline_mode_text),
         baseline_apply_1h=bool(baseline_apply_1h),
         baseline_apply_13c=bool(baseline_apply_13c),
@@ -1490,6 +1501,20 @@ def _validated_peak_threshold_fraction(raw_value: str, default: float = DEFAULT_
     return fraction
 
 
+def _validated_target_signal_height_fraction(raw_value: str) -> float:
+    raw_value = str(raw_value).strip().replace(",", ".")
+    if not raw_value:
+        return DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION
+    try:
+        value = float(raw_value)
+    except ValueError as exc:
+        raise ValueError("Signal height must be a number, for example 80 or 0.8.") from exc
+    fraction = value / 100 if value > 1 else value
+    if fraction < 0.20 or fraction > 0.95:
+        raise ValueError("Signal height must be between 20 and 95%.")
+    return fraction
+
+
 def _validated_positive_int(raw_value: str, label: str) -> int:
     raw_value = str(raw_value).strip()
     try:
@@ -1520,6 +1545,10 @@ def _validated_fraction(raw_value: str, label: str) -> float:
 
 
 def _format_peak_threshold_percent(fraction: float) -> str:
+    return f"{fraction * 100:g}"
+
+
+def _format_fraction_percent(fraction: float) -> str:
     return f"{fraction * 100:g}"
 
 

@@ -57,10 +57,10 @@ class FormulaHrmsTests(unittest.TestCase):
 
         self.assertEqual(block["found_mz"], 272.9921)
 
-    def test_hrms_block_helpers_prefer_legacy_found_and_structured_adduct(self) -> None:
+    def test_hrms_block_helpers_prefer_fallback_found_and_structured_adduct(self) -> None:
         block = {"adduct": "[M+Na]+", "found_text": "83.0104", "label": "HRMS (ESI/Q-TOF) m/z"}
 
-        self.assertEqual(hrms_found_text(block, legacy_found="84.0000"), "84.0000")
+        self.assertEqual(hrms_found_text(block, fallback_found="84.0000"), "84.0000")
         self.assertEqual(hrms_found_text(block), "83.0104")
         self.assertEqual(hrms_adduct_text(block, "[M+H]+"), "[M+Na]+")
         self.assertEqual(hrms_label_text(block, "HRMS"), "HRMS (ESI/Q-TOF) m/z")

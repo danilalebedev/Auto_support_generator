@@ -8,7 +8,7 @@ from si_generator.domain.spectra_config import build_spectra_config, build_spect
 from si_generator.graph.compound_store import make_compound_store
 from si_generator.graph.nodes.spectra import plan_nmr_processing_node
 from si_generator.mnova import _format_task_line, _render_spec_arg
-from si_generator.models import Compound
+from si_generator.domain.compound import Compound
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

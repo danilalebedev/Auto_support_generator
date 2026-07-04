@@ -16,7 +16,6 @@ def build_generation_config(
         "include_elemental_analysis": True,
         "calculate_elemental_analysis": calculate_elemental_analysis,
         "include_references": has_references,
-        "include_xrd": False,
         "check_support": check_support,
         "validate_only": False,
         "patch_existing_support": False,

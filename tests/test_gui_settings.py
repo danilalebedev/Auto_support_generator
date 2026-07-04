@@ -17,6 +17,7 @@ class GuiSettingsTests(unittest.TestCase):
                     "unknown": "ignored",
                     "input_kind": "WORD",
                     "insert_spectra_as": "invalid",
+                    "target_signal_height_percent": "72",
                     "peak_threshold_1h_percent": "8",
                     "peak_threshold_13c_percent": "4",
                     "loadings_schema_docx": Path("Reaction_schema.docx"),
@@ -32,6 +33,7 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(settings["input_path"], "input.docx")
         self.assertEqual(settings["output_folder"], str(Path("output/runs/demo")))
         self.assertEqual(settings["input_kind"], "word")
+        self.assertEqual(settings["target_signal_height_percent"], "72")
         self.assertEqual(settings["peak_threshold_1h_percent"], "8")
         self.assertEqual(settings["peak_threshold_13c_percent"], "4")
         self.assertEqual(settings["loadings_schema_docx"], "Reaction_schema.docx")
@@ -54,6 +56,7 @@ class GuiSettingsTests(unittest.TestCase):
                     "output_folder": "C:/data/output",
                     "input_kind": "csv",
                     "insert_spectra_as": "mnova",
+                    "target_signal_height_percent": "85",
                     "peak_threshold_1h_percent": "6",
                     "peak_threshold_13c_percent": "4",
                     "loadings_schema_docx": "C:/data/loadings/Reaction_schema.docx",
@@ -73,6 +76,7 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(loaded["output_folder"], "C:/data/output")
         self.assertEqual(loaded["input_kind"], "csv")
         self.assertEqual(loaded["insert_spectra_as"], "mnova")
+        self.assertEqual(loaded["target_signal_height_percent"], "85")
         self.assertEqual(loaded["peak_threshold_1h_percent"], "6")
         self.assertEqual(loaded["peak_threshold_13c_percent"], "4")
         self.assertEqual(loaded["loadings_schema_docx"], "C:/data/loadings/Reaction_schema.docx")

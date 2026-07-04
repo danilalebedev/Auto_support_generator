@@ -4,7 +4,7 @@ from typing import Literal, TypedDict
 
 
 IssueSeverity = Literal["info", "warning", "error"]
-ArtifactKind = Literal["docx", "png", "mnova", "txt", "zip", "cif", "json"]
+ArtifactKind = Literal["docx", "png", "mnova", "txt", "zip", "json"]
 PeakPickingPolicy = Literal["minimal", "normal", "dense", "manual"]
 SpectrumEmbedMode = Literal["png", "mnova", "none"]
 BaselineMode = Literal["auto", "off", "bernstein", "whittaker"]
@@ -159,16 +159,6 @@ class ReferenceStore(TypedDict, total=False):
     order: list[str]
 
 
-class XRDBlock(TypedDict, total=False):
-    cif_path: str
-    checkcif_path: str
-    crystal_data: dict[str, object]
-    table_path: str
-    figure_paths: list[str]
-    ccdc_number: str
-    formatted_text: str
-
-
 class Compound(TypedDict, total=False):
     id: str
     number: str
@@ -184,7 +174,6 @@ class Compound(TypedDict, total=False):
     elemental_analysis: ElementalAnalysisBlock
     reaction: ReactionBlock
     references: list[str]
-    xrd: XRDBlock
     issues: list[Issue]
 
 
@@ -209,17 +198,12 @@ class SpectraConfig(TypedDict, total=False):
     mnova_script_path: str
     keep_intermediate_reports: bool
 
-
-SpectraProcessingConfig = SpectraConfig
-
-
 class GenerationConfig(TypedDict, total=False):
     generate_loadings: bool
     include_ir: bool
     include_elemental_analysis: bool
     calculate_elemental_analysis: bool
     include_references: bool
-    include_xrd: bool
     check_support: bool
     validate_only: bool
     patch_existing_support: bool

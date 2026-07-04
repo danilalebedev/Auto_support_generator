@@ -40,10 +40,6 @@ def prepare_spectra_source_node(state: GenerateSIState) -> dict:
         "artifacts": {**artifacts, "spectra_root": str(spectra_root)},
     }
 
-
-prepare_spectra_zip_node = prepare_spectra_source_node
-
-
 def _copy_input_artifacts(request, input_dir: Path) -> dict[str, str]:
     artifacts: dict[str, str] = {}
     for key, source in {

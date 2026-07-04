@@ -13,7 +13,7 @@ from si_generator.docx_builder import build_document_from_model
 from si_generator.graph.state import GenerateSIRequest
 from si_generator.graph.nodes.settings import load_settings_node
 from si_generator.gui import _build_generate_request
-from si_generator.models import Compound
+from si_generator.domain.compound import Compound
 from si_generator.render.document_model import build_si_document_model
 from si_generator.workflows.generate_si import request_from_args
 

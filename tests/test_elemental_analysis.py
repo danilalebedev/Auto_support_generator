@@ -9,7 +9,7 @@ from si_generator.domain.elemental_analysis import (
 )
 from si_generator.graph.compound_store import make_compound_store
 from si_generator.graph.nodes.elemental_analysis import calculate_elemental_analysis_node
-from si_generator.models import Compound
+from si_generator.domain.compound import Compound
 
 
 class ElementalAnalysisTests(unittest.TestCase):

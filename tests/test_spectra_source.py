@@ -110,7 +110,7 @@ class SpectraSourceTests(unittest.TestCase):
         self.assertIsNone(request.spectra_zip)
         self.assertEqual(request.resolved_spectra_source, Path("spectra-folder"))
 
-    def test_cli_keeps_spectra_zip_as_deprecated_alias(self) -> None:
+    def test_cli_keeps_spectra_zip_as_alias(self) -> None:
         parser = _build_parser()
         args = parser.parse_args(
             [
@@ -129,7 +129,7 @@ class SpectraSourceTests(unittest.TestCase):
         self.assertEqual(request.spectra_zip, Path("spectra.zip"))
         self.assertEqual(request.resolved_spectra_source, Path("spectra.zip"))
 
-    def test_spectra_source_takes_precedence_over_deprecated_zip_alias(self) -> None:
+    def test_spectra_source_takes_precedence_over_zip_alias(self) -> None:
         parser = _build_parser()
         args = parser.parse_args(
             [
@@ -140,14 +140,14 @@ class SpectraSourceTests(unittest.TestCase):
                 "--spectra-source",
                 "spectra-folder",
                 "--spectra-zip",
-                "legacy.zip",
+                "alias.zip",
             ]
         )
 
         request = request_from_args(args)
 
         self.assertEqual(request.spectra_source, Path("spectra-folder"))
-        self.assertEqual(request.spectra_zip, Path("legacy.zip"))
+        self.assertEqual(request.spectra_zip, Path("alias.zip"))
         self.assertEqual(request.resolved_spectra_source, Path("spectra-folder"))
 
 

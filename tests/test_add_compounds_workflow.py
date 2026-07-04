@@ -12,7 +12,7 @@ from si_generator.docx_builder import build_document_from_model
 from si_generator.domain.bookmarks import bookmark_name_for_block_id
 from si_generator.domain.requests import AddCompoundsRequest
 from si_generator.graph.nodes.add_compounds import _append_generated_docx_blocks, _new_compound_id_map
-from si_generator.models import Compound
+from si_generator.domain.compound import Compound
 from si_generator.render.document_model import build_si_document_model
 from si_generator.workflows.add_compounds import run_add_compounds
 

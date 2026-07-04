@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from si_generator.chemistry import calc_hrms_mz
-from si_generator.models import Compound
+from si_generator.domain.compound import Compound
 from si_generator.nmr_validation import count_c_from_13c_nmr, count_h_from_1h_nmr, validate_elemental_analysis, validate_hrms, validate_support
 
 

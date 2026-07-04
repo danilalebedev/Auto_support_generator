@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from si_generator.domain.types import SpectraConfig, SpectraProcessingConfig
+from si_generator.domain.types import SpectraConfig
 from si_generator.domain.spectra_config import (
     DEFAULT_C13_PEAK_THRESHOLD_FRACTION,
     DEFAULT_H1_PEAK_THRESHOLD_FRACTION,
@@ -15,9 +15,6 @@ from si_generator.domain.spectra_config import (
 
 
 class SpectraConfigTests(unittest.TestCase):
-    def test_legacy_spectra_processing_config_alias_matches_spectra_config(self) -> None:
-        self.assertIs(SpectraProcessingConfig, SpectraConfig)
-
     def test_builds_default_spectra_processing_config(self) -> None:
         config = build_spectra_config()
 
@@ -44,6 +41,7 @@ class SpectraConfigTests(unittest.TestCase):
             insert_spectra_as="mnova",
             mnova_executable_path="C:/Tools/MestReNova.exe",
             mnova_graphics_profile_path="C:/profiles/default.mngp",
+            target_signal_height_fraction=0.72,
             peak_threshold_fraction_1h=0.08,
             peak_threshold_fraction_13c=0.035,
             baseline_mode="whittaker",
@@ -58,6 +56,7 @@ class SpectraConfigTests(unittest.TestCase):
         self.assertEqual(config["insert_spectra_as"], "mnova")
         self.assertEqual(config["mnova_executable_path"], "C:/Tools/MestReNova.exe")
         self.assertEqual(config["mnova_graphics_profile_path"], "C:/profiles/default.mngp")
+        self.assertEqual(config["target_signal_height_fraction"], 0.72)
         self.assertEqual(config["peak_threshold_fraction_1h"], 0.08)
         self.assertEqual(config["peak_threshold_fraction_13c"], 0.035)
         self.assertEqual(config["baseline_mode"], "whittaker")
@@ -88,11 +87,20 @@ class SpectraConfigTests(unittest.TestCase):
         self.assertEqual(spec["baseline_mode"], "whittaker")
         self.assertTrue(spec["baseline_apply"])
 
-    def test_shared_peak_threshold_is_used_as_backward_compatible_fallback(self) -> None:
+    def test_shared_peak_threshold_populates_both_nuclei(self) -> None:
         config = build_spectra_config(peak_threshold_fraction=0.09)
 
         self.assertEqual(config["peak_threshold_fraction_1h"], 0.09)
         self.assertEqual(config["peak_threshold_fraction_13c"], 0.09)
+
+    def test_target_signal_height_is_clamped_to_supported_range(self) -> None:
+        low = build_spectra_config(target_signal_height_fraction=0.1)
+        high = build_spectra_config(target_signal_height_fraction=120)
+        percent = build_spectra_config(target_signal_height_fraction=80)
+
+        self.assertEqual(low["target_signal_height_fraction"], 0.20)
+        self.assertEqual(high["target_signal_height_fraction"], 0.95)
+        self.assertEqual(percent["target_signal_height_fraction"], 0.80)
 
 
 if __name__ == "__main__":

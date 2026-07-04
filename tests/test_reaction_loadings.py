@@ -14,7 +14,7 @@ from si_generator.domain.reactions import calculate_reaction_loadings, format_re
 from si_generator.graph.compound_store import make_compound_store
 from si_generator.graph.nodes.loadings import calculate_loadings_node
 from si_generator.input_table import read_compounds
-from si_generator.models import Compound
+from si_generator.domain.compound import Compound
 from si_generator.render.document_model import build_si_document_model
 from si_generator.structure_metadata import extract_structure_metadata_by_cell
 from si_generator.workflows.generate_si import request_from_args

@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 
 from si_generator.output_layout import (
-    LEGACY_GENERATED_DIRS,
-    LEGACY_GENERATED_FILES,
-    cleanup_legacy_output_root,
+    PREVIOUS_GENERATED_DIRS,
+    PREVIOUS_GENERATED_FILES,
+    cleanup_previous_generated_output,
     create_run_output_root,
     prepare_output_layout,
     run_output_dirs,
@@ -30,13 +30,13 @@ class OutputLayoutTests(unittest.TestCase):
         self.assertEqual(second.name, "20260704_120000_test_input_2")
         self.assertEqual(first.parent.name, "runs")
 
-    def test_cleanup_legacy_output_root_deletes_only_known_generated_paths(self) -> None:
+    def test_cleanup_previous_generated_output_deletes_only_known_generated_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             user_file = root / "notes.docx"
             user_dir_file = root / "custom" / "keep.txt"
-            generated_files = [root / name for name in LEGACY_GENERATED_FILES]
-            generated_dirs = [root / name for name in LEGACY_GENERATED_DIRS]
+            generated_files = [root / name for name in PREVIOUS_GENERATED_FILES]
+            generated_dirs = [root / name for name in PREVIOUS_GENERATED_DIRS]
             for path in generated_files:
                 path.write_text("old", encoding="utf-8")
             for path in generated_dirs:
@@ -46,7 +46,7 @@ class OutputLayoutTests(unittest.TestCase):
             user_dir_file.parent.mkdir()
             user_dir_file.write_text("keep", encoding="utf-8")
 
-            cleanup_legacy_output_root(root)
+            cleanup_previous_generated_output(root)
 
             self.assertTrue(all(not path.exists() for path in generated_files))
             self.assertTrue(all(not path.exists() for path in generated_dirs))

@@ -26,6 +26,7 @@ class GenerateSIRequest:
     mnova_graphics_profile: Path | None = None
     no_extract_nmr: bool = False
     insert_spectra_as: SpectrumEmbedMode = "png"
+    target_signal_height_fraction: float = 0.80
     peak_threshold_fraction: float | None = None
     peak_threshold_fraction_1h: float | None = None
     peak_threshold_fraction_13c: float | None = None
@@ -89,6 +90,7 @@ class AddCompoundsRequest:
     mnova_graphics_profile: Path | None = None
     no_extract_nmr: bool = False
     insert_spectra_as: SpectrumEmbedMode = "png"
+    target_signal_height_fraction: float = 0.80
     peak_threshold_fraction: float | None = None
     peak_threshold_fraction_1h: float | None = None
     peak_threshold_fraction_13c: float | None = None

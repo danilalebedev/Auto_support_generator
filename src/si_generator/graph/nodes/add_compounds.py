@@ -128,6 +128,7 @@ def generate_new_support_node(state: AddCompoundsState) -> dict:
         mnova_graphics_profile=request.mnova_graphics_profile,
         no_extract_nmr=request.no_extract_nmr,
         insert_spectra_as=request.insert_spectra_as,
+        target_signal_height_fraction=request.target_signal_height_fraction,
         peak_threshold_fraction=request.peak_threshold_fraction,
         peak_threshold_fraction_1h=request.peak_threshold_fraction_1h,
         peak_threshold_fraction_13c=request.peak_threshold_fraction_13c,

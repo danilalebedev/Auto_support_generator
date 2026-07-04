@@ -15,7 +15,7 @@ from si_generator.domain.bookmarks import bookmark_name_for_block_id
 from si_generator.domain.manifest import check_manifest, manifest_has_errors
 from si_generator.domain.patching import parse_remove_list, parse_renumber_map, parse_reorder_list
 from si_generator.graph.state import PatchSIRequest
-from si_generator.models import Compound
+from si_generator.domain.compound import Compound
 from si_generator.render.document_model import build_si_document_model
 from si_generator.workflows.patch_si import run_patch_si
 

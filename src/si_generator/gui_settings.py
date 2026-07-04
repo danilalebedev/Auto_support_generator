@@ -25,6 +25,7 @@ STRING_FIELDS = (
     "peak_threshold_percent",
     "peak_threshold_1h_percent",
     "peak_threshold_13c_percent",
+    "target_signal_height_percent",
     "baseline_poly_order",
     "whittaker_lambda",
     "whittaker_asymmetry",

@@ -66,15 +66,6 @@ threshold, baseline или single-spectrum `.mnova` файл.
 - курсив для символа `J` в константах;
 - текст reagent loadings без отдельного `Compound_characterization` template.
 
-### РСА/XRD
-
-Добавлен минимальный XRD-блок: таблица может содержать колонки `XRD`, `CCDC`,
-`CIF`, `checkCIF`, `XRD table`, `XRD figures`. Программа вставляет XRD-строку
-в описание соединения, поддерживает placeholder-ы `{xrd.text}`, `{xrd.ccdc}`,
-`{xrd.cif}`, `{xrd.checkcif}` в Word-шаблоне и сохраняет XRD-артефакты в
-manifest.
-
-
 ### Работа со спектрами Mnova
 
 Для каждого соединения программа может обработать `1H` и `13C` спектры из zip-архива:

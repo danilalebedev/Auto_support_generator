@@ -20,7 +20,6 @@ from .domain.ir import parse_ir_block
 from .domain.massspec import build_hrms_block, hrms_adduct_text, hrms_found_text, hrms_label_text
 from .domain.references import format_reference
 from .domain.reactions import calculate_reaction_loadings
-from .domain.xrd import xrd_formatted_text
 from .mnova_ole import MnovaOleTarget, embed_mnova_ole_objects, preview_size_pt
 from .render.si_document import DocumentBlock, SIDocument
 from .runtime_paths import bundled_resource_path
@@ -106,10 +105,7 @@ def _render_compound_blocks(document: DocumentObject, template_paragraphs: list[
         first_index = len(document.paragraphs)
         compound: Compound = block["content"]
         values = _compound_values(compound)
-        has_xrd_placeholder = _template_has_xrd_placeholder(template_paragraphs)
         _render_template_paragraphs(document, template_paragraphs, values, compound=compound)
-        if values.get("xrd.text") and not has_xrd_placeholder:
-            _render_xrd_fallback(document, values["xrd.text"])
         _add_bookmark_range(document.paragraphs[first_index], document.paragraphs[-1], block.get("bookmark", ""))
 
 
@@ -427,8 +423,6 @@ def _should_skip_paragraph(text: str, values: dict[str, str]) -> bool:
         return True
     if "compound.support_warning" in keys and not values.get("compound.support_warning"):
         return True
-    if any(key.startswith("xrd.") for key in keys) and not values.get("xrd.text"):
-        return True
     return False
 
 
@@ -456,7 +450,6 @@ def _compound_values(compound: Compound) -> dict[str, str]:
     values.update(_hrms_values(compound))
     values.update(_elemental_values(compound))
     values.update(_ir_values(compound))
-    values.update(_xrd_values(compound))
     values.update(loadings_values)
     return {_key(key): value for key, value in values.items()}
 
@@ -575,30 +568,6 @@ def _ir_values(compound: Compound) -> dict[str, str]:
         "ir.method": str(block.get("method") or "KBr"),
         "ir.peaks": ", ".join(str(peak) for peak in peaks),
     }
-
-
-def _xrd_values(compound: Compound) -> dict[str, str]:
-    text = xrd_formatted_text(compound.xrd)
-    if not text:
-        return {}
-    return {
-        "xrd.label": "XRD",
-        "xrd.text": text,
-        "xrd.ccdc": str(compound.xrd.get("ccdc_number") or ""),
-        "xrd.cif": str(compound.xrd.get("cif_path") or ""),
-        "xrd.checkcif": str(compound.xrd.get("checkcif_path") or ""),
-    }
-
-
-def _template_has_xrd_placeholder(template_paragraphs: list[Paragraph]) -> bool:
-    return any("xrd." in paragraph.text.lower() for paragraph in template_paragraphs)
-
-
-def _render_xrd_fallback(document: DocumentObject, text: str) -> None:
-    paragraph = document.add_paragraph()
-    paragraph.paragraph_format.space_after = Pt(0)
-    paragraph.add_run(text)
-    _apply_inline_formatting(paragraph)
 
 
 def _formula_with_isotope_labels(formula: str, isotope_labels: Any) -> str:

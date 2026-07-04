@@ -26,6 +26,7 @@ def build_spectra_config(
     insert_spectra_as: SpectrumEmbedMode = "png",
     mnova_executable_path: str | None = None,
     mnova_graphics_profile_path: str | None = None,
+    target_signal_height_fraction: float = DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION,
     peak_threshold_fraction: float | None = None,
     peak_threshold_fraction_1h: float | None = None,
     peak_threshold_fraction_13c: float | None = None,
@@ -39,7 +40,7 @@ def build_spectra_config(
     config: SpectraConfig = {
         "extract_nmr": extract_nmr,
         "insert_spectra_as": insert_spectra_as,
-        "target_signal_height_fraction": DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION,
+        "target_signal_height_fraction": _target_signal_height_fraction(target_signal_height_fraction),
         "peak_threshold_fraction_1h": _normalized_fraction(
             peak_threshold_fraction_1h if peak_threshold_fraction_1h is not None else peak_threshold_fraction,
             DEFAULT_H1_PEAK_THRESHOLD_FRACTION,
@@ -107,6 +108,20 @@ def _normalized_fraction(value, fallback: float) -> float:
         return 0
     if fraction > 1:
         return 1
+    return fraction
+
+
+def _target_signal_height_fraction(value) -> float:
+    try:
+        fraction = float(value)
+    except (TypeError, ValueError):
+        fraction = DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION
+    if fraction > 1:
+        fraction /= 100
+    if fraction < 0.20:
+        return 0.20
+    if fraction > 0.95:
+        return 0.95
     return fraction
 
 

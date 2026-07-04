@@ -5,7 +5,6 @@ from pathlib import Path
 
 from .domain.references import parse_reference_keys
 from .domain.reactions import reaction_from_fields
-from .domain.xrd import xrd_from_fields
 from .domain.compound import Compound
 
 
@@ -19,22 +18,6 @@ FIELD_ALIASES = {
     "analysis": "elemental_analysis",
     "ea": "elemental_analysis",
     "elementalanalysis": "elemental_analysis",
-    "xrdtext": "xrd_text",
-    "xrd_text": "xrd_text",
-    "ccdc": "ccdc_number",
-    "ccdcnumber": "ccdc_number",
-    "ccdc_number": "ccdc_number",
-    "cif": "cif_path",
-    "cifpath": "cif_path",
-    "cif_path": "cif_path",
-    "checkcif": "checkcif_path",
-    "checkcifpath": "checkcif_path",
-    "checkcif_path": "checkcif_path",
-    "xrdtable": "xrd_table_path",
-    "xrd_table": "xrd_table_path",
-    "xrd_table_path": "xrd_table_path",
-    "xrdfigures": "xrd_figure_paths",
-    "xrd_figure_paths": "xrd_figure_paths",
 }
 
 
@@ -57,9 +40,6 @@ def read_compounds(path: str | Path) -> list[Compound]:
                 kwargs["references"] = parse_reference_keys(row.get("references", ""))
                 if "elemental_analysis" in row:
                     kwargs["elemental_analysis"] = {"found": row.get("elemental_analysis", "")}
-                xrd = xrd_from_fields(row)
-                if xrd:
-                    kwargs["xrd"] = xrd
                 reaction = reaction_from_fields(row)
                 if reaction:
                     kwargs["reaction"] = reaction

@@ -5,13 +5,13 @@ from pathlib import Path
 import re
 
 
-LEGACY_GENERATED_FILES = (
+PREVIOUS_GENERATED_FILES = (
     "support_information.docx",
     "support_information.manifest.json",
     "support_information.run_summary.json",
     "processed_spectra.zip",
 )
-LEGACY_GENERATED_DIRS = (
+PREVIOUS_GENERATED_DIRS = (
     "processed_spectra",
     "processed_mnova",
     "mnova_reports",
@@ -56,7 +56,7 @@ def run_output_dirs(run_root: str | Path) -> dict[str, Path]:
 def create_run_output_root(input_path: str | Path, requested_output: str | Path, run_id: str) -> Path:
     requested = Path(requested_output)
     base = _requested_output_base(requested)
-    cleanup_legacy_output_root(base)
+    cleanup_previous_generated_output(base)
     run_parent = base if base.name.lower() == "runs" else base / "runs"
     run_parent.mkdir(parents=True, exist_ok=True)
     stem = _safe_stem(Path(input_path).stem) or "support"
@@ -80,20 +80,20 @@ def prepare_output_layout(output_path: str | Path, *, input_path: str | Path | N
         dirs = output_dirs(output_path)
     root = dirs["output_root"]
     root.mkdir(parents=True, exist_ok=True)
-    cleanup_legacy_output_root(root)
+    cleanup_previous_generated_output(root)
     for key in ("docx_dir", "input_dir", "logs_dir", "reports_dir", "mnova_dir", "spectra_dir"):
         dirs[key].mkdir(parents=True, exist_ok=True)
     dirs["support_docx"] = dirs["docx_dir"] / (Path(output_path).name if Path(output_path).suffix.lower() == ".docx" else "support_information.docx")
     return dirs
 
 
-def cleanup_legacy_output_root(root: str | Path) -> None:
+def cleanup_previous_generated_output(root: str | Path) -> None:
     root = Path(root)
-    for name in LEGACY_GENERATED_FILES:
+    for name in PREVIOUS_GENERATED_FILES:
         path = root / name
         if path.exists() and path.is_file():
             path.unlink()
-    for name in LEGACY_GENERATED_DIRS:
+    for name in PREVIOUS_GENERATED_DIRS:
         path = root / name
         if path.exists() and path.is_dir():
             shutil.rmtree(path)

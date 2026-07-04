@@ -22,6 +22,7 @@ from si_generator.gui import (
     _format_peak_threshold_percent,
     _report_overview,
     _validated_peak_threshold_fraction,
+    _validated_target_signal_height_fraction,
 )
 from si_generator.graph.state import CheckSIRequest
 
@@ -53,6 +54,7 @@ class GuiWorkflowTests(unittest.TestCase):
                 mnova_graphics_profile_text=str(graphics_profile),
                 peak_threshold_1h_percent_text="8",
                 peak_threshold_13c_percent_text="3,5",
+                target_signal_height_percent_text="72",
                 baseline_mode_text="whittaker",
                 baseline_apply_1h=True,
                 baseline_apply_13c=False,
@@ -74,6 +76,7 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(request.mnova_graphics_profile, graphics_profile)
         self.assertEqual(request.peak_threshold_fraction_1h, 0.08)
         self.assertEqual(request.peak_threshold_fraction_13c, 0.035)
+        self.assertEqual(request.target_signal_height_fraction, 0.72)
         self.assertEqual(request.baseline_mode, "whittaker")
         self.assertTrue(request.baseline_apply_1h)
         self.assertFalse(request.baseline_apply_13c)
@@ -103,7 +106,7 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(request.spectra_source, spectra_folder)
         self.assertEqual(request.resolved_spectra_source, spectra_folder)
 
-    def test_legacy_shared_peak_threshold_populates_both_nuclei(self) -> None:
+    def test_shared_peak_threshold_populates_both_nuclei(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             table = root / "input.docx"
@@ -133,6 +136,18 @@ class GuiWorkflowTests(unittest.TestCase):
             _validated_peak_threshold_fraction("abc")
         with self.assertRaisesRegex(ValueError, "between 0 and 100"):
             _validated_peak_threshold_fraction("120")
+
+    def test_target_signal_height_validation_accepts_percent_fraction_and_comma(self) -> None:
+        self.assertEqual(_validated_target_signal_height_fraction("80"), 0.8)
+        self.assertEqual(_validated_target_signal_height_fraction("0.8"), 0.8)
+        self.assertEqual(_validated_target_signal_height_fraction("72,5"), 0.725)
+        self.assertEqual(_validated_target_signal_height_fraction(""), 0.8)
+
+    def test_target_signal_height_validation_rejects_invalid_values(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Signal height must be a number"):
+            _validated_target_signal_height_fraction("abc")
+        with self.assertRaisesRegex(ValueError, "between 20 and 95"):
+            _validated_target_signal_height_fraction("10")
 
     def test_rejects_missing_input_file(self) -> None:
         with self.assertRaisesRegex(ValueError, "compound table"):
@@ -400,6 +415,7 @@ class GuiWorkflowTests(unittest.TestCase):
                 input_kind="csv",
                 input_path_text=str(new_table),
                 output_docx_text=str(output),
+                target_signal_height_percent_text="85",
                 calculate_elemental_analysis=True,
             )
 
@@ -407,6 +423,7 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(request.input_path, new_table)
         self.assertEqual(request.input_kind, "csv")
         self.assertEqual(request.output_docx, output)
+        self.assertEqual(request.target_signal_height_fraction, 0.85)
         self.assertTrue(request.calculate_elemental_analysis)
 
     def test_report_overview_ignores_missing_or_invalid_json(self) -> None:

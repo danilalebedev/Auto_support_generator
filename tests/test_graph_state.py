@@ -20,7 +20,7 @@ from si_generator.graph.state import CheckSIRequest as GraphCheckSIRequest
 from si_generator.graph.state import GenerateSIRequest
 from si_generator.graph.state import PatchSIRequest as GraphPatchSIRequest
 from si_generator.graph.state import Issue as GraphIssue
-from si_generator.models import Compound
+from si_generator.domain.compound import Compound
 from si_generator.workflows.generate_si import make_initial_generate_state
 
 
@@ -67,6 +67,7 @@ class GraphStateTests(unittest.TestCase):
             mnova_graphics_profile=Path("C:/Profiles/default.mngp"),
             no_extract_nmr=True,
             no_check_support=True,
+            target_signal_height_fraction=0.72,
             peak_threshold_fraction_1h=0.08,
             peak_threshold_fraction_13c=0.04,
             baseline_mode="whittaker",
@@ -82,7 +83,7 @@ class GraphStateTests(unittest.TestCase):
 
         self.assertFalse(result["spectra_config"]["extract_nmr"])
         self.assertEqual(result["spectra_config"]["insert_spectra_as"], "png")
-        self.assertEqual(result["spectra_config"]["target_signal_height_fraction"], 0.80)
+        self.assertEqual(result["spectra_config"]["target_signal_height_fraction"], 0.72)
         self.assertEqual(result["spectra_config"]["peak_threshold_fraction_1h"], 0.08)
         self.assertEqual(result["spectra_config"]["peak_threshold_fraction_13c"], 0.04)
         self.assertEqual(result["spectra_config"]["baseline_mode"], "whittaker")
