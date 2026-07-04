@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 import zipfile
 from pathlib import Path
@@ -7,14 +8,37 @@ from pathlib import Path
 from .domain.compound import Compound
 
 
-def prepare_spectra_source(source_path: str | Path, work_dir: str | Path) -> Path:
+MAX_SPECTRA_ZIP_MEMBERS = 100_000
+MAX_SPECTRA_ZIP_UNCOMPRESSED_BYTES = 10 * 1024 * 1024 * 1024
+ZIP_UNIX_SYMLINK_MODE = 0o120000
+ZIP_UNIX_FILE_TYPE_MASK = 0o170000
+
+
+def prepare_spectra_source(
+    source_path: str | Path,
+    work_dir: str | Path,
+    *,
+    max_members: int = MAX_SPECTRA_ZIP_MEMBERS,
+    max_uncompressed_bytes: int = MAX_SPECTRA_ZIP_UNCOMPRESSED_BYTES,
+) -> Path:
     source_path = Path(source_path).resolve()
     if source_path.is_dir():
         return source_path
-    return prepare_spectra_zip(source_path, work_dir)
+    return prepare_spectra_zip(
+        source_path,
+        work_dir,
+        max_members=max_members,
+        max_uncompressed_bytes=max_uncompressed_bytes,
+    )
 
 
-def prepare_spectra_zip(zip_path: str | Path, work_dir: str | Path) -> Path:
+def prepare_spectra_zip(
+    zip_path: str | Path,
+    work_dir: str | Path,
+    *,
+    max_members: int = MAX_SPECTRA_ZIP_MEMBERS,
+    max_uncompressed_bytes: int = MAX_SPECTRA_ZIP_UNCOMPRESSED_BYTES,
+) -> Path:
     zip_path = Path(zip_path).resolve()
     work_dir = Path(work_dir).resolve() / zip_path.stem
     if work_dir.exists():
@@ -22,7 +46,12 @@ def prepare_spectra_zip(zip_path: str | Path, work_dir: str | Path) -> Path:
     work_dir.mkdir(parents=True, exist_ok=True)
 
     with zipfile.ZipFile(zip_path) as archive:
-        _safe_extract(archive, work_dir)
+        _safe_extract(
+            archive,
+            work_dir,
+            max_members=max_members,
+            max_uncompressed_bytes=max_uncompressed_bytes,
+        )
 
     children = [path for path in work_dir.iterdir() if path.is_dir()]
     if len(children) == 1 and not _looks_like_compound_dir(children[0]):
@@ -44,13 +73,60 @@ def assign_spectra_from_folder(compounds: list[Compound], spectra_root: str | Pa
             compound.c13_spectrum_path = str(spectra["13C"])
 
 
-def _safe_extract(archive: zipfile.ZipFile, target: Path) -> None:
+def validate_spectra_zip(
+    archive: zipfile.ZipFile,
+    target: str | Path,
+    *,
+    max_members: int = MAX_SPECTRA_ZIP_MEMBERS,
+    max_uncompressed_bytes: int = MAX_SPECTRA_ZIP_UNCOMPRESSED_BYTES,
+) -> None:
+    target = Path(target).resolve()
+    members = archive.infolist()
+    if len(members) > max_members:
+        raise ValueError(f"Spectra zip contains too many entries: {len(members)} > {max_members}")
+
+    total_size = 0
+    for member in members:
+        _validate_zip_member_path(target, member.filename)
+        _validate_zip_member_type(member)
+        if not member.is_dir():
+            total_size += int(member.file_size)
+        if total_size > max_uncompressed_bytes:
+            limit_mb = max_uncompressed_bytes // (1024 * 1024)
+            raise ValueError(f"Spectra zip is too large after extraction: more than {limit_mb} MB")
+
+
+def _safe_extract(
+    archive: zipfile.ZipFile,
+    target: Path,
+    *,
+    max_members: int = MAX_SPECTRA_ZIP_MEMBERS,
+    max_uncompressed_bytes: int = MAX_SPECTRA_ZIP_UNCOMPRESSED_BYTES,
+) -> None:
     target = target.resolve()
+    validate_spectra_zip(
+        archive,
+        target,
+        max_members=max_members,
+        max_uncompressed_bytes=max_uncompressed_bytes,
+    )
     for member in archive.infolist():
-        destination = (target / member.filename).resolve()
-        if target != destination and target not in destination.parents:
-            raise ValueError(f"Unsafe path in zip: {member.filename}")
         archive.extract(member, target)
+
+
+def _validate_zip_member_path(target: Path, filename: str) -> None:
+    normalized = filename.replace("\\", "/")
+    if "\0" in normalized or normalized.startswith("/") or re.match(r"^[A-Za-z]:", normalized):
+        raise ValueError(f"Unsafe path in zip: {filename}")
+    destination = (target / normalized).resolve()
+    if target != destination and target not in destination.parents:
+        raise ValueError(f"Unsafe path in zip: {filename}")
+
+
+def _validate_zip_member_type(member: zipfile.ZipInfo) -> None:
+    mode = (member.external_attr >> 16) & ZIP_UNIX_FILE_TYPE_MASK
+    if mode == ZIP_UNIX_SYMLINK_MODE:
+        raise ValueError(f"Unsafe symlink in zip: {member.filename}")
 
 
 def _looks_like_compound_dir(path: Path) -> bool:

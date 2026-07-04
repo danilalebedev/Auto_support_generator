@@ -48,6 +48,27 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(issue_has_errors(issues))
         self.assertIn("PREFLIGHT_SPECTRA_ZIP_INVALID", {issue["code"] for issue in issues})
 
+    def test_preflight_reports_unsafe_spectra_source_zip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_docx = root / "input.docx"
+            spectra_zip = root / "spectra.zip"
+            input_docx.write_bytes(b"placeholder")
+            with zipfile.ZipFile(spectra_zip, "w") as archive:
+                archive.writestr("../evil.txt", "owned")
+            request = GenerateSIRequest(
+                input_path=input_docx,
+                input_kind="word",
+                output_path=root / "support_information.docx",
+                spectra_source=spectra_zip,
+                no_extract_nmr=True,
+            )
+
+            issues = preflight_generate_request(request)
+
+        self.assertTrue(issue_has_errors(issues))
+        self.assertIn("PREFLIGHT_SPECTRA_ZIP_UNSAFE", {issue["code"] for issue in issues})
+
     def test_preflight_warns_when_spectra_appendix_is_enabled_without_zip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

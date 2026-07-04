@@ -9,6 +9,7 @@ from .domain.requests import GenerateSIRequest
 from .domain.types import Issue
 from .external_tools import find_mnova_executable
 from .mnova import SCRIPT_PATH
+from .spectra_zip import validate_spectra_zip
 
 
 MnovaFinder = Callable[[str | Path | None], Path]
@@ -104,6 +105,10 @@ def _check_spectra_source(spectra_source: Path) -> list[Issue]:
         with zipfile.ZipFile(spectra_source) as archive:
             if not archive.namelist():
                 return [_issue("PREFLIGHT_SPECTRA_ZIP_EMPTY", "warning", "Spectra zip archive is empty.", spectra_source)]
+            try:
+                validate_spectra_zip(archive, spectra_source.parent / spectra_source.stem)
+            except ValueError as exc:
+                return [_issue("PREFLIGHT_SPECTRA_ZIP_UNSAFE", "error", str(exc), spectra_source)]
     except OSError as exc:
         return [_issue("PREFLIGHT_SPECTRA_ZIP_INVALID", "error", f"Spectra zip cannot be read: {exc}", spectra_source)]
     return []
