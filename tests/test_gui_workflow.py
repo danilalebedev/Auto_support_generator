@@ -17,6 +17,7 @@ from si_generator.gui import (
     _existing_result_path,
     _mousewheel_units,
     _next_available_docx_path,
+    _output_docx_from_folder,
     _format_peak_threshold_percent,
     _report_overview,
     _validated_peak_threshold_fraction,
@@ -404,6 +405,13 @@ class GuiWorkflowTests(unittest.TestCase):
 
         self.assertEqual(result, str(fallback.parent.resolve()))
 
+    def test_output_docx_from_folder_uses_standard_support_name(self) -> None:
+        self.assertEqual(
+            _output_docx_from_folder(str(Path("output/runs/demo")), "old/custom.docx"),
+            str(Path("output/runs/demo") / "support_information.docx"),
+        )
+        self.assertEqual(_output_docx_from_folder("", "old/custom.docx"), "old/custom.docx")
+
     def test_example_field_updates_clear_project_specific_paths(self) -> None:
         updates = _example_field_updates(
             Path("examples/test_input.docx"),
@@ -415,6 +423,7 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(updates["input_path"], str(Path("examples/test_input.docx")))
         self.assertEqual(updates["spectra_zip"], str(Path("examples/test_input.zip")))
         self.assertEqual(updates["output_docx"], str(Path("output/docx/support_information.docx")))
+        self.assertEqual(updates["output_folder"], str(Path("output/docx")))
         self.assertEqual(updates["template_docx"], "")
         self.assertEqual(updates["references_file"], "")
         self.assertEqual(updates["loadings_schema_docx"], "")

@@ -13,6 +13,7 @@ class GuiSettingsTests(unittest.TestCase):
             {
                 "settings": {
                     "input_path": Path("input.docx"),
+                    "output_folder": Path("output/runs/demo"),
                     "unknown": "ignored",
                     "input_kind": "WORD",
                     "insert_spectra_as": "invalid",
@@ -27,6 +28,7 @@ class GuiSettingsTests(unittest.TestCase):
         )
 
         self.assertEqual(settings["input_path"], "input.docx")
+        self.assertEqual(settings["output_folder"], str(Path("output/runs/demo")))
         self.assertEqual(settings["input_kind"], "word")
         self.assertEqual(settings["peak_threshold_1h_percent"], "8")
         self.assertEqual(settings["peak_threshold_13c_percent"], "4")
@@ -45,6 +47,7 @@ class GuiSettingsTests(unittest.TestCase):
                 {
                     "input_path": "C:/data/input.docx",
                     "spectra_zip": "C:/data/spectra.zip",
+                    "output_folder": "C:/data/output",
                     "input_kind": "csv",
                     "insert_spectra_as": "mnova",
                     "peak_threshold_1h_percent": "6",
@@ -61,6 +64,7 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(saved_path, path)
         self.assertEqual(loaded["input_path"], "C:/data/input.docx")
         self.assertEqual(loaded["spectra_zip"], "C:/data/spectra.zip")
+        self.assertEqual(loaded["output_folder"], "C:/data/output")
         self.assertEqual(loaded["input_kind"], "csv")
         self.assertEqual(loaded["insert_spectra_as"], "mnova")
         self.assertEqual(loaded["peak_threshold_1h_percent"], "6")

@@ -20,6 +20,7 @@ STRING_FIELDS = (
     "loadings_scope_docx",
     "mnova_exe",
     "output_docx",
+    "output_folder",
     "peak_threshold_percent",
     "peak_threshold_1h_percent",
     "peak_threshold_13c_percent",

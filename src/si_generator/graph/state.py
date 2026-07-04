@@ -60,6 +60,7 @@ class AddCompoundsState(TypedDict, total=False):
     manifest: dict[str, Any]
     new_compounds: list[Compound]
     new_generate_state: dict[str, Any]
+    add_id_map: dict[str, str]
     add_result: dict[str, Any]
     artifacts: dict[str, str]
     issues: list[Issue]

@@ -38,7 +38,7 @@ class SIGeneratorApp:
     def __init__(self, root: Tk) -> None:
         self.root = root
         self.root.title("Auto Support Generator")
-        self.root.geometry("840x560")
+        self.root.geometry("720x480")
         self.root.minsize(720, 480)
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
@@ -52,6 +52,7 @@ class SIGeneratorApp:
         self.loadings_scope_docx = StringVar()
         self.mnova_exe = StringVar()
         self.output_docx = StringVar(value=str(default_output_path()))
+        self.output_folder = StringVar(value=str(default_output_path().parent))
         self.input_kind = StringVar(value="word")
         self.insert_spectra_as = StringVar(value="png")
         self.peak_threshold_1h_percent = StringVar(value=_format_peak_threshold_percent(DEFAULT_H1_PEAK_THRESHOLD_FRACTION))
@@ -134,29 +135,24 @@ class SIGeneratorApp:
         simple = ttk.LabelFrame(generate_tab, text="Simple", padding=12)
         simple.grid(row=0, column=0, sticky="ew")
         simple.columnconfigure(1, weight=1)
-        ttk.Label(simple, text="Table type").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
-        kind = ttk.Frame(simple)
-        kind.grid(row=0, column=1, sticky="w", pady=4)
-        ttk.Radiobutton(kind, text="Word table with ChemDraw objects", variable=self.input_kind, value="word").pack(side="left")
-        ttk.Radiobutton(kind, text="CSV table", variable=self.input_kind, value="csv").pack(side="left", padx=(16, 0))
-        self._file_row(simple, 1, "Compound table", self.input_path, self._browse_input)
-        self._source_row(simple, 2, "Spectra source", self.spectra_source, self._browse_spectra_source, self._browse_spectra_folder)
-        self._file_row(simple, 3, "Output .docx", self.output_docx, self._browse_output)
+        self._file_row(simple, 0, "Compound table", self.input_path, self._browse_input)
+        self._source_row(simple, 1, "Spectra source", self.spectra_source, self._browse_spectra_source, self._browse_spectra_folder)
+        self._folder_row(simple, 2, "Output folder", self.output_folder, self._browse_output_folder)
 
         results = ttk.LabelFrame(generate_tab, text="Results", padding=12)
         results.grid(row=1, column=0, sticky="ew", pady=(10, 0))
         results.columnconfigure(1, weight=1)
-        self._result_row(results, 0, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"))
-        self._result_row(results, 1, "Output folder", self.result_output_folder, lambda: self._open_result_path(self.result_output_folder, "Output folder"))
-        self._result_row(results, 2, "Logs", self.result_logs, lambda: self._open_result_path(self.result_logs, "Logs"))
-        self._result_row(results, 3, "Report", self.result_report, lambda: self._open_result_path(self.result_report, "Report"))
+        self._result_row(results, 0, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"), "Open support")
+        self._result_row(results, 1, "Output folder", self.result_output_folder, lambda: self._open_result_path(self.result_output_folder, "Output folder"), "Open output folder")
+        self._result_row(results, 2, "Logs", self.result_logs, lambda: self._open_result_path(self.result_logs, "Logs"), "Open logs")
+        self._result_row(results, 3, "Report", self.result_report, lambda: self._open_result_path(self.result_report, "Report"), "Open report")
         ttk.Label(results, textvariable=self.result_overview, style="Muted.TLabel").grid(row=4, column=0, columnspan=3, sticky="ew", pady=(6, 0))
 
         log_frame = ttk.LabelFrame(generate_tab, text="Run Log", padding=8)
         log_frame.grid(row=2, column=0, sticky="nsew", pady=(10, 0))
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
-        self.log = _LogText(log_frame, height=6)
+        self.log = _LogText(log_frame, height=4)
         self.log.grid(row=0, column=0, sticky="nsew")
         scroll = ttk.Scrollbar(log_frame, command=self.log.yview)
         scroll.grid(row=0, column=1, sticky="ns")
@@ -184,23 +180,28 @@ class SIGeneratorApp:
 
         options = ttk.LabelFrame(advanced, text="Processing", padding=12)
         options.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        ttk.Label(options, text="Compound table type").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        kind = ttk.Frame(options)
+        kind.grid(row=0, column=1, columnspan=3, sticky="w", pady=4)
+        ttk.Radiobutton(kind, text="Word table with ChemDraw objects", variable=self.input_kind, value="word").pack(side="left")
+        ttk.Radiobutton(kind, text="CSV table", variable=self.input_kind, value="csv").pack(side="left", padx=(16, 0))
         ttk.Checkbutton(
             options,
             text="Check support (NMR, HRMS, elemental analysis)",
             variable=self.check_support,
-        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=4)
-        ttk.Label(options, text="Spectra appendix").grid(row=0, column=2, sticky="e", padx=(12, 8), pady=4)
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=4)
+        ttk.Label(options, text="Spectra appendix").grid(row=1, column=2, sticky="e", padx=(12, 8), pady=4)
         ttk.Combobox(
             options,
             textvariable=self.insert_spectra_as,
             values=("png", "mnova", "none"),
             state="readonly",
             width=8,
-        ).grid(row=0, column=3, sticky="w", pady=4)
-        ttk.Label(options, text="1H threshold (%)").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(options, textvariable=self.peak_threshold_1h_percent, width=8).grid(row=1, column=1, sticky="w", pady=4)
-        ttk.Label(options, text="13C threshold (%)").grid(row=1, column=2, sticky="e", padx=(12, 8), pady=4)
-        ttk.Entry(options, textvariable=self.peak_threshold_13c_percent, width=8).grid(row=1, column=3, sticky="w", pady=4)
+        ).grid(row=1, column=3, sticky="w", pady=4)
+        ttk.Label(options, text="1H threshold (%)").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(options, textvariable=self.peak_threshold_1h_percent, width=8).grid(row=2, column=1, sticky="w", pady=4)
+        ttk.Label(options, text="13C threshold (%)").grid(row=2, column=2, sticky="e", padx=(12, 8), pady=4)
+        ttk.Entry(options, textvariable=self.peak_threshold_13c_percent, width=8).grid(row=2, column=3, sticky="w", pady=4)
 
         baseline = ttk.LabelFrame(advanced, text="Baseline correction", padding=12)
         baseline.grid(row=2, column=0, sticky="ew", pady=(10, 0))
@@ -333,12 +334,17 @@ class SIGeneratorApp:
             ttk.Button(button_box, text=text, command=extra_command).pack(side="left", padx=(0, 6))
         ttk.Button(button_box, text="Browse...", command=command).pack(side="left")
 
-    def _result_row(self, parent, row: int, label: str, variable: StringVar, open_command=None) -> None:
+    def _folder_row(self, parent, row: int, label: str, variable: StringVar, command, optional: bool = False) -> None:
+        ttk.Label(parent, text=f"{label}{' (optional)' if optional else ''}").grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(parent, textvariable=variable).grid(row=row, column=1, sticky="ew", pady=4)
+        ttk.Button(parent, text="Browse...", command=command).grid(row=row, column=2, sticky="e", padx=(8, 0), pady=4)
+
+    def _result_row(self, parent, row: int, label: str, variable: StringVar, open_command=None, button_text: str = "Open") -> None:
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=3)
         entry = ttk.Entry(parent, textvariable=variable, state="readonly")
         entry.grid(row=row, column=1, sticky="ew", pady=3)
         if open_command:
-            ttk.Button(parent, text="Open", command=open_command, width=8).grid(row=row, column=2, sticky="e", padx=(8, 0), pady=3)
+            ttk.Button(parent, text=button_text, command=open_command).grid(row=row, column=2, sticky="e", padx=(8, 0), pady=3)
 
     def _browse_input(self) -> None:
         if self.input_kind.get() == "csv":
@@ -346,12 +352,12 @@ class SIGeneratorApp:
         else:
             types = [("Word documents", "*.docx"), ("All files", "*.*")]
         self._browse_file(self.input_path, types)
-        if self.input_path.get() and not self.output_docx.get():
-            self.output_docx.set(str(Path(self.input_path.get()).with_name("support_information.docx")))
+        if self.input_path.get() and not self.output_folder.get():
+            self._set_output_folder(str(Path(self.input_path.get()).parent), save=False)
 
     def _browse_file(self, variable: StringVar, filetypes) -> None:
         kwargs: dict[str, object] = {"filetypes": filetypes}
-        initialdir = _dialog_initialdir(variable.get(), self.input_path.get(), self.output_docx.get(), self._last_output_folder)
+        initialdir = _dialog_initialdir(variable.get(), self.input_path.get(), self.output_folder.get(), self.output_docx.get(), self._last_output_folder)
         if initialdir:
             kwargs["initialdir"] = initialdir
         path = filedialog.askopenfilename(**kwargs)
@@ -361,7 +367,7 @@ class SIGeneratorApp:
 
     def _browse_folder(self, variable: StringVar) -> None:
         kwargs: dict[str, object] = {}
-        initialdir = _dialog_initialdir(variable.get(), self.input_path.get(), self.output_docx.get(), self._last_output_folder)
+        initialdir = _dialog_initialdir(variable.get(), self.input_path.get(), self.output_folder.get(), self.output_docx.get(), self._last_output_folder)
         if initialdir:
             kwargs["initialdir"] = initialdir
         path = filedialog.askdirectory(**kwargs)
@@ -381,14 +387,24 @@ class SIGeneratorApp:
             "filetypes": [("Word documents", "*.docx"), ("All files", "*.*")],
             "initialfile": Path(self.output_docx.get()).name if self.output_docx.get() else "support_information.docx",
         }
-        initialdir = _dialog_initialdir(self.output_docx.get(), self.input_path.get(), self._last_output_folder)
+        initialdir = _dialog_initialdir(self.output_folder.get(), self.output_docx.get(), self.input_path.get(), self._last_output_folder)
         if initialdir:
             kwargs["initialdir"] = initialdir
         path = filedialog.asksaveasfilename(**kwargs)
         if path:
             variable_path = Path(path)
             self.output_docx.set(str(variable_path))
+            self.output_folder.set(str(variable_path.parent))
             self._save_settings()
+
+    def _browse_output_folder(self) -> None:
+        kwargs: dict[str, object] = {}
+        initialdir = _dialog_initialdir(self.output_folder.get(), self.output_docx.get(), self.input_path.get(), self._last_output_folder)
+        if initialdir:
+            kwargs["initialdir"] = initialdir
+        path = filedialog.askdirectory(**kwargs)
+        if path:
+            self._set_output_folder(path)
 
     def _browse_patch_output(self) -> None:
         kwargs: dict[str, object] = {
@@ -396,7 +412,7 @@ class SIGeneratorApp:
             "filetypes": [("Word documents", "*.docx"), ("All files", "*.*")],
             "initialfile": "support_information_patched.docx",
         }
-        initialdir = _dialog_initialdir(self.patch_output_docx.get(), self.existing_manifest.get(), self.output_docx.get(), self._last_output_folder)
+        initialdir = _dialog_initialdir(self.patch_output_docx.get(), self.existing_manifest.get(), self.output_folder.get(), self.output_docx.get(), self._last_output_folder)
         if initialdir:
             kwargs["initialdir"] = initialdir
         path = filedialog.asksaveasfilename(**kwargs)
@@ -417,7 +433,7 @@ class SIGeneratorApp:
             "filetypes": [("Word documents", "*.docx"), ("All files", "*.*")],
             "initialfile": Path(self.add_output_docx.get()).name if self.add_output_docx.get() else "support_information_added.docx",
         }
-        initialdir = _dialog_initialdir(self.add_output_docx.get(), self.add_input_path.get(), self.output_docx.get(), self._last_output_folder)
+        initialdir = _dialog_initialdir(self.add_output_docx.get(), self.add_input_path.get(), self.output_folder.get(), self.output_docx.get(), self._last_output_folder)
         if initialdir:
             kwargs["initialdir"] = initialdir
         path = filedialog.asksaveasfilename(**kwargs)
@@ -434,6 +450,7 @@ class SIGeneratorApp:
             return
         for field, value in _example_field_updates(table, spectra, default_output_path()).items():
             getattr(self, field).set(value)
+        self._sync_output_docx_from_folder()
         self.status_text.set("Example loaded")
         self._save_settings()
 
@@ -596,7 +613,7 @@ class SIGeneratorApp:
         return _build_generate_request(
             input_kind=self.input_kind.get(),
             input_path_text=self.input_path.get(),
-            output_docx_text=self.output_docx.get(),
+            output_docx_text=_output_docx_from_folder(self.output_folder.get(), self.output_docx.get()),
             spectra_source_text=self.spectra_source.get(),
             template_docx_text=self.template_docx.get(),
             references_text=self.references_file.get(),
@@ -727,7 +744,7 @@ class SIGeneratorApp:
         self.root.after(100, self._poll_log_queue)
 
     def _open_output_folder(self) -> None:
-        path = self._last_output_folder or Path(self.output_docx.get() or ".").expanduser()
+        path = self._last_output_folder or Path(self.output_folder.get() or self.output_docx.get() or ".").expanduser()
         folder = path if path.is_dir() else path.parent
         folder.mkdir(parents=True, exist_ok=True)
         os.startfile(str(folder))
@@ -770,6 +787,12 @@ class SIGeneratorApp:
                 variable.set(value)
         if not self.spectra_source.get() and isinstance(settings.get("spectra_zip"), str):
             self.spectra_source.set(str(settings["spectra_zip"]))
+        if isinstance(settings.get("output_folder"), str) and self.output_folder.get():
+            self._sync_output_docx_from_folder()
+        elif isinstance(settings.get("output_docx"), str) and self.output_docx.get():
+            self._sync_output_folder_from_docx()
+        else:
+            self._sync_output_docx_from_folder()
         legacy_threshold = settings.get("peak_threshold_percent")
         if isinstance(legacy_threshold, str):
             if not isinstance(settings.get("peak_threshold_1h_percent"), str):
@@ -782,6 +805,7 @@ class SIGeneratorApp:
                 variable.set(value)
 
     def _save_settings(self) -> None:
+        self._sync_output_docx_from_folder()
         values: dict[str, str | bool] = {}
         for key, variable in self._string_settings_variables().items():
             values[key] = variable.get()
@@ -803,6 +827,7 @@ class SIGeneratorApp:
             "loadings_scope_docx": self.loadings_scope_docx,
             "mnova_exe": self.mnova_exe,
             "output_docx": self.output_docx,
+            "output_folder": self.output_folder,
             "peak_threshold_1h_percent": self.peak_threshold_1h_percent,
             "peak_threshold_13c_percent": self.peak_threshold_13c_percent,
             "baseline_mode": self.baseline_mode,
@@ -824,6 +849,22 @@ class SIGeneratorApp:
             "add_output_docx": self.add_output_docx,
             "add_input_kind": self.add_input_kind,
         }
+
+    def _set_output_folder(self, folder: str, *, save: bool = True) -> None:
+        self.output_folder.set(folder)
+        self._sync_output_docx_from_folder()
+        if save:
+            self._save_settings()
+
+    def _sync_output_docx_from_folder(self) -> None:
+        output_docx = _output_docx_from_folder(self.output_folder.get(), self.output_docx.get())
+        if output_docx:
+            self.output_docx.set(output_docx)
+
+    def _sync_output_folder_from_docx(self) -> None:
+        raw_docx = self.output_docx.get().strip().strip('"')
+        if raw_docx:
+            self.output_folder.set(str(Path(raw_docx).expanduser().parent))
 
     def _bool_settings_variables(self) -> dict[str, BooleanVar]:
         return {
@@ -1241,6 +1282,13 @@ def _dialog_initialdir(*candidates: str | Path | None) -> str | None:
     return None
 
 
+def _output_docx_from_folder(output_folder_text: str, fallback_docx_text: str = "") -> str:
+    raw_folder = output_folder_text.strip().strip('"')
+    if raw_folder:
+        return str(Path(raw_folder).expanduser() / "support_information.docx")
+    return fallback_docx_text.strip().strip('"')
+
+
 def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) -> dict[str, str]:
     return {
         "input_kind": "word",
@@ -1248,6 +1296,7 @@ def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) ->
         "spectra_source": str(spectra_zip),
         "spectra_zip": str(spectra_zip),
         "output_docx": str(output_docx),
+        "output_folder": str(output_docx.parent),
         "template_docx": "",
         "references_file": "",
         "loadings_schema_docx": "",
