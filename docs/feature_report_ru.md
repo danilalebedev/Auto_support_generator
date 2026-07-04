@@ -7,27 +7,28 @@
 Добавлен графический интерфейс, в котором пользователь выбирает:
 
 - таблицу с соединениями: Word `.docx` с ChemDraw-объектами или CSV;
-- zip-архив со спектрами;
+- spectra source: zip-архив или обычную папку со спектрами;
 - путь к `MestReNova.exe`, если автоопределение не сработало;
-- выходной `.docx`.
+- output folder.
 
 Как пользоваться: запустить `SI Generator GUI.bat` или `AutoSupportGenerator.exe`, нажать `Load example` для проверки примера или выбрать свои файлы, затем нажать `Generate SI`.
 
 ### Масштабируемое окно GUI
 
-Окно переработано так, чтобы помещаться на небольших экранах: основной контент теперь прокручивается, а нижние кнопки `Generate SI`, `Open output folder`, `Clear log` остаются видимыми. Диалоги выбора файлов открываются рядом с уже выбранными путями.
+Окно переработано так, чтобы помещаться на небольших экранах: основной контент теперь прокручивается, а нижние кнопки `Generate SI`, `Open last output`, `Clear log` остаются видимыми. Диалоги выбора файлов открываются рядом с уже выбранными путями.
 
 ### Структурированный output
 
-После генерации программа складывает результаты в понятные артефакты:
+После генерации программа создает отдельную папку запуска `output/runs/YYYYMMDD_HHMMSS_<input>/` и складывает результаты в понятные артефакты:
 
-- `support_information.docx` - готовый Supporting Information;
-- `processed_spectra.zip` - пакет обработанных спектров;
-- `processed_mnova` - сохраненные `.mnova` файлы;
-- `mnova_reports` - текстовые отчеты из Mnova;
-- `logs` - предупреждения и служебные логи;
-- `support_information.manifest.json` - manifest для проверки и дальнейшего patch workflow;
-- `support_information.run_summary.json` - краткий отчет о запуске.
+- `docx/support_information.docx` - готовый Supporting Information;
+- `docx/support_information.manifest.json` - manifest для проверки и дальнейшего patch/add workflow;
+- `docx/support_information.run_summary.json` - краткий отчет о запуске;
+- `spectra/processed_spectra.zip` - пакет обработанных спектров;
+- `spectra/processed_spectra/` - PNG и single-spectrum `.mnova` файлы;
+- `mnova/processed/` - сохраненные `.mnova` файлы;
+- `logs/` - предупреждения, Mnova reports и служебные логи;
+- `reports/` - machine-readable reports.
 
 ### Проверка экспериментальных данных
 
@@ -53,6 +54,14 @@
 - надстрочные индексы изотопов;
 - курсив для символа `J` в константах;
 - текст reagent loadings без отдельного `Compound_characterization` template.
+
+### РСА/XRD
+
+Добавлен минимальный XRD-блок: таблица может содержать колонки `XRD`, `CCDC`,
+`CIF`, `checkCIF`, `XRD table`, `XRD figures`. Программа вставляет XRD-строку
+в описание соединения, поддерживает placeholder-ы `{xrd.text}`, `{xrd.ccdc}`,
+`{xrd.cif}`, `{xrd.checkcif}` в Word-шаблоне и сохраняет XRD-артефакты в
+manifest.
 
 
 ### Работа со спектрами Mnova

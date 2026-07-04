@@ -23,6 +23,7 @@ class DomainCompoundTests(unittest.TestCase):
             h1_conditions="CDCl3, 600 MHz",
             hrms_found="47.0491",
             ir="IR (ATR, cm-1): 3038, 2957.",
+            xrd={"ccdc_number": "2350001", "cif_path": "2a.cif"},
             references=["ref1"],
         )
 
@@ -34,6 +35,8 @@ class DomainCompoundTests(unittest.TestCase):
         self.assertEqual(snapshot["nmr"]["spectra"]["1H"]["formatted_text"], "δ = 1.23 (s, 6H).")
         self.assertEqual(snapshot["hrms"]["found_text"], "47.0491")
         self.assertEqual(snapshot["ir"]["method"], "ATR")
+        self.assertEqual(snapshot["xrd"]["ccdc_number"], "2350001")
+        self.assertEqual(snapshot["xrd"]["cif_path"], "2a.cif")
         self.assertEqual(snapshot["references"], ["ref1"])
 
     def test_compound_domain_snapshot_omits_empty_default_hrms(self) -> None:

@@ -217,10 +217,10 @@ class SIGeneratorApp:
         ttk.Checkbutton(baseline, text="Apply to 13C", variable=self.baseline_apply_13c).grid(row=0, column=3, sticky="w", padx=(12, 0), pady=4)
         ttk.Label(baseline, text="Bernstein order").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=4)
         ttk.Entry(baseline, textvariable=self.baseline_poly_order, width=8).grid(row=1, column=1, sticky="w", pady=4)
-        ttk.Label(baseline, text="Whittaker lambda").grid(row=1, column=2, sticky="e", padx=(12, 8), pady=4)
-        ttk.Entry(baseline, textvariable=self.whittaker_lambda, width=12).grid(row=1, column=3, sticky="w", pady=4)
-        ttk.Label(baseline, text="Whittaker asymmetry").grid(row=1, column=4, sticky="e", padx=(12, 8), pady=4)
-        ttk.Entry(baseline, textvariable=self.whittaker_asymmetry, width=10).grid(row=1, column=5, sticky="w", pady=4)
+        ttk.Label(baseline, text="Whittaker lambda").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(baseline, textvariable=self.whittaker_lambda, width=12).grid(row=2, column=1, sticky="w", pady=4)
+        ttk.Label(baseline, text="Whittaker asymmetry").grid(row=2, column=2, sticky="e", padx=(12, 8), pady=4)
+        ttk.Entry(baseline, textvariable=self.whittaker_asymmetry, width=10).grid(row=2, column=3, sticky="w", pady=4)
 
         loadings = ttk.LabelFrame(advanced, text="Reagent Loadings", padding=12)
         loadings.grid(row=3, column=0, sticky="ew", pady=(10, 0))
@@ -247,12 +247,12 @@ class SIGeneratorApp:
             optional=True,
         )
 
-        tools_scroll = _ScrollableFrame(notebook, padding=12)
-        tools = tools_scroll.content
-        tools.columnconfigure(0, weight=1)
-        notebook.add(tools_scroll, text="Tools")
+        check_scroll = _ScrollableFrame(notebook, padding=12)
+        check_tab = check_scroll.content
+        check_tab.columnconfigure(0, weight=1)
+        notebook.add(check_scroll, text="Check support")
 
-        check_box = ttk.LabelFrame(tools, text="Check existing support", padding=12)
+        check_box = ttk.LabelFrame(check_tab, text="Check existing support", padding=12)
         check_box.grid(row=0, column=0, sticky="ew")
         check_box.columnconfigure(1, weight=1)
         self._file_row(
@@ -273,8 +273,13 @@ class SIGeneratorApp:
             optional=True,
         )
 
-        patch_box = ttk.LabelFrame(tools, text="Patch existing support", padding=12)
-        patch_box.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        patch_scroll = _ScrollableFrame(notebook, padding=12)
+        patch_tab = patch_scroll.content
+        patch_tab.columnconfigure(0, weight=1)
+        notebook.add(patch_scroll, text="Patch SI")
+
+        patch_box = ttk.LabelFrame(patch_tab, text="Patch existing support", padding=12)
+        patch_box.grid(row=0, column=0, sticky="ew")
         patch_box.columnconfigure(1, weight=1)
         self._file_row(patch_box, 0, "Patched output .docx", self.patch_output_docx, self._browse_patch_output, optional=True)
         ttk.Label(patch_box, text="Renumber").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=4)
@@ -287,23 +292,33 @@ class SIGeneratorApp:
         ttk.Entry(patch_box, textvariable=self.patch_reorder).grid(row=3, column=1, sticky="ew", pady=4)
         ttk.Button(patch_box, text="Apply patch", command=self._start_patch).grid(row=3, column=2, sticky="e", padx=(8, 0), pady=4)
 
-        add_box = ttk.LabelFrame(tools, text="Add compounds", padding=12)
-        add_box.grid(row=2, column=0, sticky="ew", pady=(10, 0))
+        add_scroll = _ScrollableFrame(notebook, padding=12)
+        add_tab = add_scroll.content
+        add_tab.columnconfigure(0, weight=1)
+        notebook.add(add_scroll, text="Add compounds")
+
+        add_box = ttk.LabelFrame(add_tab, text="Add compounds", padding=12)
+        add_box.grid(row=0, column=0, sticky="ew")
         add_box.columnconfigure(1, weight=1)
         self._file_row(add_box, 0, "Existing manifest", self.add_manifest, lambda: self._browse_file(self.add_manifest, [("Manifest JSON", "*.json"), ("All files", "*.*")]), optional=True)
         self._file_row(add_box, 1, "Existing support .docx", self.add_support_docx, lambda: self._browse_file(self.add_support_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
-        self._file_row(add_box, 2, "New compound table", self.add_input_path, self._browse_add_input, optional=True)
+        ttk.Label(add_box, text="New table type").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
+        add_kind = ttk.Frame(add_box)
+        add_kind.grid(row=2, column=1, columnspan=2, sticky="w", pady=4)
+        ttk.Radiobutton(add_kind, text="Word table with ChemDraw objects", variable=self.add_input_kind, value="word").pack(side="left")
+        ttk.Radiobutton(add_kind, text="CSV table", variable=self.add_input_kind, value="csv").pack(side="left", padx=(16, 0))
+        self._file_row(add_box, 3, "New compound table", self.add_input_path, self._browse_add_input, optional=True)
         self._source_row(
             add_box,
-            3,
+            4,
             "New spectra source",
             self.add_spectra_source,
             lambda: self._browse_file(self.add_spectra_source, [("Zip archives", "*.zip"), ("All files", "*.*")]),
             lambda: self._browse_folder(self.add_spectra_source),
             optional=True,
         )
-        self._file_row(add_box, 4, "Output .docx", self.add_output_docx, self._browse_add_output, optional=True)
-        ttk.Button(add_box, text="Add compounds", command=self._start_add_compounds).grid(row=5, column=2, sticky="e", padx=(8, 0), pady=(8, 0))
+        self._file_row(add_box, 5, "Output .docx", self.add_output_docx, self._browse_add_output, optional=True)
+        ttk.Button(add_box, text="Add compounds", command=self._start_add_compounds).grid(row=6, column=2, sticky="e", padx=(8, 0), pady=(8, 0))
 
         actions = ttk.Frame(self.root, padding=(18, 8, 18, 18))
         actions.grid(row=1, column=0, sticky="ew")
@@ -313,7 +328,7 @@ class SIGeneratorApp:
         self.progress.pack(side="left", padx=(12, 0))
         self.run_button = ttk.Button(actions, text="Generate SI", command=self._start_generation, style="Accent.TButton")
         self.run_button.pack(side="right")
-        ttk.Button(actions, text="Open output folder", command=self._open_output_folder).pack(side="right", padx=(0, 8))
+        ttk.Button(actions, text="Open last output", command=self._open_output_folder).pack(side="right", padx=(0, 8))
         ttk.Button(actions, text="Clear log", command=lambda: self.log.clear()).pack(side="right", padx=(0, 8))
 
     def _source_row(self, parent, row: int, label: str, variable: StringVar, file_command, folder_command, optional: bool = False) -> None:

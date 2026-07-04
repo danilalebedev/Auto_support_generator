@@ -335,6 +335,28 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(summary["run_summary"], str(report.resolve()))
         self.assertEqual(summary["overview"], "Status: fail | Errors: 1 | Warnings: 2")
 
+    def test_builds_add_compounds_request_from_csv_table(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = root / "support_information.manifest.json"
+            new_table = root / "new_compounds.csv"
+            output = root / "combined.docx"
+            manifest.write_text("{}", encoding="utf-8")
+            new_table.write_text("number,name\n3a,Example\n", encoding="utf-8")
+
+            request = _build_add_compounds_request(
+                manifest_text=str(manifest),
+                support_docx_text="",
+                input_kind="csv",
+                input_path_text=str(new_table),
+                output_docx_text=str(output),
+            )
+
+        self.assertEqual(request.manifest_path, manifest)
+        self.assertEqual(request.input_path, new_table)
+        self.assertEqual(request.input_kind, "csv")
+        self.assertEqual(request.output_docx, output)
+
     def test_report_overview_ignores_missing_or_invalid_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             report = Path(tmp) / "broken.json"

@@ -194,6 +194,23 @@ class DocumentModelTests(unittest.TestCase):
         self.assertIn("IR (ATR, cm-1): 3038, 2957, 1711.", text)
         self.assertNotIn("IR (KBr, cm-1): IR", text)
 
+    def test_renders_xrd_block_from_structured_input(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "support_information.docx"
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="XRD example",
+                xrd={"ccdc_number": "2350001", "cif_path": "2a.cif"},
+            )
+            model = build_si_document_model([compound])
+
+            build_document_from_model(model, output_path)
+
+            text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
+
+        self.assertIn("XRD: crystallographic data are provided in the CIF file; CCDC 2350001.", text)
+
     def test_renders_chemical_inline_word_formatting(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_path = Path(tmp) / "support_information.docx"

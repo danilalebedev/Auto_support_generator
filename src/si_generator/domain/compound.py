@@ -6,7 +6,7 @@ from typing import Any
 from .ir import parse_ir_block
 from .massspec import hrms_found_text
 from .types import Compound as CompoundSnapshot
-from .types import ElementalAnalysisBlock, HRMSBlock, IRBlock, Issue, NMRSpectrumBlock, ReactionBlock
+from .types import ElementalAnalysisBlock, HRMSBlock, IRBlock, Issue, NMRSpectrumBlock, ReactionBlock, XRDBlock
 
 
 @dataclass(slots=True)
@@ -43,6 +43,7 @@ class Compound:
     extra_nmr: str = ""
     ir: str | IRBlock = ""
     elemental_analysis: ElementalAnalysisBlock = field(default_factory=dict)
+    xrd: XRDBlock = field(default_factory=dict)
     reaction: ReactionBlock = field(default_factory=dict)
     references: list[str] = field(default_factory=list)
     structure_path: str = ""
@@ -72,6 +73,7 @@ def compound_to_domain_dict(compound: Compound) -> CompoundSnapshot:
     _put(data, "hrms", _hrms_block(compound))
     _put(data, "ir", _ir_block(compound.ir))
     _put(data, "elemental_analysis", compound.elemental_analysis)
+    _put(data, "xrd", compound.xrd)
     _put(data, "reaction", compound.reaction)
     _put(data, "references", list(compound.references))
     _put(data, "issues", list(compound.validation_issues))

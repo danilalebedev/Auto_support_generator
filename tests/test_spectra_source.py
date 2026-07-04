@@ -33,6 +33,18 @@ class SpectraSourceTests(unittest.TestCase):
             self.assertEqual(prepared.name, "test_input")
             self.assertTrue((prepared / "2a" / "1H" / "fid").exists())
 
+    def test_prepare_spectra_source_rejects_zip_slip_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            spectra_zip = root / "unsafe.zip"
+            with zipfile.ZipFile(spectra_zip, "w") as archive:
+                archive.writestr("../evil.txt", "owned")
+
+            with self.assertRaisesRegex(ValueError, "Unsafe path in zip"):
+                prepare_spectra_source(spectra_zip, root / "work")
+
+            self.assertFalse((root / "evil.txt").exists())
+
     def test_cli_accepts_spectra_source_folder(self) -> None:
         parser = _build_parser()
         args = parser.parse_args(

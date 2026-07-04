@@ -32,6 +32,8 @@ class PackagingTests(unittest.TestCase):
             h1_image = output_root / "spectra" / "processed_spectra" / "2a" / "2a_1H.png"
             h1_image.parent.mkdir(parents=True)
             h1_mnova = output_root / "spectra" / "processed_spectra" / "2a" / "2a_1H.mnova"
+            xrd_cif = output_root / "input" / "2a.cif"
+            xrd_cif.write_text("data_2a", encoding="utf-8")
 
             structure_path = root / "structures" / "2a.cdx"
             compound = Compound(
@@ -43,6 +45,7 @@ class PackagingTests(unittest.TestCase):
                 h1_nmr="1.23 (s, 3H)",
                 hrms_found="47.0491",
                 ir="IR (KBr, cm-1): 1700",
+                xrd={"ccdc_number": "2350001", "cif_path": str(xrd_cif)},
             )
             compound.structure_path = str(structure_path)
             compound.has_word_structure = True
@@ -104,10 +107,13 @@ class PackagingTests(unittest.TestCase):
                 "ir": True,
                 "hrms": True,
                 "elemental_analysis": False,
+                "xrd": True,
             },
         )
         self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_png"], str(Path("spectra") / "processed_spectra" / "2a" / "2a_1H.png"))
         self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_mnova"], str(Path("spectra") / "processed_spectra" / "2a" / "2a_1H.mnova"))
+        self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["xrd_cif"], str(Path("input") / "2a.cif"))
+        self.assertEqual(manifest["compounds"]["cmp_001"]["domain_snapshot"]["xrd"]["ccdc_number"], "2350001")
         self.assertEqual(manifest["configs"]["spectra"]["extract_nmr"], False)
         self.assertEqual(
             manifest["compounds"]["cmp_001"]["docx_bookmark"],

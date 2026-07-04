@@ -21,6 +21,7 @@ from rdkit.Chem import rdMolDescriptors
 from .domain.massspec import extract_mz_text
 from .domain.references import parse_reference_keys
 from .domain.reactions import reaction_from_fields
+from .domain.xrd import xrd_from_fields
 from .domain.compound import Compound
 from .structure_metadata import extract_structure_metadata_by_row
 from .word_ole_trace import trace_word_ole_event
@@ -104,6 +105,7 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
                     extra_nmr=fields.get("extra_nmr", ""),
                     ir=fields.get("ir", ""),
                     elemental_analysis=_elemental_analysis_from_fields(fields),
+                    xrd=xrd_from_fields(fields),
                     reaction=reaction_from_fields(fields),
                     references=parse_reference_keys(fields.get("references", "")),
                     has_word_structure=has_structure,
@@ -168,6 +170,7 @@ def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Comp
                 extra_nmr=fields.get("extra_nmr", ""),
                 ir=fields.get("ir", ""),
                 elemental_analysis=_elemental_analysis_from_fields(fields),
+                xrd=xrd_from_fields(fields),
                 reaction=reaction_from_fields(fields),
                 references=parse_reference_keys(fields.get("references", "")),
                 has_word_structure=metadata is not None,
@@ -352,6 +355,18 @@ def _map_row(headers: list[str], values: list[str]) -> dict[str, str]:
             result["ir"] = value
         elif key in {"elementalanalysis", "elementaryanalysis", "analysis", "anal", "ea"}:
             result["elemental_analysis"] = value
+        elif key in {"xrd", "xrdtext", "crystallography", "crystaldata"}:
+            result["xrd_text"] = value
+        elif key in {"ccdc", "ccdcnumber"}:
+            result["ccdc_number"] = value
+        elif key in {"cif", "cifpath"}:
+            result["cif_path"] = value
+        elif key in {"checkcif", "checkcifpath", "checkcifreport", "checkcifreportpath"}:
+            result["checkcif_path"] = value
+        elif key in {"xrdtable", "xrdtablepath", "crystaltable", "crystaltablepath"}:
+            result["xrd_table_path"] = value
+        elif key in {"xrdfigures", "xrdfigurepaths", "crystalfigures"}:
+            result["xrd_figure_paths"] = value
         elif key in {"references", "refs", "referencekeys"}:
             result["references"] = value
         elif key in {"targetmmol", "reactiontargetmmol"}:

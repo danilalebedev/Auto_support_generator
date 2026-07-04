@@ -7,6 +7,7 @@ from pathlib import Path
 from ...domain.bookmarks import bookmark_name_for_block_id
 from ...domain.compound import compound_to_domain_dict
 from ...domain.issues import compound_issue_counts, count_issues, generation_status, issue_code_counts, issues_by_compound
+from ...domain.xrd import xrd_artifacts
 from ...output_layout import output_dirs, output_root_for
 from ..state import GenerateSIState
 
@@ -222,6 +223,7 @@ def _compound_artifacts(compound) -> dict[str, str]:
         artifacts["c13_mnova"] = compound.c13_mnova_path
     if compound.mnova_path:
         artifacts["mnova"] = compound.mnova_path
+    artifacts.update(xrd_artifacts(getattr(compound, "xrd", {})))
     return artifacts
 
 
@@ -236,6 +238,7 @@ def _analytical_blocks(compound) -> dict[str, bool]:
         "ir": bool(compound.ir),
         "hrms": bool(compound.hrms or compound.hrms_found),
         "elemental_analysis": bool(compound.elemental_analysis),
+        "xrd": bool(getattr(compound, "xrd", {})),
     }
 
 
