@@ -304,18 +304,22 @@ class GuiWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             manifest = root / "support_information.manifest.json"
+            support = root / "support_information.docx"
             output = root / "patched.docx"
             manifest.write_text("{}", encoding="utf-8")
+            support.write_text("placeholder", encoding="utf-8")
 
             request = _build_patch_request(
                 manifest_text=str(manifest),
                 renumber_text="2a=3a,2b=3b",
+                support_docx_text=str(support),
                 remove_text="2c",
                 reorder_text="2b,2a",
                 output_docx_text=str(output),
             )
 
         self.assertEqual(request.manifest_path, manifest)
+        self.assertEqual(request.support_docx, support)
         self.assertEqual(request.renumber, {"2a": "3a", "2b": "3b"})
         self.assertEqual(request.remove, ("2c",))
         self.assertEqual(request.reorder, ("2b", "2a"))

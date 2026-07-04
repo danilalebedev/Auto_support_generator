@@ -299,16 +299,31 @@ class SIGeneratorApp:
         patch_box = ttk.LabelFrame(patch_tab, text="Patch existing support", padding=12)
         patch_box.grid(row=0, column=0, sticky="ew")
         patch_box.columnconfigure(1, weight=1)
-        self._file_row(patch_box, 0, "Patched output .docx", self.patch_output_docx, self._browse_patch_output, optional=True)
-        ttk.Label(patch_box, text="Renumber").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(patch_box, textvariable=self.patch_renumber).grid(row=1, column=1, sticky="ew", pady=4)
-        ttk.Label(patch_box, text="Example: 2a=3a,2b=3b", style="Muted.TLabel").grid(row=1, column=2, sticky="w", padx=(8, 0), pady=4)
-        ttk.Label(patch_box, text="Remove").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(patch_box, textvariable=self.patch_remove).grid(row=2, column=1, sticky="ew", pady=4)
-        ttk.Label(patch_box, text="Example: 2a,2c", style="Muted.TLabel").grid(row=2, column=2, sticky="w", padx=(8, 0), pady=4)
-        ttk.Label(patch_box, text="Reorder").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(patch_box, textvariable=self.patch_reorder).grid(row=3, column=1, sticky="ew", pady=4)
-        ttk.Button(patch_box, text="Apply patch", command=self._start_patch).grid(row=3, column=2, sticky="e", padx=(8, 0), pady=4)
+        self._file_row(
+            patch_box,
+            0,
+            "Existing manifest",
+            self.existing_manifest,
+            lambda: self._browse_file(self.existing_manifest, [("Manifest JSON", "*.json"), ("All files", "*.*")]),
+        )
+        self._file_row(
+            patch_box,
+            1,
+            "Existing support .docx override",
+            self.check_support_docx,
+            lambda: self._browse_file(self.check_support_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
+            optional=True,
+        )
+        self._file_row(patch_box, 2, "Patched output .docx", self.patch_output_docx, self._browse_patch_output, optional=True)
+        ttk.Label(patch_box, text="Renumber").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(patch_box, textvariable=self.patch_renumber).grid(row=3, column=1, sticky="ew", pady=4)
+        ttk.Label(patch_box, text="Example: 2a=3a,2b=3b", style="Muted.TLabel").grid(row=3, column=2, sticky="w", padx=(8, 0), pady=4)
+        ttk.Label(patch_box, text="Remove").grid(row=4, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(patch_box, textvariable=self.patch_remove).grid(row=4, column=1, sticky="ew", pady=4)
+        ttk.Label(patch_box, text="Example: 2a,2c", style="Muted.TLabel").grid(row=4, column=2, sticky="w", padx=(8, 0), pady=4)
+        ttk.Label(patch_box, text="Reorder").grid(row=5, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(patch_box, textvariable=self.patch_reorder).grid(row=5, column=1, sticky="ew", pady=4)
+        ttk.Button(patch_box, text="Apply patch", command=self._start_patch).grid(row=5, column=2, sticky="e", padx=(8, 0), pady=4)
 
         add_scroll = _ScrollableFrame(notebook, padding=12)
         add_tab = add_scroll.content
@@ -570,6 +585,7 @@ class SIGeneratorApp:
         try:
             request = _build_patch_request(
                 manifest_text=self.existing_manifest.get(),
+                support_docx_text=self.check_support_docx.get(),
                 renumber_text=self.patch_renumber.get(),
                 remove_text=self.patch_remove.get(),
                 reorder_text=self.patch_reorder.get(),
@@ -1157,6 +1173,7 @@ def _build_patch_request(
     *,
     manifest_text: str,
     renumber_text: str,
+    support_docx_text: str = "",
     remove_text: str = "",
     reorder_text: str = "",
     output_docx_text: str = "",
@@ -1169,6 +1186,7 @@ def _build_patch_request(
         raise ValueError("Enter renumber, remove, or reorder patch instructions.")
     return PatchSIRequest(
         manifest_path=manifest_path,
+        support_docx=_optional_existing_file(support_docx_text, "Existing support .docx", suffixes=(".docx",)),
         renumber=renumber,
         remove=remove,
         reorder=reorder,
