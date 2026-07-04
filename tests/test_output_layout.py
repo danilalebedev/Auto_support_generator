@@ -10,6 +10,7 @@ from si_generator.output_layout import (
     cleanup_legacy_output_root,
     create_run_output_root,
     prepare_output_layout,
+    run_output_dirs,
 )
 
 
@@ -78,6 +79,19 @@ class OutputLayoutTests(unittest.TestCase):
             self.assertEqual(dirs["input_dir"].parent, dirs["output_root"])
             self.assertEqual(dirs["reports_dir"].parent, dirs["output_root"])
             self.assertTrue(logs_exists)
+
+    def test_run_output_dirs_returns_standard_dirs_for_existing_run_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "20260704_120000_input"
+
+            dirs = run_output_dirs(run_root)
+
+            self.assertEqual(dirs["output_root"], run_root)
+            self.assertEqual(dirs["docx_dir"], run_root / "docx")
+            self.assertEqual(dirs["input_dir"], run_root / "input")
+            self.assertEqual(dirs["spectra_dir"], run_root / "spectra")
+            self.assertEqual(dirs["processed_mnova_dir"], run_root / "mnova" / "processed")
+            self.assertEqual(dirs["mnova_reports_dir"], run_root / "logs" / "mnova_reports")
 
 
 if __name__ == "__main__":

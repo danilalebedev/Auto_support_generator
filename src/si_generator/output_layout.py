@@ -49,6 +49,10 @@ def output_dirs(output_path: str | Path) -> dict[str, Path]:
     }
 
 
+def run_output_dirs(run_root: str | Path) -> dict[str, Path]:
+    return output_dirs(Path(run_root) / "docx" / "support_information.docx")
+
+
 def create_run_output_root(input_path: str | Path, requested_output: str | Path, run_id: str) -> Path:
     requested = Path(requested_output)
     base = _requested_output_base(requested)
