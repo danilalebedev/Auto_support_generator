@@ -7,6 +7,13 @@ from pathlib import Path
 from .domain.compound import Compound
 
 
+def prepare_spectra_source(source_path: str | Path, work_dir: str | Path) -> Path:
+    source_path = Path(source_path).resolve()
+    if source_path.is_dir():
+        return source_path
+    return prepare_spectra_zip(source_path, work_dir)
+
+
 def prepare_spectra_zip(zip_path: str | Path, work_dir: str | Path) -> Path:
     zip_path = Path(zip_path).resolve()
     work_dir = Path(work_dir).resolve() / zip_path.stem

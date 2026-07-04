@@ -68,6 +68,12 @@ class GraphStateTests(unittest.TestCase):
             no_check_support=True,
             peak_threshold_fraction_1h=0.08,
             peak_threshold_fraction_13c=0.04,
+            baseline_mode="whittaker",
+            baseline_apply_1h=True,
+            baseline_apply_13c=False,
+            baseline_poly_order=4,
+            whittaker_lambda=300000,
+            whittaker_asymmetry=0.003,
         )
 
         result = load_settings_node({"request": request})
@@ -77,6 +83,12 @@ class GraphStateTests(unittest.TestCase):
         self.assertEqual(result["spectra_config"]["target_signal_height_fraction"], 0.80)
         self.assertEqual(result["spectra_config"]["peak_threshold_fraction_1h"], 0.08)
         self.assertEqual(result["spectra_config"]["peak_threshold_fraction_13c"], 0.04)
+        self.assertEqual(result["spectra_config"]["baseline_mode"], "whittaker")
+        self.assertTrue(result["spectra_config"]["baseline_apply_1h"])
+        self.assertFalse(result["spectra_config"]["baseline_apply_13c"])
+        self.assertEqual(result["spectra_config"]["baseline_poly_order"], 4)
+        self.assertEqual(result["spectra_config"]["whittaker_lambda"], 300000.0)
+        self.assertEqual(result["spectra_config"]["whittaker_asymmetry"], 0.003)
         self.assertEqual(result["spectra_config"]["mnova_executable_path"], "C:\\Tools\\MestReNova.exe")
         self.assertFalse(result["generation_config"]["check_support"])
         self.assertTrue(result["generation_config"]["include_ir"])

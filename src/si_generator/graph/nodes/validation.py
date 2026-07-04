@@ -4,6 +4,7 @@ from ..compound_store import ordered_compounds
 from ..state import GenerateSIState, Issue
 from ...domain.input_validation import validate_compound_inputs
 from ...nmr_validation import validate_support
+from ...output_layout import output_root_for
 
 
 def validate_input_node(state: GenerateSIState) -> dict:
@@ -21,7 +22,7 @@ def validate_input_node(state: GenerateSIState) -> dict:
         issues.append(_input_warning_issue(warning, state))
     result = {"issues": issues}
     if warnings:
-        log_path = request.output_dir / "logs" / "input_warnings.txt"
+        log_path = output_root_for(state.get("output_path", request.output_path)) / "logs" / "input_warnings.txt"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(warnings) + "\n", encoding="utf-8")
         result["artifacts"] = {**state.get("artifacts", {}), "input_warnings": str(log_path)}
@@ -88,7 +89,7 @@ def validate_support_node(state: GenerateSIState) -> dict:
 
     result = {"compounds": state.get("compounds", {}), "issues": issues}
     if warnings:
-        log_path = request.output_dir / "logs" / "support_warnings.txt"
+        log_path = output_root_for(state.get("output_path", request.output_path)) / "logs" / "support_warnings.txt"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(warnings) + "\n", encoding="utf-8")
         result["artifacts"] = {**state.get("artifacts", {}), "support_warnings": str(log_path)}

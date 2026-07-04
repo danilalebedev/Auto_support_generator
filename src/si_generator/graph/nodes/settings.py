@@ -18,6 +18,12 @@ def load_settings_node(state: GenerateSIState) -> dict:
             peak_threshold_fraction=request.peak_threshold_fraction,
             peak_threshold_fraction_1h=request.peak_threshold_fraction_1h,
             peak_threshold_fraction_13c=request.peak_threshold_fraction_13c,
+            baseline_mode=request.baseline_mode,
+            baseline_apply_1h=request.baseline_apply_1h,
+            baseline_apply_13c=request.baseline_apply_13c,
+            baseline_poly_order=request.baseline_poly_order,
+            whittaker_lambda=request.whittaker_lambda,
+            whittaker_asymmetry=request.whittaker_asymmetry,
         ),
         "generation_config": build_generation_config(
             generate_loadings=request.generate_loadings,

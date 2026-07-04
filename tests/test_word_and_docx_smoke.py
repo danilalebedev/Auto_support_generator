@@ -48,6 +48,7 @@ class WordAndDocxSmokeTests(unittest.TestCase):
                 )
 
             self.assertEqual(exit_code, 0)
+            output_path = _generated_path_from_stdout(stdout.getvalue())
             self.assertTrue(output_path.exists())
             self.assertTrue(output_path.with_suffix(".run_summary.json").exists())
             self.assertIn("Run summary:", stdout.getvalue())
@@ -73,6 +74,13 @@ def _all_structure_ole_objects_use_chemdraw(path: Path) -> bool:
                 if b"ACD.ChemSketchCDX" in data or b"ChemDraw.Document" not in data:
                     return False
     return True
+
+
+def _generated_path_from_stdout(output: str) -> Path:
+    for line in output.splitlines():
+        if line.startswith("Generated "):
+            return Path(line.removeprefix("Generated ").strip())
+    raise AssertionError(f"Generated path not found in CLI output:\n{output}")
 
 
 if __name__ == "__main__":

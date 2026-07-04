@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from ..compound_store import ordered_compounds
@@ -7,27 +8,64 @@ from ..state import GenerateSIState
 from ...domain.spectra_config import build_spectrum_render_spec
 from ...domain.types import SpectrumRenderSpec
 from ...nmr_fill import fill_nmr_from_mnova
-from ...output_layout import prepare_output_layout
-from ...spectra_zip import assign_spectra_from_folder, prepare_spectra_zip
+from ...output_layout import output_root_for, prepare_output_layout
+from ...spectra_zip import assign_spectra_from_folder, prepare_spectra_source
 
 
-def prepare_spectra_zip_node(state: GenerateSIState) -> dict:
+def prepare_spectra_source_node(state: GenerateSIState) -> dict:
     request = state["request"]
     compounds = ordered_compounds(state)
-    dirs = prepare_output_layout(request.output_path)
+    dirs = prepare_output_layout(request.output_path, input_path=request.input_path, run_id=state.get("run_id", ""))
+    output_path = dirs["support_docx"]
     artifacts = {
         **state.get("artifacts", {}),
+        "output_root": str(dirs["output_root"]),
         "docx_dir": str(dirs["docx_dir"]),
         "input_dir": str(dirs["input_dir"]),
         "logs_dir": str(dirs["logs_dir"]),
+        "reports_dir": str(dirs["reports_dir"]),
         "spectra_dir": str(dirs["spectra_dir"]),
     }
-    if not request.spectra_zip:
-        return {"artifacts": artifacts}
+    input_artifacts = _copy_input_artifacts(request, dirs["input_dir"])
+    artifacts.update(input_artifacts)
+    spectra_source = request.resolved_spectra_source
+    if not spectra_source:
+        return {"output_path": output_path, "artifacts": artifacts}
 
-    spectra_root = prepare_spectra_zip(request.spectra_zip, dirs["input_dir"] / "spectra")
+    spectra_root = prepare_spectra_source(spectra_source, dirs["input_dir"] / "spectra")
     assign_spectra_from_folder(compounds, spectra_root)
-    return {"compounds": state.get("compounds", {}), "artifacts": {**artifacts, "spectra_root": str(spectra_root)}}
+    return {
+        "output_path": output_path,
+        "compounds": state.get("compounds", {}),
+        "artifacts": {**artifacts, "spectra_root": str(spectra_root)},
+    }
+
+
+prepare_spectra_zip_node = prepare_spectra_source_node
+
+
+def _copy_input_artifacts(request, input_dir: Path) -> dict[str, str]:
+    artifacts: dict[str, str] = {}
+    for key, source in {
+        "compound_table_copy": request.input_path,
+        "template_docx_copy": request.template_docx,
+        "references_copy": request.references_path,
+        "loadings_schema_copy": request.loadings_schema_docx,
+        "loadings_scope_copy": request.loadings_scope_docx,
+    }.items():
+        if not source:
+            continue
+        path = Path(source)
+        if not path.exists() or not path.is_file():
+            continue
+        target = input_dir / path.name
+        if path.resolve() == target.resolve():
+            artifacts[key] = str(target)
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, target)
+        artifacts[key] = str(target)
+    return artifacts
 
 
 def plan_nmr_processing_node(state: GenerateSIState) -> dict:
@@ -69,8 +107,8 @@ def mnova_batch_node(state: GenerateSIState) -> dict:
     fill_nmr_from_mnova(
         compounds,
         request.input_base_dir,
-        request.output_dir / "logs" / "mnova_batch",
-        output_root=request.output_dir,
+        output_root_for(state.get("output_path", request.output_path)) / "logs" / "mnova_batch",
+        output_root=output_root_for(state.get("output_path", request.output_path)),
         mnova_exe=mnova_exe,
         render_specs_by_compound=state.get("spectra_plan"),
     )

@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
-from ..domain.requests import CheckSIRequest, GenerateSIRequest, InputKind, PatchSIRequest
+from ..domain.requests import AddCompoundsRequest, CheckSIRequest, GenerateSIRequest, InputKind, PatchSIRequest
 from ..domain.types import (
     GenerationConfig,
     Issue,
@@ -49,6 +49,18 @@ class PatchSIState(TypedDict, total=False):
     request: PatchSIRequest
     manifest: dict[str, Any]
     patch_result: dict[str, Any]
+    artifacts: dict[str, str]
+    issues: list[Issue]
+    status: Literal["pass", "fail"]
+
+
+class AddCompoundsState(TypedDict, total=False):
+    run_id: str
+    request: AddCompoundsRequest
+    manifest: dict[str, Any]
+    new_compounds: list[Compound]
+    new_generate_state: dict[str, Any]
+    add_result: dict[str, Any]
     artifacts: dict[str, str]
     issues: list[Issue]
     status: Literal["pass", "fail"]

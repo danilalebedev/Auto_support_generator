@@ -7,6 +7,7 @@ IssueSeverity = Literal["info", "warning", "error"]
 ArtifactKind = Literal["docx", "png", "mnova", "txt", "zip", "cif", "json"]
 PeakPickingPolicy = Literal["minimal", "normal", "dense", "manual"]
 SpectrumEmbedMode = Literal["png", "mnova", "none"]
+BaselineMode = Literal["auto", "off", "bernstein", "whittaker"]
 
 
 class Issue(TypedDict, total=False):
@@ -48,6 +49,11 @@ class SpectrumRenderSpec(TypedDict, total=False):
     peak_threshold_fraction: float
     ignore_regions_ppm: list[tuple[float, float]]
     peak_picking: PeakPickingPolicy
+    baseline_mode: BaselineMode
+    baseline_apply: bool
+    baseline_poly_order: int
+    whittaker_lambda: float
+    whittaker_asymmetry: float
 
 
 class SpectrumAsset(TypedDict, total=False):
@@ -189,6 +195,12 @@ class SpectraConfig(TypedDict, total=False):
     peak_threshold_fraction: float
     peak_threshold_fraction_1h: float
     peak_threshold_fraction_13c: float
+    baseline_mode: BaselineMode
+    baseline_apply_1h: bool
+    baseline_apply_13c: bool
+    baseline_poly_order: int
+    whittaker_lambda: float
+    whittaker_asymmetry: float
     solvent_suppression: bool
     ignore_regions_ppm: dict[str, list[tuple[float, float]]]
     peak_picking: PeakPickingPolicy

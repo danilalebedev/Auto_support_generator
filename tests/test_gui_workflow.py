@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from si_generator.gui import (
+    _build_add_compounds_request,
     _build_check_summary,
     _build_check_request,
     _build_generate_request,
@@ -41,12 +42,18 @@ class GuiWorkflowTests(unittest.TestCase):
                 input_kind="word",
                 input_path_text=str(table),
                 output_docx_text=str(output),
-                spectra_zip_text=str(spectra),
+                spectra_source_text=str(spectra),
                 references_text="",
                 loadings_schema_text=str(schema),
                 loadings_scope_text=str(scope),
                 peak_threshold_1h_percent_text="8",
                 peak_threshold_13c_percent_text="3,5",
+                baseline_mode_text="whittaker",
+                baseline_apply_1h=True,
+                baseline_apply_13c=False,
+                baseline_poly_order_text="5",
+                whittaker_lambda_text="250000",
+                whittaker_asymmetry_text="0,002",
                 generate_loadings=True,
                 check_support=False,
             )
@@ -54,13 +61,39 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(request.input_path, table)
         self.assertEqual(request.input_kind, "word")
         self.assertEqual(request.output_path, output)
-        self.assertEqual(request.spectra_zip, spectra)
+        self.assertEqual(request.spectra_source, spectra)
+        self.assertEqual(request.resolved_spectra_source, spectra)
         self.assertEqual(request.loadings_schema_docx, schema)
         self.assertEqual(request.loadings_scope_docx, scope)
         self.assertEqual(request.peak_threshold_fraction_1h, 0.08)
         self.assertEqual(request.peak_threshold_fraction_13c, 0.035)
+        self.assertEqual(request.baseline_mode, "whittaker")
+        self.assertTrue(request.baseline_apply_1h)
+        self.assertFalse(request.baseline_apply_13c)
+        self.assertEqual(request.baseline_poly_order, 5)
+        self.assertEqual(request.whittaker_lambda, 250000.0)
+        self.assertEqual(request.whittaker_asymmetry, 0.002)
         self.assertTrue(request.generate_loadings)
         self.assertTrue(request.no_check_support)
+
+    def test_builds_graph_request_from_folder_spectra_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            table = root / "input.docx"
+            spectra_folder = root / "spectra"
+            output = root / "support_information.docx"
+            table.write_text("placeholder", encoding="utf-8")
+            spectra_folder.mkdir()
+
+            request = _build_generate_request(
+                input_kind="word",
+                input_path_text=str(table),
+                output_docx_text=str(output),
+                spectra_source_text=str(spectra_folder),
+            )
+
+        self.assertEqual(request.spectra_source, spectra_folder)
+        self.assertEqual(request.resolved_spectra_source, spectra_folder)
 
     def test_legacy_shared_peak_threshold_populates_both_nuclei(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -120,7 +153,7 @@ class GuiWorkflowTests(unittest.TestCase):
             table.write_text("placeholder", encoding="utf-8")
             spectra.write_text("placeholder", encoding="utf-8")
 
-            with self.assertRaisesRegex(ValueError, "Spectra zip must have one of these extensions"):
+            with self.assertRaisesRegex(ValueError, "Spectra source must have one of these extensions"):
                 _build_generate_request(
                     input_kind="word",
                     input_path_text=str(table),

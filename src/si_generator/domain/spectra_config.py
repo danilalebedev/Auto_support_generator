@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-from .types import PeakPickingPolicy, SpectraConfig, SpectrumEmbedMode, SpectrumRenderSpec
+from .types import BaselineMode, PeakPickingPolicy, SpectraConfig, SpectrumEmbedMode, SpectrumRenderSpec
 
 
 DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION = 0.80
 DEFAULT_H1_PEAK_THRESHOLD_FRACTION = 0.06
 DEFAULT_C13_PEAK_THRESHOLD_FRACTION = 0.04
+DEFAULT_BASELINE_MODE: BaselineMode = "auto"
+DEFAULT_BASELINE_APPLY_1H = False
+DEFAULT_BASELINE_APPLY_13C = True
+DEFAULT_BASELINE_POLY_ORDER = 3
+DEFAULT_WHITTAKER_LAMBDA = 100000.0
+DEFAULT_WHITTAKER_ASYMMETRY = 0.001
 DEFAULT_PEAK_THRESHOLD_FRACTION = DEFAULT_H1_PEAK_THRESHOLD_FRACTION
 DEFAULT_PEAK_PICKING: PeakPickingPolicy = "normal"
 DEFAULT_X_RANGES = {
@@ -22,6 +28,12 @@ def build_spectra_config(
     peak_threshold_fraction: float | None = None,
     peak_threshold_fraction_1h: float | None = None,
     peak_threshold_fraction_13c: float | None = None,
+    baseline_mode: BaselineMode | str = DEFAULT_BASELINE_MODE,
+    baseline_apply_1h: bool = DEFAULT_BASELINE_APPLY_1H,
+    baseline_apply_13c: bool = DEFAULT_BASELINE_APPLY_13C,
+    baseline_poly_order: int = DEFAULT_BASELINE_POLY_ORDER,
+    whittaker_lambda: float = DEFAULT_WHITTAKER_LAMBDA,
+    whittaker_asymmetry: float = DEFAULT_WHITTAKER_ASYMMETRY,
 ) -> SpectraConfig:
     config: SpectraConfig = {
         "extract_nmr": extract_nmr,
@@ -35,6 +47,12 @@ def build_spectra_config(
             peak_threshold_fraction_13c if peak_threshold_fraction_13c is not None else peak_threshold_fraction,
             DEFAULT_C13_PEAK_THRESHOLD_FRACTION,
         ),
+        "baseline_mode": _baseline_mode(baseline_mode),
+        "baseline_apply_1h": bool(baseline_apply_1h),
+        "baseline_apply_13c": bool(baseline_apply_13c),
+        "baseline_poly_order": _positive_int(baseline_poly_order, DEFAULT_BASELINE_POLY_ORDER),
+        "whittaker_lambda": _positive_float(whittaker_lambda, DEFAULT_WHITTAKER_LAMBDA),
+        "whittaker_asymmetry": _normalized_fraction(whittaker_asymmetry, DEFAULT_WHITTAKER_ASYMMETRY),
         "solvent_suppression": True,
         "ignore_regions_ppm": {},
         "peak_picking": DEFAULT_PEAK_PICKING,
@@ -61,6 +79,11 @@ def build_spectrum_render_spec(
             default_threshold,
         ),
         "peak_picking": config.get("peak_picking", DEFAULT_PEAK_PICKING),
+        "baseline_mode": _baseline_mode(config.get("baseline_mode", DEFAULT_BASELINE_MODE)),
+        "baseline_apply": _baseline_apply(nucleus, config),
+        "baseline_poly_order": _positive_int(config.get("baseline_poly_order"), DEFAULT_BASELINE_POLY_ORDER),
+        "whittaker_lambda": _positive_float(config.get("whittaker_lambda"), DEFAULT_WHITTAKER_LAMBDA),
+        "whittaker_asymmetry": _normalized_fraction(config.get("whittaker_asymmetry"), DEFAULT_WHITTAKER_ASYMMETRY),
     }
     ignore_regions = config.get("ignore_regions_ppm", {})
     if isinstance(ignore_regions, dict) and nucleus in ignore_regions:
@@ -82,3 +105,33 @@ def _normalized_fraction(value, fallback: float) -> float:
     if fraction > 1:
         return 1
     return fraction
+
+
+def _baseline_mode(value) -> BaselineMode:
+    text = str(value or DEFAULT_BASELINE_MODE).strip().lower()
+    if text in {"auto", "off", "bernstein", "whittaker"}:
+        return text  # type: ignore[return-value]
+    return DEFAULT_BASELINE_MODE
+
+
+def _baseline_apply(nucleus: str, config: SpectraConfig | dict) -> bool:
+    key = "baseline_apply_1h" if nucleus == "1H" else "baseline_apply_13c"
+    if key in config:
+        return bool(config[key])
+    return DEFAULT_BASELINE_APPLY_1H if nucleus == "1H" else DEFAULT_BASELINE_APPLY_13C
+
+
+def _positive_int(value, fallback: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    return parsed if parsed > 0 else fallback
+
+
+def _positive_float(value, fallback: float) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return fallback
+    return parsed if parsed > 0 else fallback

@@ -1,0 +1,69 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from si_generator.output_layout import cleanup_legacy_output_root, create_run_output_root, prepare_output_layout
+
+
+class OutputLayoutTests(unittest.TestCase):
+    def test_create_run_output_root_uses_unique_per_run_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_path = root / "test input.docx"
+            input_path.write_text("input", encoding="utf-8")
+            requested_output = root / "output" / "support_information.docx"
+
+            first = create_run_output_root(input_path, requested_output, "20260704T120000")
+            first.mkdir(parents=True)
+            second = create_run_output_root(input_path, requested_output, "20260704T120000")
+
+        self.assertEqual(first.name, "20260704_120000_test_input")
+        self.assertEqual(second.name, "20260704_120000_test_input_2")
+        self.assertEqual(first.parent.name, "runs")
+
+    def test_cleanup_legacy_output_root_deletes_only_known_generated_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            generated_file = root / "support_information.docx"
+            generated_dir = root / "processed_mnova"
+            user_file = root / "notes.docx"
+            user_dir_file = root / "custom" / "keep.txt"
+            generated_file.write_text("old", encoding="utf-8")
+            generated_dir.mkdir()
+            (generated_dir / "old.mnova").write_text("old", encoding="utf-8")
+            user_file.write_text("keep", encoding="utf-8")
+            user_dir_file.parent.mkdir()
+            user_dir_file.write_text("keep", encoding="utf-8")
+
+            cleanup_legacy_output_root(root)
+
+            self.assertFalse(generated_file.exists())
+            self.assertFalse(generated_dir.exists())
+            self.assertTrue(user_file.exists())
+            self.assertTrue(user_dir_file.exists())
+
+    def test_prepare_output_layout_returns_run_docx_and_standard_dirs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_path = root / "input.docx"
+            input_path.write_text("input", encoding="utf-8")
+            dirs = prepare_output_layout(
+                root / "output" / "support_information.docx",
+                input_path=input_path,
+                run_id="20260704T120000",
+            )
+
+            support = dirs["support_docx"]
+            logs_exists = dirs["logs_dir"].exists()
+
+        self.assertEqual(support.parent.name, "docx")
+        self.assertEqual(support.name, "support_information.docx")
+        self.assertEqual(dirs["input_dir"].parent, dirs["output_root"])
+        self.assertEqual(dirs["reports_dir"].parent, dirs["output_root"])
+        self.assertTrue(logs_exists)
+
+
+if __name__ == "__main__":
+    unittest.main()

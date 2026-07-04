@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+import re
 
 
 LEGACY_GENERATED_FILES = (
@@ -38,6 +39,7 @@ def output_dirs(output_path: str | Path) -> dict[str, Path]:
         "docx_dir": root / "docx",
         "input_dir": root / "input",
         "logs_dir": root / "logs",
+        "reports_dir": root / "reports",
         "mnova_dir": root / "mnova",
         "processed_mnova_dir": root / "mnova" / "processed",
         "spectra_dir": root / "spectra",
@@ -47,17 +49,42 @@ def output_dirs(output_path: str | Path) -> dict[str, Path]:
     }
 
 
-def prepare_output_layout(output_path: str | Path) -> dict[str, Path]:
-    dirs = output_dirs(output_path)
+def create_run_output_root(input_path: str | Path, requested_output: str | Path, run_id: str) -> Path:
+    requested = Path(requested_output)
+    base = _requested_output_base(requested)
+    cleanup_legacy_output_root(base)
+    run_parent = base if base.name.lower() == "runs" else base / "runs"
+    run_parent.mkdir(parents=True, exist_ok=True)
+    stem = _safe_stem(Path(input_path).stem) or "support"
+    run_stamp = _safe_stem(str(run_id).replace("T", "_")) or "run"
+    candidate = run_parent / f"{run_stamp}_{stem}"
+    if not candidate.exists():
+        return candidate
+    for index in range(2, 1000):
+        indexed = run_parent / f"{candidate.name}_{index}"
+        if not indexed.exists():
+            return indexed
+    raise ValueError(f"Cannot create a unique output run folder under {run_parent}")
+
+
+def prepare_output_layout(output_path: str | Path, *, input_path: str | Path | None = None, run_id: str = "") -> dict[str, Path]:
+    if input_path and run_id:
+        run_root = create_run_output_root(input_path, output_path, run_id)
+        output_name = Path(output_path).name if Path(output_path).suffix.lower() == ".docx" else "support_information.docx"
+        dirs = output_dirs(run_root / "docx" / output_name)
+    else:
+        dirs = output_dirs(output_path)
     root = dirs["output_root"]
     root.mkdir(parents=True, exist_ok=True)
-    _remove_legacy_generated_paths(root)
-    for key in ("docx_dir", "input_dir", "logs_dir", "mnova_dir", "spectra_dir"):
+    cleanup_legacy_output_root(root)
+    for key in ("docx_dir", "input_dir", "logs_dir", "reports_dir", "mnova_dir", "spectra_dir"):
         dirs[key].mkdir(parents=True, exist_ok=True)
+    dirs["support_docx"] = dirs["docx_dir"] / (Path(output_path).name if Path(output_path).suffix.lower() == ".docx" else "support_information.docx")
     return dirs
 
 
-def _remove_legacy_generated_paths(root: Path) -> None:
+def cleanup_legacy_output_root(root: str | Path) -> None:
+    root = Path(root)
     for name in LEGACY_GENERATED_FILES:
         path = root / name
         if path.exists() and path.is_file():
@@ -66,3 +93,16 @@ def _remove_legacy_generated_paths(root: Path) -> None:
         path = root / name
         if path.exists() and path.is_dir():
             shutil.rmtree(path)
+
+
+def _requested_output_base(path: Path) -> Path:
+    if path.suffix.lower() == ".docx":
+        if path.parent.name.lower() == "docx" and path.parent.parent.name:
+            return path.parent.parent
+        return path.parent
+    return path
+
+
+def _safe_stem(value: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip())
+    return safe.strip("._-")

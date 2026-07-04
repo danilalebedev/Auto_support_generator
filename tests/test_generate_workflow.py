@@ -18,7 +18,6 @@ class GenerateWorkflowTests(unittest.TestCase):
     def test_graph_generates_docx_without_mnova_or_support_check(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             requested_output_path = Path(tmp) / "support_information.docx"
-            output_path = Path(tmp) / "docx" / "support_information.docx"
             request = GenerateSIRequest(
                 input_path=REPO_ROOT / "examples" / "test_input.docx",
                 input_kind="word",
@@ -30,6 +29,10 @@ class GenerateWorkflowTests(unittest.TestCase):
 
             state = run_generate_si(request)
 
+            output_path = output_path_from_state(state)
+            self.assertEqual(output_path.parent.name, "docx")
+            self.assertEqual(output_path.parent.parent.parent, Path(tmp) / "runs")
+            self.assertTrue(output_path.parent.parent.name.endswith("_test_input"))
             self.assertEqual(output_path_from_state(state), output_path)
             self.assertTrue(output_path.exists())
             manifest_path = output_path.with_suffix(".manifest.json")
@@ -50,7 +53,7 @@ class GenerateWorkflowTests(unittest.TestCase):
             self.assertEqual(manifest["order"][:2], ["cmp_001", "cmp_002"])
             self.assertEqual(manifest["compounds"]["cmp_001"]["number"], "2a")
             self.assertIn("compound_table", manifest["input_hashes"])
-            self.assertIn("spectra_zip", manifest["input_hashes"])
+            self.assertIn("spectra_source", manifest["input_hashes"])
             self.assertFalse(manifest["configs"]["spectra"]["extract_nmr"])
             self.assertFalse(manifest["configs"]["generation"]["check_support"])
             self.assertEqual(Path(manifest["artifacts"]["support_docx"]), output_path)

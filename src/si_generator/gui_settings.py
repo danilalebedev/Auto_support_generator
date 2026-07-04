@@ -12,6 +12,7 @@ from .runtime_paths import gui_settings_path
 SETTINGS_VERSION = 1
 STRING_FIELDS = (
     "input_path",
+    "spectra_source",
     "spectra_zip",
     "template_docx",
     "references_file",
@@ -22,16 +23,27 @@ STRING_FIELDS = (
     "peak_threshold_percent",
     "peak_threshold_1h_percent",
     "peak_threshold_13c_percent",
+    "baseline_poly_order",
+    "whittaker_lambda",
+    "whittaker_asymmetry",
     "existing_manifest",
+    "check_support_docx",
     "patch_output_docx",
     "patch_renumber",
     "patch_remove",
     "patch_reorder",
+    "add_manifest",
+    "add_support_docx",
+    "add_input_path",
+    "add_spectra_source",
+    "add_output_docx",
 )
-BOOL_FIELDS = ("check_support", "generate_loadings")
+BOOL_FIELDS = ("check_support", "generate_loadings", "baseline_apply_1h", "baseline_apply_13c")
 CHOICE_FIELDS = {
     "input_kind": {"word", "csv"},
+    "add_input_kind": {"word", "csv"},
     "insert_spectra_as": {"png", "mnova", "none"},
+    "baseline_mode": {"auto", "off", "bernstein", "whittaker"},
 }
 
 

@@ -28,7 +28,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         self.assertEqual(issues, [])
 
-    def test_preflight_reports_invalid_spectra_zip(self) -> None:
+    def test_preflight_reports_invalid_spectra_source_zip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             input_docx = root / "input.docx"
@@ -63,7 +63,26 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             issues = preflight_generate_request(request, mnova_finder=_raising_mnova_finder)
 
         self.assertFalse(issue_has_errors(issues))
-        self.assertIn("PREFLIGHT_SPECTRA_ZIP_NOT_SELECTED", {issue["code"] for issue in issues})
+        self.assertIn("PREFLIGHT_SPECTRA_SOURCE_NOT_SELECTED", {issue["code"] for issue in issues})
+
+    def test_preflight_accepts_spectra_source_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_docx = root / "input.docx"
+            spectra_folder = root / "spectra"
+            input_docx.write_bytes(b"placeholder")
+            spectra_folder.mkdir()
+            request = GenerateSIRequest(
+                input_path=input_docx,
+                input_kind="word",
+                output_path=root / "support_information.docx",
+                spectra_source=spectra_folder,
+                no_extract_nmr=True,
+            )
+
+            issues = preflight_generate_request(request, mnova_finder=_raising_mnova_finder)
+
+        self.assertFalse(issue_has_errors(issues))
 
     def test_preflight_is_silent_without_zip_when_spectra_appendix_is_disabled(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -12,7 +12,15 @@ from .external_tools import find_mnova_executable, make_ascii_work_dir
 from .runtime_paths import bundled_resource_path
 
 
-SCRIPT_PATH = bundled_resource_path("scripts/extract_nmr_report.qs", package_file=__file__)
+def _mnova_script_path() -> Path:
+    frozen_script = bundled_resource_path("scripts/extract_nmr_report.qs", package_file=__file__)
+    package_script = Path(__file__).resolve().parent / "resources" / "scripts" / "extract_nmr_report.qs"
+    if package_script.exists():
+        return package_script
+    return frozen_script
+
+
+SCRIPT_PATH = _mnova_script_path()
 
 
 @dataclass(frozen=True)

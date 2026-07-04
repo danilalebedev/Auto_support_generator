@@ -2,6 +2,18 @@ from __future__ import annotations
 
 from langgraph.graph import END, START, StateGraph
 
+from .nodes.add_compounds import (
+    append_new_blocks_node,
+    check_duplicate_compound_numbers_node,
+    generate_new_support_node,
+    load_add_manifest_node,
+    read_new_compounds_node,
+    route_add_compounds_after_duplicate_check,
+    route_add_compounds_after_generation,
+    route_add_compounds_after_load,
+    write_add_compounds_report_node,
+    write_add_manifest_node,
+)
 from .nodes.elemental_analysis import calculate_elemental_analysis_node
 from .nodes.check import check_manifest_node, load_manifest_node
 from .nodes.ingest import read_input_table_node
@@ -13,9 +25,9 @@ from .nodes.packaging import write_manifest_node
 from .nodes.patching import apply_renumber_patch_node, check_patched_manifest_node, load_patch_manifest_node
 from .nodes.render import build_document_model_node, postprocess_word_objects_node, render_docx_node
 from .nodes.settings import load_settings_node
-from .nodes.spectra import mnova_batch_node, plan_nmr_processing_node, prepare_spectra_zip_node, route_nmr_processing
+from .nodes.spectra import mnova_batch_node, plan_nmr_processing_node, prepare_spectra_source_node, route_nmr_processing
 from .nodes.validation import validate_input_node, validate_support_node
-from .state import CheckSIState, GenerateSIState, PatchSIState
+from .state import AddCompoundsState, CheckSIState, GenerateSIState, PatchSIState
 
 
 def build_generate_si_graph():
@@ -24,7 +36,7 @@ def build_generate_si_graph():
     builder.add_node("load_settings", load_settings_node)
     builder.add_node("read_input_table", read_input_table_node)
     builder.add_node("normalize_compounds", normalize_compounds_node)
-    builder.add_node("prepare_spectra_zip", prepare_spectra_zip_node)
+    builder.add_node("prepare_spectra_source", prepare_spectra_source_node)
     builder.add_node("plan_nmr_processing", plan_nmr_processing_node)
     builder.add_node("validate_input", validate_input_node)
     builder.add_node("mnova_batch", mnova_batch_node)
@@ -42,8 +54,8 @@ def build_generate_si_graph():
     builder.add_edge(START, "load_settings")
     builder.add_edge("load_settings", "read_input_table")
     builder.add_edge("read_input_table", "normalize_compounds")
-    builder.add_edge("normalize_compounds", "prepare_spectra_zip")
-    builder.add_edge("prepare_spectra_zip", "plan_nmr_processing")
+    builder.add_edge("normalize_compounds", "prepare_spectra_source")
+    builder.add_edge("prepare_spectra_source", "plan_nmr_processing")
     builder.add_edge("plan_nmr_processing", "validate_input")
     builder.add_conditional_edges(
         "validate_input",
@@ -92,5 +104,49 @@ def build_patch_si_graph():
     builder.add_edge("load_manifest", "apply_renumber_patch")
     builder.add_edge("apply_renumber_patch", "check_patched_manifest")
     builder.add_edge("check_patched_manifest", END)
+
+    return builder.compile()
+
+
+def build_add_compounds_graph():
+    builder = StateGraph(AddCompoundsState)
+
+    builder.add_node("load_manifest", load_add_manifest_node)
+    builder.add_node("read_new_compounds", read_new_compounds_node)
+    builder.add_node("check_duplicate_numbers", check_duplicate_compound_numbers_node)
+    builder.add_node("generate_new_support", generate_new_support_node)
+    builder.add_node("append_new_blocks", append_new_blocks_node)
+    builder.add_node("write_manifest", write_add_manifest_node)
+    builder.add_node("write_report", write_add_compounds_report_node)
+
+    builder.add_edge(START, "load_manifest")
+    builder.add_conditional_edges(
+        "load_manifest",
+        route_add_compounds_after_load,
+        {
+            "continue": "read_new_compounds",
+            "fail": "write_report",
+        },
+    )
+    builder.add_edge("read_new_compounds", "check_duplicate_numbers")
+    builder.add_conditional_edges(
+        "check_duplicate_numbers",
+        route_add_compounds_after_duplicate_check,
+        {
+            "continue": "generate_new_support",
+            "fail": "write_report",
+        },
+    )
+    builder.add_conditional_edges(
+        "generate_new_support",
+        route_add_compounds_after_generation,
+        {
+            "continue": "append_new_blocks",
+            "fail": "write_report",
+        },
+    )
+    builder.add_edge("append_new_blocks", "write_manifest")
+    builder.add_edge("write_manifest", "write_report")
+    builder.add_edge("write_report", END)
 
     return builder.compile()

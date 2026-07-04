@@ -51,8 +51,8 @@ def examples_dir() -> Path:
 def default_output_path(*, frozen: bool | None = None, environ: dict[str, str] | None = None) -> Path:
     is_frozen = bool(getattr(sys, "frozen", False)) if frozen is None else frozen
     if is_frozen:
-        return local_app_data_dir(environ=environ) / "output" / "docx" / "support_information.docx"
-    return Path.cwd() / "output" / "docx" / "support_information.docx"
+        return local_app_data_dir(environ=environ) / "output" / "support_information.docx"
+    return Path.cwd() / "output" / "support_information.docx"
 
 
 def gui_settings_path(*, environ: dict[str, str] | None = None) -> Path:

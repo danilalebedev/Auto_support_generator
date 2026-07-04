@@ -29,6 +29,7 @@ DEFAULT_TEMPLATE_RESOURCE = Path("si_generator/templates/SI_template.docx")
 
 PLACEHOLDER_RE = re.compile(r"\[\{([^{}]+)\}\]|\{([^{}]+)\}")
 NMR_LABEL_RE = re.compile(r"13C\{1H\}|1H(?=\s*NMR\b)")
+STEREOCHEMISTRY_RE = re.compile(r"\((?:\d*[EZ](?:,\d*[EZ])*)\)")
 RF_RE = re.compile(r"\bRf\b")
 GP_RE = re.compile(r"\bGP\d+\b")
 COMPOUND_NUMBER_RE = re.compile(r"(?<![A-Za-z0-9.])\d+[a-z](?![A-Za-z0-9])")
@@ -215,6 +216,7 @@ def _apply_inline_formatting(paragraph: Paragraph) -> None:
 
 def _inline_format_segments(text: str) -> list[tuple[str, dict[str, bool]]]:
     patterns = [
+        ("stereochemistry", STEREOCHEMISTRY_RE),
         ("nmr", NMR_LABEL_RE),
         ("rf", RF_RE),
         ("gp", GP_RE),
@@ -241,7 +243,9 @@ def _inline_format_segments(text: str) -> list[tuple[str, dict[str, bool]]]:
             segments.append((text[position:start], {}))
 
         token = match.group(0)
-        if kind == "nmr":
+        if kind == "stereochemistry":
+            segments.extend(_stereochemistry_segments(token))
+        elif kind == "nmr":
             segments.extend(_nmr_label_segments(token))
         elif kind == "rf":
             segments.extend([("R", {}), ("f", {"subscript": True})])
@@ -261,6 +265,10 @@ def _nmr_label_segments(token: str) -> list[tuple[str, dict[str, bool]]]:
     if token == "1H":
         return [("1", {"superscript": True}), ("H", {})]
     return [("13", {"superscript": True}), ("C{", {}), ("1", {"superscript": True}), ("H}", {})]
+
+
+def _stereochemistry_segments(token: str) -> list[tuple[str, dict[str, bool]]]:
+    return [(char, {"italic": True} if char in {"E", "Z"} else {}) for char in token]
 
 
 def _chemical_token_segments(token: str) -> list[tuple[str, dict[str, bool]]] | None:
@@ -341,6 +349,8 @@ def _replace_run_with_segments(paragraph: Paragraph, run: Run, segments: list[tu
         new_run = Run(new_r, paragraph)
         if formatting.get("bold"):
             new_run.bold = True
+        if formatting.get("italic"):
+            new_run.italic = True
         if formatting.get("subscript"):
             new_run.font.superscript = False
             new_run.font.subscript = True

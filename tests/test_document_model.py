@@ -200,7 +200,7 @@ class DocumentModelTests(unittest.TestCase):
             compound = Compound(
                 id="cmp_001",
                 number="3a",
-                name="Formatting example",
+                name="Methyl (E)-3-(2-(bromomethyl)phenyl)acrylate",
                 preparation="Bromide 3a was obtained according to GP2. Rf = 0.4 in CDCl3",
                 h1_conditions="CDCl3, 600 MHz",
                 h1_nmr="δ = δ = 7.26 (s, 1H).",
@@ -227,6 +227,7 @@ class DocumentModelTests(unittest.TestCase):
         self.assertTrue(_has_run(runs, "3", vert_align="subscript"))
         self.assertTrue(_has_run(runs, "17", vert_align="subscript"))
         self.assertTrue(_has_run(runs, "+", vert_align="superscript"))
+        self.assertTrue(_has_run(runs, "E", italic=True))
 
 W_NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 W_VAL = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val"
@@ -244,12 +245,14 @@ def _document_runs(path: Path) -> list[dict[str, str | bool]]:
         properties = run.find("w:rPr", W_NS)
         vert_align = ""
         bold = False
+        italic = False
         if properties is not None:
             bold = properties.find("w:b", W_NS) is not None
+            italic = properties.find("w:i", W_NS) is not None
             vert = properties.find("w:vertAlign", W_NS)
             if vert is not None:
                 vert_align = str(vert.attrib.get(W_VAL, ""))
-        runs.append({"text": text, "bold": bold, "vert_align": vert_align})
+        runs.append({"text": text, "bold": bold, "italic": italic, "vert_align": vert_align})
     return runs
 
 
@@ -258,12 +261,15 @@ def _has_run(
     text: str,
     *,
     bold: bool | None = None,
+    italic: bool | None = None,
     vert_align: str | None = None,
 ) -> bool:
     for run in runs:
         if run["text"] != text:
             continue
         if bold is not None and run["bold"] != bold:
+            continue
+        if italic is not None and run["italic"] != italic:
             continue
         if vert_align is not None and run["vert_align"] != vert_align:
             continue

@@ -18,7 +18,7 @@ def build_document_model_node(state: GenerateSIState) -> dict:
 def render_docx_node(state: GenerateSIState) -> dict:
     request = state["request"]
     document_model = state.get("document_model") or _build_document_model_from_state(state)
-    target_path = support_docx_path(request.output_path)
+    target_path = support_docx_path(state.get("output_path", request.output_path))
     output_path = build_document_from_model(
         document_model,
         target_path,

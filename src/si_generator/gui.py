@@ -13,8 +13,17 @@ from typing import Any
 
 from .domain.manifest import manifest_has_errors
 from .domain.patching import parse_remove_list, parse_renumber_map, parse_reorder_list
-from .domain.requests import CheckSIRequest, GenerateSIRequest, PatchSIRequest
-from .domain.spectra_config import DEFAULT_C13_PEAK_THRESHOLD_FRACTION, DEFAULT_H1_PEAK_THRESHOLD_FRACTION
+from .domain.requests import AddCompoundsRequest, CheckSIRequest, GenerateSIRequest, PatchSIRequest
+from .domain.spectra_config import (
+    DEFAULT_BASELINE_APPLY_13C,
+    DEFAULT_BASELINE_APPLY_1H,
+    DEFAULT_BASELINE_MODE,
+    DEFAULT_BASELINE_POLY_ORDER,
+    DEFAULT_C13_PEAK_THRESHOLD_FRACTION,
+    DEFAULT_H1_PEAK_THRESHOLD_FRACTION,
+    DEFAULT_WHITTAKER_ASYMMETRY,
+    DEFAULT_WHITTAKER_LAMBDA,
+)
 from .domain.types import SpectrumEmbedMode
 from .external_tools import find_mnova_executable
 from .gui_settings import load_gui_settings, save_gui_settings
@@ -29,13 +38,14 @@ class SIGeneratorApp:
     def __init__(self, root: Tk) -> None:
         self.root = root
         self.root.title("Auto Support Generator")
-        self.root.geometry("980x680")
+        self.root.geometry("840x560")
         self.root.minsize(720, 480)
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
 
         self.input_path = StringVar()
-        self.spectra_zip = StringVar()
+        self.spectra_source = StringVar()
+        self.spectra_zip = self.spectra_source
         self.template_docx = StringVar()
         self.references_file = StringVar()
         self.loadings_schema_docx = StringVar()
@@ -46,24 +56,33 @@ class SIGeneratorApp:
         self.insert_spectra_as = StringVar(value="png")
         self.peak_threshold_1h_percent = StringVar(value=_format_peak_threshold_percent(DEFAULT_H1_PEAK_THRESHOLD_FRACTION))
         self.peak_threshold_13c_percent = StringVar(value=_format_peak_threshold_percent(DEFAULT_C13_PEAK_THRESHOLD_FRACTION))
+        self.baseline_mode = StringVar(value=DEFAULT_BASELINE_MODE)
+        self.baseline_apply_1h = BooleanVar(value=DEFAULT_BASELINE_APPLY_1H)
+        self.baseline_apply_13c = BooleanVar(value=DEFAULT_BASELINE_APPLY_13C)
+        self.baseline_poly_order = StringVar(value=str(DEFAULT_BASELINE_POLY_ORDER))
+        self.whittaker_lambda = StringVar(value=f"{DEFAULT_WHITTAKER_LAMBDA:g}")
+        self.whittaker_asymmetry = StringVar(value=f"{DEFAULT_WHITTAKER_ASYMMETRY:g}")
         self.check_support = BooleanVar(value=True)
         self.generate_loadings = BooleanVar(value=False)
         self.status_text = StringVar(value="Ready")
         self.result_support = StringVar(value="")
-        self.result_spectra = StringVar(value="")
+        self.result_output_folder = StringVar(value="")
         self.result_manifest = StringVar(value="")
-        self.result_run_summary = StringVar(value="")
-        self.result_warnings = StringVar(value="")
-        self.result_support_warnings = StringVar(value="")
-        self.result_processed_mnova = StringVar(value="")
-        self.result_mnova_reports = StringVar(value="")
+        self.result_report = StringVar(value="")
         self.result_logs = StringVar(value="")
         self.result_overview = StringVar(value="")
         self.existing_manifest = StringVar(value="")
+        self.check_support_docx = StringVar(value="")
         self.patch_output_docx = StringVar(value="")
         self.patch_renumber = StringVar(value="")
         self.patch_remove = StringVar(value="")
         self.patch_reorder = StringVar(value="")
+        self.add_manifest = StringVar(value="")
+        self.add_support_docx = StringVar(value="")
+        self.add_input_path = StringVar(value="")
+        self.add_spectra_source = StringVar(value="")
+        self.add_output_docx = StringVar(value="")
+        self.add_input_kind = StringVar(value="word")
 
         self._is_running = False
         self._last_output_folder: Path | None = None
@@ -89,48 +108,121 @@ class SIGeneratorApp:
         style.configure("Status.TLabel", foreground="#355070")
 
     def _build_ui(self) -> None:
-        scroll_area = _ScrollableFrame(self.root, padding=18)
-        scroll_area.grid(row=0, column=0, sticky="nsew")
-
-        outer = scroll_area.content
+        outer = ttk.Frame(self.root, padding=14)
+        outer.grid(row=0, column=0, sticky="nsew")
         outer.columnconfigure(0, weight=1)
-        outer.rowconfigure(6, weight=1)
+        outer.rowconfigure(1, weight=1)
 
         header = ttk.Frame(outer)
-        header.grid(row=0, column=0, sticky="ew", pady=(0, 14))
+        header.grid(row=0, column=0, sticky="ew", pady=(0, 10))
         header.columnconfigure(0, weight=1)
         ttk.Label(header, text="Auto Support Generator", style="Title.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(header, text="Word table + spectra zip -> formatted Supporting Information", style="Muted.TLabel").grid(row=1, column=0, sticky="w", pady=(2, 0))
+        ttk.Label(header, text="Compound table + spectra source -> formatted Supporting Information", style="Muted.TLabel").grid(
+            row=1, column=0, sticky="w", pady=(2, 0)
+        )
         ttk.Button(header, text="Load example", command=self._load_examples).grid(row=0, column=1, rowspan=2, sticky="e", padx=(12, 0))
         ttk.Button(header, text="Open examples", command=self._open_examples_folder).grid(row=0, column=2, rowspan=2, sticky="e", padx=(8, 0))
 
-        files = ttk.LabelFrame(outer, text="Input and Output", padding=12)
-        files.grid(row=1, column=0, sticky="ew")
-        files.columnconfigure(1, weight=1)
+        notebook = ttk.Notebook(outer)
+        notebook.grid(row=1, column=0, sticky="nsew")
 
-        ttk.Label(files, text="Table type").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
-        kind = ttk.Frame(files)
+        generate_tab = ttk.Frame(notebook, padding=12)
+        generate_tab.columnconfigure(0, weight=1)
+        generate_tab.rowconfigure(2, weight=1)
+        notebook.add(generate_tab, text="Generate")
+
+        simple = ttk.LabelFrame(generate_tab, text="Simple", padding=12)
+        simple.grid(row=0, column=0, sticky="ew")
+        simple.columnconfigure(1, weight=1)
+        ttk.Label(simple, text="Table type").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        kind = ttk.Frame(simple)
         kind.grid(row=0, column=1, sticky="w", pady=4)
         ttk.Radiobutton(kind, text="Word table with ChemDraw objects", variable=self.input_kind, value="word").pack(side="left")
         ttk.Radiobutton(kind, text="CSV table", variable=self.input_kind, value="csv").pack(side="left", padx=(16, 0))
+        self._file_row(simple, 1, "Compound table", self.input_path, self._browse_input)
+        self._source_row(simple, 2, "Spectra source", self.spectra_source, self._browse_spectra_source, self._browse_spectra_folder)
+        self._file_row(simple, 3, "Output .docx", self.output_docx, self._browse_output)
 
-        self._file_row(files, 1, "Compound table", self.input_path, self._browse_input)
-        self._file_row(files, 2, "Spectra zip", self.spectra_zip, lambda: self._browse_file(self.spectra_zip, [("Zip archives", "*.zip"), ("All files", "*.*")]))
-        self._file_row(files, 3, "SI template .docx", self.template_docx, lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
-        self._file_row(files, 4, "References .yml", self.references_file, lambda: self._browse_file(self.references_file, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
+        results = ttk.LabelFrame(generate_tab, text="Results", padding=12)
+        results.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        results.columnconfigure(1, weight=1)
+        self._result_row(results, 0, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"))
+        self._result_row(results, 1, "Output folder", self.result_output_folder, lambda: self._open_result_path(self.result_output_folder, "Output folder"))
+        self._result_row(results, 2, "Logs", self.result_logs, lambda: self._open_result_path(self.result_logs, "Logs"))
+        self._result_row(results, 3, "Report", self.result_report, lambda: self._open_result_path(self.result_report, "Report"))
+        ttk.Label(results, textvariable=self.result_overview, style="Muted.TLabel").grid(row=4, column=0, columnspan=3, sticky="ew", pady=(6, 0))
+
+        log_frame = ttk.LabelFrame(generate_tab, text="Run Log", padding=8)
+        log_frame.grid(row=2, column=0, sticky="nsew", pady=(10, 0))
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(0, weight=1)
+        self.log = _LogText(log_frame, height=6)
+        self.log.grid(row=0, column=0, sticky="nsew")
+        scroll = ttk.Scrollbar(log_frame, command=self.log.yview)
+        scroll.grid(row=0, column=1, sticky="ns")
+        self.log.configure(yscrollcommand=scroll.set)
+
+        advanced_scroll = _ScrollableFrame(notebook, padding=12)
+        advanced = advanced_scroll.content
+        advanced.columnconfigure(0, weight=1)
+        notebook.add(advanced_scroll, text="Advanced")
+
+        files = ttk.LabelFrame(advanced, text="Optional inputs", padding=12)
+        files.grid(row=0, column=0, sticky="ew")
+        files.columnconfigure(1, weight=1)
+        self._file_row(files, 0, "SI template .docx", self.template_docx, lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
+        self._file_row(files, 1, "References .yml", self.references_file, lambda: self._browse_file(self.references_file, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
         self._file_row(
             files,
-            5,
+            2,
             "MestReNova .exe",
             self.mnova_exe,
             lambda: self._browse_file(self.mnova_exe, [("MestReNova", "*.exe"), ("All files", "*.*")]),
             optional=True,
             extra_button=("Detect", self._detect_mnova),
         )
-        self._file_row(files, 6, "Output .docx", self.output_docx, self._browse_output)
 
-        loadings = ttk.LabelFrame(outer, text="Reagent Loadings", padding=12)
-        loadings.grid(row=2, column=0, sticky="ew", pady=(12, 12))
+        options = ttk.LabelFrame(advanced, text="Processing", padding=12)
+        options.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        ttk.Checkbutton(
+            options,
+            text="Check support (NMR, HRMS, elemental analysis)",
+            variable=self.check_support,
+        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=4)
+        ttk.Label(options, text="Spectra appendix").grid(row=0, column=2, sticky="e", padx=(12, 8), pady=4)
+        ttk.Combobox(
+            options,
+            textvariable=self.insert_spectra_as,
+            values=("png", "mnova", "none"),
+            state="readonly",
+            width=8,
+        ).grid(row=0, column=3, sticky="w", pady=4)
+        ttk.Label(options, text="1H threshold (%)").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(options, textvariable=self.peak_threshold_1h_percent, width=8).grid(row=1, column=1, sticky="w", pady=4)
+        ttk.Label(options, text="13C threshold (%)").grid(row=1, column=2, sticky="e", padx=(12, 8), pady=4)
+        ttk.Entry(options, textvariable=self.peak_threshold_13c_percent, width=8).grid(row=1, column=3, sticky="w", pady=4)
+
+        baseline = ttk.LabelFrame(advanced, text="Baseline correction", padding=12)
+        baseline.grid(row=2, column=0, sticky="ew", pady=(10, 0))
+        ttk.Label(baseline, text="Mode").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Combobox(
+            baseline,
+            textvariable=self.baseline_mode,
+            values=("auto", "off", "bernstein", "whittaker"),
+            state="readonly",
+            width=12,
+        ).grid(row=0, column=1, sticky="w", pady=4)
+        ttk.Checkbutton(baseline, text="Apply to 1H", variable=self.baseline_apply_1h).grid(row=0, column=2, sticky="w", padx=(12, 0), pady=4)
+        ttk.Checkbutton(baseline, text="Apply to 13C", variable=self.baseline_apply_13c).grid(row=0, column=3, sticky="w", padx=(12, 0), pady=4)
+        ttk.Label(baseline, text="Bernstein order").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(baseline, textvariable=self.baseline_poly_order, width=8).grid(row=1, column=1, sticky="w", pady=4)
+        ttk.Label(baseline, text="Whittaker lambda").grid(row=1, column=2, sticky="e", padx=(12, 8), pady=4)
+        ttk.Entry(baseline, textvariable=self.whittaker_lambda, width=12).grid(row=1, column=3, sticky="w", pady=4)
+        ttk.Label(baseline, text="Whittaker asymmetry").grid(row=1, column=4, sticky="e", padx=(12, 8), pady=4)
+        ttk.Entry(baseline, textvariable=self.whittaker_asymmetry, width=10).grid(row=1, column=5, sticky="w", pady=4)
+
+        loadings = ttk.LabelFrame(advanced, text="Reagent Loadings", padding=12)
+        loadings.grid(row=3, column=0, sticky="ew", pady=(10, 0))
         loadings.columnconfigure(1, weight=1)
         ttk.Checkbutton(
             loadings,
@@ -153,55 +245,17 @@ class SIGeneratorApp:
             lambda: self._browse_file(self.loadings_scope_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
             optional=True,
         )
-        options = ttk.LabelFrame(outer, text="Options", padding=12)
-        options.grid(row=3, column=0, sticky="ew", pady=(0, 12))
-        options.columnconfigure(5, weight=1)
-        ttk.Checkbutton(
-            options,
-            text="Check support (NMR, HRMS, elemental analysis)",
-            variable=self.check_support,
-        ).grid(row=0, column=0, sticky="w")
-        ttk.Label(options, text="Spectra appendix").grid(row=0, column=1, sticky="e", padx=(12, 8))
-        ttk.Combobox(
-            options,
-            textvariable=self.insert_spectra_as,
-            values=("png", "mnova", "none"),
-            state="readonly",
-            width=8,
-        ).grid(row=0, column=2, sticky="w")
-        ttk.Label(options, textvariable=self.status_text, style="Status.TLabel").grid(row=0, column=5, sticky="e", padx=(12, 0))
-        self.progress = ttk.Progressbar(options, mode="indeterminate", length=180)
-        self.progress.grid(row=0, column=6, sticky="e", padx=(12, 0))
-        ttk.Label(options, text="1H threshold (%)").grid(row=1, column=1, sticky="e", padx=(12, 8), pady=(8, 0))
-        ttk.Entry(options, textvariable=self.peak_threshold_1h_percent, width=6).grid(row=1, column=2, sticky="w", pady=(8, 0))
-        ttk.Label(options, text="13C threshold (%)").grid(row=1, column=3, sticky="e", padx=(12, 8), pady=(8, 0))
-        ttk.Entry(options, textvariable=self.peak_threshold_13c_percent, width=6).grid(row=1, column=4, sticky="w", pady=(8, 0))
 
-        results = ttk.LabelFrame(outer, text="Results", padding=12)
-        results.grid(row=4, column=0, sticky="ew", pady=(0, 12))
-        results.columnconfigure(1, weight=1)
-        self._result_row(results, 0, "Summary", self.result_overview)
-        self._result_row(results, 1, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"))
-        self._result_row(results, 2, "Spectra package", self.result_spectra, lambda: self._open_result_path(self.result_spectra, "Spectra package"))
-        self._result_row(results, 3, "Processed Mnova", self.result_processed_mnova, lambda: self._open_result_path(self.result_processed_mnova, "Processed Mnova"))
-        self._result_row(results, 4, "Mnova reports", self.result_mnova_reports, lambda: self._open_result_path(self.result_mnova_reports, "Mnova reports"))
-        self._result_row(results, 5, "Logs", self.result_logs, lambda: self._open_result_path(self.result_logs, "Logs"))
-        self._result_row(results, 6, "Manifest", self.result_manifest, lambda: self._open_result_path(self.result_manifest, "Manifest"))
-        self._result_row(results, 7, "Run report", self.result_run_summary, lambda: self._open_result_path(self.result_run_summary, "Run report"))
-        self._result_row(results, 8, "Input warnings", self.result_warnings, lambda: self._open_result_path(self.result_warnings, "Input warnings"))
-        self._result_row(
-            results,
-            9,
-            "Support warnings",
-            self.result_support_warnings,
-            lambda: self._open_result_path(self.result_support_warnings, "Support warnings"),
-        )
+        tools_scroll = _ScrollableFrame(notebook, padding=12)
+        tools = tools_scroll.content
+        tools.columnconfigure(0, weight=1)
+        notebook.add(tools_scroll, text="Tools")
 
-        tools = ttk.LabelFrame(outer, text="Existing SI Tools", padding=12)
-        tools.grid(row=5, column=0, sticky="ew", pady=(0, 12))
-        tools.columnconfigure(1, weight=1)
+        check_box = ttk.LabelFrame(tools, text="Check existing support", padding=12)
+        check_box.grid(row=0, column=0, sticky="ew")
+        check_box.columnconfigure(1, weight=1)
         self._file_row(
-            tools,
+            check_box,
             0,
             "Manifest",
             self.existing_manifest,
@@ -209,35 +263,65 @@ class SIGeneratorApp:
             optional=True,
             extra_button=("Check", self._start_manifest_check),
         )
-        self._file_row(tools, 1, "Patched output .docx", self.patch_output_docx, self._browse_patch_output, optional=True)
-        ttk.Label(tools, text="Renumber").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(tools, textvariable=self.patch_renumber).grid(row=2, column=1, sticky="ew", pady=4)
-        ttk.Label(tools, text="Example: 2a=3a,2b=3b", style="Muted.TLabel").grid(row=2, column=2, sticky="w", padx=(8, 0), pady=4)
-        ttk.Label(tools, text="Remove").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(tools, textvariable=self.patch_remove).grid(row=3, column=1, sticky="ew", pady=4)
-        ttk.Label(tools, text="Example: 2a,2c", style="Muted.TLabel").grid(row=3, column=2, sticky="w", padx=(8, 0), pady=4)
-        ttk.Label(tools, text="Reorder").grid(row=4, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(tools, textvariable=self.patch_reorder).grid(row=4, column=1, sticky="ew", pady=4)
-        ttk.Button(tools, text="Apply patch", command=self._start_patch).grid(row=4, column=2, sticky="e", padx=(8, 0), pady=4)
+        self._file_row(
+            check_box,
+            1,
+            "Support .docx override",
+            self.check_support_docx,
+            lambda: self._browse_file(self.check_support_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
+            optional=True,
+        )
 
-        log_frame = ttk.LabelFrame(outer, text="Run Log", padding=8)
-        log_frame.grid(row=6, column=0, sticky="nsew")
-        log_frame.columnconfigure(0, weight=1)
-        log_frame.rowconfigure(0, weight=1)
+        patch_box = ttk.LabelFrame(tools, text="Patch existing support", padding=12)
+        patch_box.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        patch_box.columnconfigure(1, weight=1)
+        self._file_row(patch_box, 0, "Patched output .docx", self.patch_output_docx, self._browse_patch_output, optional=True)
+        ttk.Label(patch_box, text="Renumber").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(patch_box, textvariable=self.patch_renumber).grid(row=1, column=1, sticky="ew", pady=4)
+        ttk.Label(patch_box, text="Example: 2a=3a,2b=3b", style="Muted.TLabel").grid(row=1, column=2, sticky="w", padx=(8, 0), pady=4)
+        ttk.Label(patch_box, text="Remove").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(patch_box, textvariable=self.patch_remove).grid(row=2, column=1, sticky="ew", pady=4)
+        ttk.Label(patch_box, text="Example: 2a,2c", style="Muted.TLabel").grid(row=2, column=2, sticky="w", padx=(8, 0), pady=4)
+        ttk.Label(patch_box, text="Reorder").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(patch_box, textvariable=self.patch_reorder).grid(row=3, column=1, sticky="ew", pady=4)
+        ttk.Button(patch_box, text="Apply patch", command=self._start_patch).grid(row=3, column=2, sticky="e", padx=(8, 0), pady=4)
 
-        self.log = _LogText(log_frame)
-        self.log.grid(row=0, column=0, sticky="nsew")
-        scroll = ttk.Scrollbar(log_frame, command=self.log.yview)
-        scroll.grid(row=0, column=1, sticky="ns")
-        self.log.configure(yscrollcommand=scroll.set)
+        add_box = ttk.LabelFrame(tools, text="Add compounds", padding=12)
+        add_box.grid(row=2, column=0, sticky="ew", pady=(10, 0))
+        add_box.columnconfigure(1, weight=1)
+        self._file_row(add_box, 0, "Existing manifest", self.add_manifest, lambda: self._browse_file(self.add_manifest, [("Manifest JSON", "*.json"), ("All files", "*.*")]), optional=True)
+        self._file_row(add_box, 1, "Existing support .docx", self.add_support_docx, lambda: self._browse_file(self.add_support_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
+        self._file_row(add_box, 2, "New compound table", self.add_input_path, self._browse_add_input, optional=True)
+        self._source_row(
+            add_box,
+            3,
+            "New spectra source",
+            self.add_spectra_source,
+            lambda: self._browse_file(self.add_spectra_source, [("Zip archives", "*.zip"), ("All files", "*.*")]),
+            lambda: self._browse_folder(self.add_spectra_source),
+            optional=True,
+        )
+        self._file_row(add_box, 4, "Output .docx", self.add_output_docx, self._browse_add_output, optional=True)
+        ttk.Button(add_box, text="Add compounds", command=self._start_add_compounds).grid(row=5, column=2, sticky="e", padx=(8, 0), pady=(8, 0))
 
         actions = ttk.Frame(self.root, padding=(18, 8, 18, 18))
         actions.grid(row=1, column=0, sticky="ew")
         actions.columnconfigure(0, weight=1)
+        ttk.Label(actions, textvariable=self.status_text, style="Status.TLabel").pack(side="left")
+        self.progress = ttk.Progressbar(actions, mode="indeterminate", length=150)
+        self.progress.pack(side="left", padx=(12, 0))
         self.run_button = ttk.Button(actions, text="Generate SI", command=self._start_generation, style="Accent.TButton")
         self.run_button.pack(side="right")
         ttk.Button(actions, text="Open output folder", command=self._open_output_folder).pack(side="right", padx=(0, 8))
         ttk.Button(actions, text="Clear log", command=lambda: self.log.clear()).pack(side="right", padx=(0, 8))
+
+    def _source_row(self, parent, row: int, label: str, variable: StringVar, file_command, folder_command, optional: bool = False) -> None:
+        ttk.Label(parent, text=f"{label}{' (optional)' if optional else ''}").grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(parent, textvariable=variable).grid(row=row, column=1, sticky="ew", pady=4)
+        button_box = ttk.Frame(parent)
+        button_box.grid(row=row, column=2, sticky="e", padx=(8, 0), pady=4)
+        ttk.Button(button_box, text="Zip...", command=file_command).pack(side="left", padx=(0, 6))
+        ttk.Button(button_box, text="Folder...", command=folder_command).pack(side="left")
 
     def _file_row(self, parent, row: int, label: str, variable: StringVar, command, optional: bool = False, extra_button=None) -> None:
         ttk.Label(parent, text=f"{label}{' (optional)' if optional else ''}").grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
@@ -275,6 +359,22 @@ class SIGeneratorApp:
             variable.set(path)
             self._save_settings()
 
+    def _browse_folder(self, variable: StringVar) -> None:
+        kwargs: dict[str, object] = {}
+        initialdir = _dialog_initialdir(variable.get(), self.input_path.get(), self.output_docx.get(), self._last_output_folder)
+        if initialdir:
+            kwargs["initialdir"] = initialdir
+        path = filedialog.askdirectory(**kwargs)
+        if path:
+            variable.set(path)
+            self._save_settings()
+
+    def _browse_spectra_source(self) -> None:
+        self._browse_file(self.spectra_source, [("Zip archives", "*.zip"), ("All files", "*.*")])
+
+    def _browse_spectra_folder(self) -> None:
+        self._browse_folder(self.spectra_source)
+
     def _browse_output(self) -> None:
         kwargs: dict[str, object] = {
             "defaultextension": ".docx",
@@ -302,6 +402,27 @@ class SIGeneratorApp:
         path = filedialog.asksaveasfilename(**kwargs)
         if path:
             self.patch_output_docx.set(path)
+            self._save_settings()
+
+    def _browse_add_input(self) -> None:
+        if self.add_input_kind.get() == "csv":
+            types = [("CSV files", "*.csv"), ("All files", "*.*")]
+        else:
+            types = [("Word documents", "*.docx"), ("All files", "*.*")]
+        self._browse_file(self.add_input_path, types)
+
+    def _browse_add_output(self) -> None:
+        kwargs: dict[str, object] = {
+            "defaultextension": ".docx",
+            "filetypes": [("Word documents", "*.docx"), ("All files", "*.*")],
+            "initialfile": Path(self.add_output_docx.get()).name if self.add_output_docx.get() else "support_information_added.docx",
+        }
+        initialdir = _dialog_initialdir(self.add_output_docx.get(), self.add_input_path.get(), self.output_docx.get(), self._last_output_folder)
+        if initialdir:
+            kwargs["initialdir"] = initialdir
+        path = filedialog.asksaveasfilename(**kwargs)
+        if path:
+            self.add_output_docx.set(path)
             self._save_settings()
 
     def _load_examples(self) -> None:
@@ -380,7 +501,7 @@ class SIGeneratorApp:
             messagebox.showinfo("SI Generator", "Another operation is already running.")
             return
         try:
-            request = _build_check_request(self.existing_manifest.get())
+            request = _build_check_request(self.existing_manifest.get(), support_docx_text=self.check_support_docx.get())
         except ValueError as exc:
             messagebox.showerror("SI Generator", str(exc))
             return
@@ -415,6 +536,53 @@ class SIGeneratorApp:
             request,
         )
 
+    def _start_add_compounds(self) -> None:
+        if self._is_running:
+            messagebox.showinfo("SI Generator", "Another operation is already running.")
+            return
+        try:
+            request = _build_add_compounds_request(
+                manifest_text=self.add_manifest.get() or self.existing_manifest.get(),
+                support_docx_text=self.add_support_docx.get(),
+                input_kind=self.add_input_kind.get(),
+                input_path_text=self.add_input_path.get(),
+                output_docx_text=self.add_output_docx.get(),
+                spectra_source_text=self.add_spectra_source.get(),
+                template_docx_text=self.template_docx.get(),
+                references_text=self.references_file.get(),
+                mnova_exe_text=self.mnova_exe.get(),
+                insert_spectra_as=self.insert_spectra_as.get(),
+                peak_threshold_1h_percent_text=self.peak_threshold_1h_percent.get(),
+                peak_threshold_13c_percent_text=self.peak_threshold_13c_percent.get(),
+                baseline_mode_text=self.baseline_mode.get(),
+                baseline_apply_1h=self.baseline_apply_1h.get(),
+                baseline_apply_13c=self.baseline_apply_13c.get(),
+                baseline_poly_order_text=self.baseline_poly_order.get(),
+                whittaker_lambda_text=self.whittaker_lambda.get(),
+                whittaker_asymmetry_text=self.whittaker_asymmetry.get(),
+                generate_loadings=self.generate_loadings.get(),
+                check_support=self.check_support.get(),
+            )
+        except ValueError as exc:
+            messagebox.showerror("SI Generator", str(exc))
+            return
+        self._save_settings()
+        try:
+            from .workflows.add_compounds import run_add_compounds
+        except ImportError:
+            self.log.write(
+                "\n> Add compounds\n"
+                "The Add compounds backend workflow is not available in this build yet.\n"
+            )
+            messagebox.showinfo("SI Generator", "Add compounds workflow is not available in this build yet.")
+            return
+        self._start_background_operation(
+            "Add compounds",
+            f"Manifest: {request.manifest_path}\nNew table: {request.input_path}\nOutput: {request.output_docx}\n",
+            self._run_add_compounds_workflow,
+            (run_add_compounds, request),
+        )
+
     def _start_background_operation(self, title: str, details: str, target, request) -> None:
         self._is_running = True
         self.run_button.configure(state="disabled")
@@ -429,7 +597,7 @@ class SIGeneratorApp:
             input_kind=self.input_kind.get(),
             input_path_text=self.input_path.get(),
             output_docx_text=self.output_docx.get(),
-            spectra_zip_text=self.spectra_zip.get(),
+            spectra_source_text=self.spectra_source.get(),
             template_docx_text=self.template_docx.get(),
             references_text=self.references_file.get(),
             loadings_schema_text=self.loadings_schema_docx.get(),
@@ -438,6 +606,12 @@ class SIGeneratorApp:
             insert_spectra_as=self.insert_spectra_as.get(),
             peak_threshold_1h_percent_text=self.peak_threshold_1h_percent.get(),
             peak_threshold_13c_percent_text=self.peak_threshold_13c_percent.get(),
+            baseline_mode_text=self.baseline_mode.get(),
+            baseline_apply_1h=self.baseline_apply_1h.get(),
+            baseline_apply_13c=self.baseline_apply_13c.get(),
+            baseline_poly_order_text=self.baseline_poly_order.get(),
+            whittaker_lambda_text=self.whittaker_lambda.get(),
+            whittaker_asymmetry_text=self.whittaker_asymmetry.get(),
             generate_loadings=self.generate_loadings.get(),
             check_support=self.check_support.get(),
         )
@@ -510,6 +684,27 @@ class SIGeneratorApp:
         finally:
             self._log_queue.put("__RUN_FINISHED__")
 
+    def _run_add_compounds_workflow(self, payload) -> None:
+        run_add_compounds, request = payload
+        try:
+            result = run_add_compounds(request)
+            for issue in result.get("issues", []):
+                self._log_queue.put(f"[{issue.get('severity', 'warning').upper()}] {issue.get('code', 'ADD')}: {issue.get('message', '')}\n")
+            summary = _build_patch_summary(result)
+            if summary.get("run_summary"):
+                self._log_queue.put(f"Add compounds report: {summary['run_summary']}\n")
+            if manifest_has_errors(result.get("issues", [])):
+                self._log_queue.put("\nAdd compounds failed.\n")
+                self._log_queue.put({"type": "run_failed", "error": "Add compounds failed", "summary": summary})
+            else:
+                self._log_queue.put(f"\nGenerated {summary.get('support_docx', '')}\n")
+                self._log_queue.put({"type": "run_succeeded", "summary": summary})
+        except Exception as exc:
+            self._log_queue.put(f"\nERROR: {exc}\n")
+            self._log_queue.put({"type": "run_failed", "error": str(exc)})
+        finally:
+            self._log_queue.put("__RUN_FINISHED__")
+
     def _poll_log_queue(self) -> None:
         try:
             while True:
@@ -547,30 +742,22 @@ class SIGeneratorApp:
 
     def _clear_results(self) -> None:
         self.result_support.set("")
-        self.result_spectra.set("")
+        self.result_output_folder.set("")
         self.result_manifest.set("")
-        self.result_run_summary.set("")
-        self.result_warnings.set("")
-        self.result_support_warnings.set("")
-        self.result_processed_mnova.set("")
-        self.result_mnova_reports.set("")
+        self.result_report.set("")
         self.result_logs.set("")
         self.result_overview.set("")
 
     def _apply_result_summary(self, summary: dict[str, str]) -> None:
         self.result_support.set(summary.get("support_docx", ""))
-        self.result_spectra.set(summary.get("processed_spectra_zip", ""))
         self.result_manifest.set(summary.get("manifest", ""))
-        self.result_run_summary.set(summary.get("run_summary", ""))
-        self.result_warnings.set(summary.get("input_warnings", ""))
-        self.result_support_warnings.set(summary.get("support_warnings", ""))
-        self.result_processed_mnova.set(summary.get("processed_mnova_dir", ""))
-        self.result_mnova_reports.set(summary.get("mnova_reports_dir", ""))
+        self.result_report.set(summary.get("run_summary", ""))
         self.result_logs.set(summary.get("logs_dir", ""))
         self.result_overview.set(summary.get("overview", ""))
-        support_path = summary.get("support_docx")
-        if support_path:
-            self._last_output_folder = Path(support_path).expanduser().parent
+        output_folder = summary.get("output_folder") or _summary_output_folder(summary)
+        self.result_output_folder.set(output_folder)
+        if output_folder:
+            self._last_output_folder = Path(output_folder).expanduser()
         if summary.get("manifest"):
             self.existing_manifest.set(summary["manifest"])
         self._save_settings()
@@ -581,6 +768,8 @@ class SIGeneratorApp:
             value = settings.get(key)
             if isinstance(value, str):
                 variable.set(value)
+        if not self.spectra_source.get() and isinstance(settings.get("spectra_zip"), str):
+            self.spectra_source.set(str(settings["spectra_zip"]))
         legacy_threshold = settings.get("peak_threshold_percent")
         if isinstance(legacy_threshold, str):
             if not isinstance(settings.get("peak_threshold_1h_percent"), str):
@@ -606,7 +795,8 @@ class SIGeneratorApp:
     def _string_settings_variables(self) -> dict[str, StringVar]:
         return {
             "input_path": self.input_path,
-            "spectra_zip": self.spectra_zip,
+            "spectra_source": self.spectra_source,
+            "spectra_zip": self.spectra_source,
             "template_docx": self.template_docx,
             "references_file": self.references_file,
             "loadings_schema_docx": self.loadings_schema_docx,
@@ -615,19 +805,32 @@ class SIGeneratorApp:
             "output_docx": self.output_docx,
             "peak_threshold_1h_percent": self.peak_threshold_1h_percent,
             "peak_threshold_13c_percent": self.peak_threshold_13c_percent,
+            "baseline_mode": self.baseline_mode,
+            "baseline_poly_order": self.baseline_poly_order,
+            "whittaker_lambda": self.whittaker_lambda,
+            "whittaker_asymmetry": self.whittaker_asymmetry,
             "input_kind": self.input_kind,
             "insert_spectra_as": self.insert_spectra_as,
             "existing_manifest": self.existing_manifest,
+            "check_support_docx": self.check_support_docx,
             "patch_output_docx": self.patch_output_docx,
             "patch_renumber": self.patch_renumber,
             "patch_remove": self.patch_remove,
             "patch_reorder": self.patch_reorder,
+            "add_manifest": self.add_manifest,
+            "add_support_docx": self.add_support_docx,
+            "add_input_path": self.add_input_path,
+            "add_spectra_source": self.add_spectra_source,
+            "add_output_docx": self.add_output_docx,
+            "add_input_kind": self.add_input_kind,
         }
 
     def _bool_settings_variables(self) -> dict[str, BooleanVar]:
         return {
             "check_support": self.check_support,
             "generate_loadings": self.generate_loadings,
+            "baseline_apply_1h": self.baseline_apply_1h,
+            "baseline_apply_13c": self.baseline_apply_13c,
         }
 
     def _on_close(self) -> None:
@@ -679,11 +882,11 @@ def _mousewheel_units(delta: int) -> int:
 
 
 class _LogText(ttk.Frame):
-    def __init__(self, parent) -> None:
+    def __init__(self, parent, *, height: int = 16) -> None:
         super().__init__(parent)
         import tkinter as tk
 
-        self.text = tk.Text(self, wrap="word", height=16, borderwidth=0, font=("Consolas", 10))
+        self.text = tk.Text(self, wrap="word", height=height, borderwidth=0, font=("Consolas", 10))
         self.text.pack(fill="both", expand=True)
 
     def grid(self, *args, **kwargs):
@@ -721,6 +924,7 @@ def _build_generate_request(
     input_kind: str,
     input_path_text: str,
     output_docx_text: str,
+    spectra_source_text: str = "",
     spectra_zip_text: str = "",
     template_docx_text: str = "",
     references_text: str = "",
@@ -731,6 +935,12 @@ def _build_generate_request(
     peak_threshold_percent_text: str = "",
     peak_threshold_1h_percent_text: str = "",
     peak_threshold_13c_percent_text: str = "",
+    baseline_mode_text: str = DEFAULT_BASELINE_MODE,
+    baseline_apply_1h: bool = DEFAULT_BASELINE_APPLY_1H,
+    baseline_apply_13c: bool = DEFAULT_BASELINE_APPLY_13C,
+    baseline_poly_order_text: str = str(DEFAULT_BASELINE_POLY_ORDER),
+    whittaker_lambda_text: str = f"{DEFAULT_WHITTAKER_LAMBDA:g}",
+    whittaker_asymmetry_text: str = f"{DEFAULT_WHITTAKER_ASYMMETRY:g}",
     generate_loadings: bool = False,
     check_support: bool = True,
 ) -> GenerateSIRequest:
@@ -751,7 +961,7 @@ def _build_generate_request(
         input_path=input_path,
         input_kind="csv" if input_kind == "csv" else "word",
         output_path=output_docx,
-        spectra_zip=_optional_existing_file(spectra_zip_text, "Spectra zip", suffixes=(".zip",)),
+        spectra_source=_optional_spectra_source(spectra_source_text or spectra_zip_text),
         template_docx=_optional_existing_file(template_docx_text, "SI template .docx", suffixes=(".docx",)),
         references_path=_optional_existing_file(references_text, "References .yml", suffixes=(".yml", ".yaml")),
         loadings_schema_docx=loadings_schema,
@@ -767,14 +977,84 @@ def _build_generate_request(
             peak_threshold_13c_percent_text,
             shared_peak_threshold if shared_peak_threshold is not None else DEFAULT_C13_PEAK_THRESHOLD_FRACTION,
         ),
+        baseline_mode=_validated_baseline_mode(baseline_mode_text),
+        baseline_apply_1h=bool(baseline_apply_1h),
+        baseline_apply_13c=bool(baseline_apply_13c),
+        baseline_poly_order=_validated_positive_int(baseline_poly_order_text, "Baseline polynomial order"),
+        whittaker_lambda=_validated_positive_float(whittaker_lambda_text, "Whittaker lambda"),
+        whittaker_asymmetry=_validated_fraction(whittaker_asymmetry_text, "Whittaker asymmetry"),
         generate_loadings=generate_loadings,
         no_check_support=not check_support,
     )
 
 
-def _build_check_request(manifest_text: str) -> CheckSIRequest:
+def _build_check_request(manifest_text: str, *, support_docx_text: str = "") -> CheckSIRequest:
     manifest_path = _required_existing_file(manifest_text, "Choose an existing manifest JSON.", suffixes=(".json",))
-    return CheckSIRequest(manifest_path=manifest_path)
+    return CheckSIRequest(
+        manifest_path=manifest_path,
+        support_docx=_optional_existing_file(support_docx_text, "Support .docx override", suffixes=(".docx",)),
+    )
+
+
+def _build_add_compounds_request(
+    *,
+    manifest_text: str,
+    support_docx_text: str,
+    input_kind: str,
+    input_path_text: str,
+    output_docx_text: str,
+    spectra_source_text: str = "",
+    template_docx_text: str = "",
+    references_text: str = "",
+    mnova_exe_text: str = "",
+    insert_spectra_as: str = "png",
+    peak_threshold_percent_text: str = "",
+    peak_threshold_1h_percent_text: str = "",
+    peak_threshold_13c_percent_text: str = "",
+    baseline_mode_text: str = DEFAULT_BASELINE_MODE,
+    baseline_apply_1h: bool = DEFAULT_BASELINE_APPLY_1H,
+    baseline_apply_13c: bool = DEFAULT_BASELINE_APPLY_13C,
+    baseline_poly_order_text: str = str(DEFAULT_BASELINE_POLY_ORDER),
+    whittaker_lambda_text: str = f"{DEFAULT_WHITTAKER_LAMBDA:g}",
+    whittaker_asymmetry_text: str = f"{DEFAULT_WHITTAKER_ASYMMETRY:g}",
+    generate_loadings: bool = False,
+    check_support: bool = True,
+) -> AddCompoundsRequest:
+    input_suffixes = (".csv",) if input_kind == "csv" else (".docx",)
+    input_path = _required_existing_file(input_path_text, "Choose an existing new compound table.", suffixes=input_suffixes)
+    output_docx = Path(output_docx_text.strip().strip('"')).expanduser()
+    if not output_docx.name.lower().endswith(".docx"):
+        raise ValueError("Add compounds output file must be a .docx file.")
+    shared_peak_threshold = _optional_peak_threshold_fraction(peak_threshold_percent_text)
+    return AddCompoundsRequest(
+        manifest_path=_required_existing_file(manifest_text, "Choose an existing manifest JSON.", suffixes=(".json",)),
+        support_docx=_optional_existing_file(support_docx_text, "Existing support .docx", suffixes=(".docx",)),
+        input_path=input_path,
+        input_kind="csv" if input_kind == "csv" else "word",
+        output_docx=output_docx,
+        spectra_source=_optional_spectra_source(spectra_source_text),
+        template_docx=_optional_existing_file(template_docx_text, "SI template .docx", suffixes=(".docx",)),
+        references_path=_optional_existing_file(references_text, "References .yml", suffixes=(".yml", ".yaml")),
+        mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe", suffixes=(".exe",)),
+        insert_spectra_as=_validated_spectrum_mode(insert_spectra_as),
+        peak_threshold_fraction=shared_peak_threshold,
+        peak_threshold_fraction_1h=_validated_peak_threshold_fraction(
+            peak_threshold_1h_percent_text,
+            shared_peak_threshold if shared_peak_threshold is not None else DEFAULT_H1_PEAK_THRESHOLD_FRACTION,
+        ),
+        peak_threshold_fraction_13c=_validated_peak_threshold_fraction(
+            peak_threshold_13c_percent_text,
+            shared_peak_threshold if shared_peak_threshold is not None else DEFAULT_C13_PEAK_THRESHOLD_FRACTION,
+        ),
+        baseline_mode=_validated_baseline_mode(baseline_mode_text),
+        baseline_apply_1h=bool(baseline_apply_1h),
+        baseline_apply_13c=bool(baseline_apply_13c),
+        baseline_poly_order=_validated_positive_int(baseline_poly_order_text, "Baseline polynomial order"),
+        whittaker_lambda=_validated_positive_float(whittaker_lambda_text, "Whittaker lambda"),
+        whittaker_asymmetry=_validated_fraction(whittaker_asymmetry_text, "Whittaker asymmetry"),
+        generate_loadings=generate_loadings,
+        no_check_support=not check_support,
+    )
 
 
 def _build_patch_request(
@@ -807,8 +1087,12 @@ def _build_patch_summary(state: dict[str, Any]) -> dict[str, str]:
         "support_docx": _resolved_artifact(artifacts, "support_docx"),
         "manifest": _resolved_artifact(artifacts, "manifest"),
         "run_summary": report_path,
+        "logs_dir": _resolved_artifact(artifacts, "logs_dir"),
+        "output_folder": _resolved_artifact(artifacts, "output_root"),
         "overview": _report_overview(report_path),
     }
+    if not summary["output_folder"]:
+        summary["output_folder"] = _summary_output_folder(summary)
     return {key: value for key, value in summary.items() if value}
 
 
@@ -818,8 +1102,12 @@ def _build_check_summary(state: dict[str, Any], request: CheckSIRequest) -> dict
     summary = {
         "manifest": str(Path(artifacts.get("manifest", request.manifest_path)).resolve()),
         "run_summary": report_path,
+        "logs_dir": _resolved_artifact(artifacts, "logs_dir"),
+        "output_folder": _resolved_artifact(artifacts, "output_root"),
         "overview": _report_overview(report_path),
     }
+    if not summary["output_folder"]:
+        summary["output_folder"] = _summary_output_folder(summary)
     return {key: value for key, value in summary.items() if value}
 
 
@@ -835,16 +1123,32 @@ def _build_result_summary(state: dict[str, Any]) -> dict[str, str]:
         "logs_dir": _resolved_artifact(artifacts, "logs_dir"),
         "manifest": _resolved_artifact(artifacts, "manifest"),
         "run_summary": report_path,
+        "output_folder": _resolved_artifact(artifacts, "output_root"),
         "input_warnings": _resolved_artifact(artifacts, "input_warnings"),
         "support_warnings": _resolved_artifact(artifacts, "support_warnings"),
         "overview": _report_overview(report_path),
     }
+    if not summary["output_folder"]:
+        summary["output_folder"] = _summary_output_folder(summary)
     return {key: value for key, value in summary.items() if value}
 
 
 def _resolved_artifact(artifacts: dict[str, str], key: str) -> str:
     value = artifacts.get(key, "")
     return str(Path(value).resolve()) if value else ""
+
+
+def _summary_output_folder(summary: dict[str, str]) -> str:
+    for key in ("output_folder", "support_docx", "run_summary", "logs_dir"):
+        value = summary.get(key)
+        if not value:
+            continue
+        path = Path(value).expanduser()
+        folder = path if path.is_dir() else path.parent
+        if folder.name.lower() == "docx":
+            folder = folder.parent
+        return str(folder.resolve())
+    return ""
 
 
 def _report_overview(report_path: str) -> str:
@@ -941,6 +1245,7 @@ def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) ->
     return {
         "input_kind": "word",
         "input_path": str(table),
+        "spectra_source": str(spectra_zip),
         "spectra_zip": str(spectra_zip),
         "output_docx": str(output_docx),
         "template_docx": "",
@@ -948,10 +1253,16 @@ def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) ->
         "loadings_schema_docx": "",
         "loadings_scope_docx": "",
         "existing_manifest": "",
+        "check_support_docx": "",
         "patch_output_docx": "",
         "patch_renumber": "",
         "patch_remove": "",
         "patch_reorder": "",
+        "add_manifest": "",
+        "add_support_docx": "",
+        "add_input_path": "",
+        "add_spectra_source": "",
+        "add_output_docx": "",
     }
 
 
@@ -971,6 +1282,19 @@ def _optional_existing_file(raw_path: str, label: str, *, suffixes: tuple[str, .
     if not path.exists():
         raise ValueError(f"{label} does not exist: {path}")
     _validate_existing_file(path, label=label, suffixes=suffixes)
+    return path
+
+
+def _optional_spectra_source(raw_path: str) -> Path | None:
+    raw_path = str(raw_path).strip().strip('"')
+    if not raw_path:
+        return None
+    path = Path(raw_path).expanduser()
+    if not path.exists():
+        raise ValueError(f"Spectra source does not exist: {path}")
+    if path.is_dir():
+        return path
+    _validate_existing_file(path, label="Spectra source", suffixes=(".zip",))
     return path
 
 
@@ -999,6 +1323,13 @@ def _validated_spectrum_mode(value: str) -> SpectrumEmbedMode:
     return "png"
 
 
+def _validated_baseline_mode(value: str) -> str:
+    mode = str(value or DEFAULT_BASELINE_MODE).strip().lower()
+    if mode in {"auto", "off", "bernstein", "whittaker"}:
+        return mode
+    return DEFAULT_BASELINE_MODE
+
+
 def _optional_peak_threshold_fraction(raw_value: str) -> float | None:
     raw_value = str(raw_value).strip()
     if not raw_value:
@@ -1018,6 +1349,35 @@ def _validated_peak_threshold_fraction(raw_value: str, default: float = DEFAULT_
     if fraction < 0 or fraction > 1:
         raise ValueError("Peak threshold must be between 0 and 100%.")
     return fraction
+
+
+def _validated_positive_int(raw_value: str, label: str) -> int:
+    raw_value = str(raw_value).strip()
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{label} must be a positive integer.") from exc
+    if value <= 0:
+        raise ValueError(f"{label} must be a positive integer.")
+    return value
+
+
+def _validated_positive_float(raw_value: str, label: str) -> float:
+    raw_value = str(raw_value).strip().replace(",", ".")
+    try:
+        value = float(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{label} must be a positive number.") from exc
+    if value <= 0:
+        raise ValueError(f"{label} must be a positive number.")
+    return value
+
+
+def _validated_fraction(raw_value: str, label: str) -> float:
+    value = _validated_positive_float(raw_value, label)
+    if value > 1:
+        raise ValueError(f"{label} must be between 0 and 1.")
+    return value
 
 
 def _format_peak_threshold_percent(fraction: float) -> str:

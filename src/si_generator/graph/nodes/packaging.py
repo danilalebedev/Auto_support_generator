@@ -45,7 +45,7 @@ def build_manifest(state: GenerateSIState) -> dict:
         "input_hashes": _input_hashes(
             {
                 "compound_table": request.input_path,
-                "spectra_zip": request.spectra_zip,
+                "spectra_source": request.resolved_spectra_source,
                 "template_docx": request.template_docx,
                 "references": request.references_path,
             }
@@ -137,6 +137,7 @@ def collect_output_artifacts(state: GenerateSIState) -> dict[str, str]:
         "docx_dir": dirs["docx_dir"],
         "input_dir": dirs["input_dir"],
         "logs_dir": dirs["logs_dir"],
+        "reports_dir": dirs["reports_dir"],
         "spectra_dir": dirs["spectra_dir"],
         "processed_spectra_zip": dirs["processed_spectra_zip"],
         "processed_spectra_dir": dirs["processed_spectra_dir"],
@@ -163,6 +164,7 @@ def _output_paths(output_path: Path, artifacts: dict[str, str]) -> dict[str, str
         "processed_mnova_dir",
         "mnova_reports_dir",
         "logs_dir",
+        "reports_dir",
     ]:
         if key in artifacts:
             output_paths[key] = artifacts[key]
@@ -173,15 +175,36 @@ def _input_hashes(paths: dict[str, Path | None]) -> dict[str, str]:
     hashes: dict[str, str] = {}
     for key, path in paths.items():
         if path and Path(path).exists():
-            hashes[key] = _sha256(path)
+            hashes[key] = _sha256_path(path)
     return hashes
 
 
-def _sha256(path: Path) -> str:
+def _sha256_path(path: Path) -> str:
+    path = Path(path)
+    if path.is_dir():
+        return _sha256_dir(path)
+    return _sha256_file(path)
+
+
+def _sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _sha256_dir(path: Path) -> str:
+    digest = hashlib.sha256()
+    root = Path(path)
+    for child in sorted(item for item in root.rglob("*") if item.is_file()):
+        relative = child.relative_to(root).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        with child.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        digest.update(b"\0")
     return digest.hexdigest()
 
 

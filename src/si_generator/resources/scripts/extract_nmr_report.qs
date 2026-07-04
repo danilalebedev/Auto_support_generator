@@ -305,7 +305,117 @@ function _referenceSpectrum(spectrum, nucleus)
     }
 }
 
-function _processForReport(spectrum, nucleus, sensitivity, doReference, applyBaseline)
+function _baselineMode(renderSpec)
+{
+    var mode = renderSpec && renderSpec.baseline_mode !== undefined ? String(renderSpec.baseline_mode).toLowerCase() : "auto";
+    if (mode === "off" || mode === "bernstein" || mode === "whittaker") {
+        return mode;
+    }
+    return "auto";
+}
+
+function _baselineApply(nucleus, renderSpec)
+{
+    if (renderSpec && renderSpec.baseline_apply !== undefined) {
+        return Boolean(renderSpec.baseline_apply);
+    }
+    return nucleus === "13C";
+}
+
+function _positiveBaselineInt(value, fallback)
+{
+    var parsed = parseInt(value, 10);
+    if (isNaN(parsed) || parsed <= 0) {
+        return fallback;
+    }
+    return parsed;
+}
+
+function _positiveBaselineNumber(value, fallback)
+{
+    var parsed = Number(value);
+    if (isNaN(parsed) || parsed <= 0) {
+        return fallback;
+    }
+    return parsed;
+}
+
+function _appendBaselineWarning(statusPath, message)
+{
+    if (statusPath) {
+        _appendText(statusPath, "WARNING baseline " + message + "\n");
+    }
+}
+
+function _setBaselineParameter(processing, name, value, statusPath, context)
+{
+    try {
+        processing.setParameter(name, value);
+        return true;
+    } catch (e) {
+        if (statusPath) {
+            _appendText(statusPath, "WARNING baseline parameter " + name + " not applied for " + context + ": " + e + "\n");
+        }
+        return false;
+    }
+}
+
+function _setAnyBaselineParameter(processing, names, value, statusPath, context)
+{
+    var i, errors = [];
+    for (i = 0; i < names.length; i++) {
+        try {
+            processing.setParameter(names[i], value);
+            return true;
+        } catch (e) {
+            errors.push(names[i] + "=" + e);
+        }
+    }
+    _appendBaselineWarning(statusPath, "parameter not applied for " + context + ": " + names.join("/") + " (" + errors.join("; ") + ")");
+    return false;
+}
+
+function _configureBaselineProcessing(processing, nucleus, renderSpec, statusPath)
+{
+    var mode = _baselineMode(renderSpec || {});
+    var context = nucleus + " " + mode;
+
+    if (!_baselineApply(nucleus, renderSpec || {}) || mode === "off") {
+        return false;
+    }
+
+    _setBaselineParameter(processing, "BC.Apply", true, statusPath, context);
+    if (mode === "whittaker") {
+        _setBaselineParameter(processing, "BC.algorithm", "Whittaker", statusPath, context);
+        _setAnyBaselineParameter(
+            processing,
+            ["BC.Whittaker.Lambda", "BC.whittaker.lambda", "BC.Lambda", "BC.lambda"],
+            _positiveBaselineNumber(renderSpec ? renderSpec.whittaker_lambda : undefined, 100000),
+            statusPath,
+            context + " lambda"
+        );
+        _setAnyBaselineParameter(
+            processing,
+            ["BC.Whittaker.Asymmetry", "BC.whittaker.asymmetry", "BC.Asymmetry", "BC.asymmetry"],
+            _positiveBaselineNumber(renderSpec ? renderSpec.whittaker_asymmetry : undefined, 0.001),
+            statusPath,
+            context + " asymmetry"
+        );
+        return true;
+    }
+
+    _setBaselineParameter(processing, "BC.algorithm", "Bernstein", statusPath, context);
+    _setBaselineParameter(
+        processing,
+        "BC.PolyOrder",
+        _positiveBaselineInt(renderSpec ? renderSpec.baseline_poly_order : undefined, 3),
+        statusPath,
+        context + " poly_order"
+    );
+    return true;
+}
+
+function _processForReport(spectrum, nucleus, sensitivity, doReference, peakOnlyPass, renderSpec, statusPath)
 {
     var p = new NMRProcessing(spectrum.proc);
 
@@ -313,11 +423,7 @@ function _processForReport(spectrum, nucleus, sensitivity, doReference, applyBas
         _referenceSpectrum(spectrum, nucleus);
     }
 
-    if (nucleus === "13C" && applyBaseline) {
-        p.setParameter("BC.Apply", true);
-        p.setParameter("BC.algorithm", "Bernstein");
-        p.setParameter("BC.PolyOrder", 3);
-    }
+    _configureBaselineProcessing(p, nucleus, renderSpec || {}, statusPath);
     p.setParameter("PP.Apply", false);
     p.setParameter("PP.Method", "GSD");
     if (nucleus === "13C" && sensitivity !== undefined) {
@@ -329,7 +435,7 @@ function _processForReport(spectrum, nucleus, sensitivity, doReference, applyBas
     p.setParameter("integration.apply", false);
     spectrum.process(p);
 
-    if (nucleus === "13C" && applyBaseline) {
+    if (nucleus === "13C" && peakOnlyPass) {
         _clearNonPeakAnnotations(spectrum);
         spectrum.update();
         return;
@@ -643,7 +749,7 @@ function extractSpectrumReport(inputPath, outputPath, nucleus, statusPath)
         }
         _appendText(statusPath, "SPECTRUM\n");
 
-        _processForReport(spectrum, nucleus, undefined, true, false);
+        _processForReport(spectrum, nucleus, undefined, true, false, {}, statusPath);
         _appendText(statusPath, "PROCESSED\n");
 
         var report = _spectrumReport(spectrum, nucleus);
@@ -711,11 +817,11 @@ function extractSpectrumReportsBatch(tasksPath, outputJsonPath, statusPath)
                     if (!spectrum.isValid()) {
                         error = "No active NMR spectrum after opening " + inputPath;
                     } else {
-                        _processForReport(spectrum, nucleus, undefined, true, false);
+                        _processForReport(spectrum, nucleus, undefined, true, false, renderSpec, statusPath);
                         report = _spectrumReport(spectrum, nucleus, renderSpec);
                         referenceOffset = _referenceOffsetFromPeaks(spectrum, nucleus);
                         if (nucleus === "13C") {
-                            _processForReport(spectrum, nucleus, 1, false, true);
+                            _processForReport(spectrum, nucleus, 1, false, true, renderSpec, statusPath);
                             peakReport = _plainPeakReport(spectrum, nucleus, renderSpec);
                         }
                         image = _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec);
@@ -841,9 +947,9 @@ function _saveProcessedMnovaFile(compound, tasks, statusPath)
             if (!spectrum.isValid()) {
                 continue;
             }
-            _processForReport(spectrum, nucleus, undefined, true, false);
+            _processForReport(spectrum, nucleus, undefined, true, false, tasks[i].renderSpec || {}, statusPath);
             if (nucleus === "13C") {
-                _processForReport(spectrum, nucleus, 1, false, true);
+                _processForReport(spectrum, nucleus, 1, false, true, tasks[i].renderSpec || {}, statusPath);
             }
             _prepareSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {});
         }

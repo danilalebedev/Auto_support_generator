@@ -25,10 +25,11 @@ def preflight_generate_request(
     issues.extend(_check_input_path(request))
     issues.extend(_check_output_path(request.output_path))
     issues.extend(_check_loadings_files(request))
-    if request.spectra_zip:
-        issues.extend(_check_spectra_zip(request.spectra_zip))
+    spectra_source = request.resolved_spectra_source
+    if spectra_source:
+        issues.extend(_check_spectra_source(spectra_source))
     else:
-        issues.extend(_check_missing_spectra_zip(request))
+        issues.extend(_check_missing_spectra_source(request))
     if _mnova_required(request):
         issues.extend(_check_mnova_script(Path(mnova_script_path)))
         issues.extend(_check_mnova(request, mnova_finder))
@@ -90,17 +91,21 @@ def _check_output_path(output_path: Path) -> list[Issue]:
     return issues
 
 
-def _check_spectra_zip(spectra_zip: Path) -> list[Issue]:
-    if not spectra_zip.exists():
-        return [_issue("PREFLIGHT_SPECTRA_ZIP_MISSING", "error", "Spectra zip does not exist.", spectra_zip)]
-    if not zipfile.is_zipfile(spectra_zip):
-        return [_issue("PREFLIGHT_SPECTRA_ZIP_INVALID", "error", "Spectra file is not a readable zip archive.", spectra_zip)]
+def _check_spectra_source(spectra_source: Path) -> list[Issue]:
+    if not spectra_source.exists():
+        return [_issue("PREFLIGHT_SPECTRA_SOURCE_MISSING", "error", "Spectra source does not exist.", spectra_source)]
+    if spectra_source.is_dir():
+        return []
+    if spectra_source.suffix.lower() != ".zip":
+        return [_issue("PREFLIGHT_SPECTRA_SOURCE_INVALID", "error", "Spectra source must be a folder or a readable zip archive.", spectra_source)]
+    if not zipfile.is_zipfile(spectra_source):
+        return [_issue("PREFLIGHT_SPECTRA_ZIP_INVALID", "error", "Spectra file is not a readable zip archive.", spectra_source)]
     try:
-        with zipfile.ZipFile(spectra_zip) as archive:
+        with zipfile.ZipFile(spectra_source) as archive:
             if not archive.namelist():
-                return [_issue("PREFLIGHT_SPECTRA_ZIP_EMPTY", "warning", "Spectra zip archive is empty.", spectra_zip)]
+                return [_issue("PREFLIGHT_SPECTRA_ZIP_EMPTY", "warning", "Spectra zip archive is empty.", spectra_source)]
     except OSError as exc:
-        return [_issue("PREFLIGHT_SPECTRA_ZIP_INVALID", "error", f"Spectra zip cannot be read: {exc}", spectra_zip)]
+        return [_issue("PREFLIGHT_SPECTRA_ZIP_INVALID", "error", f"Spectra zip cannot be read: {exc}", spectra_source)]
     return []
 
 
@@ -132,14 +137,14 @@ def _check_loadings_files(request: GenerateSIRequest) -> list[Issue]:
     return issues
 
 
-def _check_missing_spectra_zip(request: GenerateSIRequest) -> list[Issue]:
+def _check_missing_spectra_source(request: GenerateSIRequest) -> list[Issue]:
     if request.insert_spectra_as == "none":
         return []
     return [
         _issue(
-            "PREFLIGHT_SPECTRA_ZIP_NOT_SELECTED",
+            "PREFLIGHT_SPECTRA_SOURCE_NOT_SELECTED",
             "warning",
-            "Spectra appendix is enabled, but no spectra zip was selected. Generated spectrum images and Mnova files will be skipped unless input rows already point to processed spectrum assets.",
+            "Spectra appendix is enabled, but no spectra source was selected. Generated spectrum images and Mnova files will be skipped unless input rows already point to processed spectrum assets.",
         )
     ]
 
@@ -174,7 +179,7 @@ def _check_mnova_script(script_path: Path) -> list[Issue]:
 
 
 def _mnova_required(request: GenerateSIRequest) -> bool:
-    return bool(request.spectra_zip and not request.no_extract_nmr)
+    return bool(request.resolved_spectra_source and not request.no_extract_nmr)
 
 
 def _issue(code: str, severity: str, message: str, path: str | Path | None = None, *, detail: str = "") -> Issue:

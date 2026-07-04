@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .domain.manifest import manifest_has_errors
 from .runtime_diagnostics import format_preflight_issues, issue_has_errors, preflight_generate_request
+from .workflows.add_compounds import add_compounds_request_from_args, run_add_compounds
 from .workflows.check_si import check_request_from_args, run_check_si
 from .workflows.generate_si import output_path_from_state, request_from_args, run_generate_si
 from .workflows.patch_si import patch_request_from_args, run_patch_si
@@ -30,6 +31,14 @@ def _main(argv: list[str] | None = None) -> int:
         result = run_patch_si(patch_request_from_args(args))
         _print_patch_result(result)
         return 1 if manifest_has_errors(result.get("issues", [])) else 0
+    if args.add_compounds_manifest:
+        if not (args.add_input or args.add_word_input):
+            parser.error("--add-input or --add-word-input is required with --add-compounds-manifest.")
+        if not (args.add_output or args.output):
+            parser.error("--add-output or --output is required with --add-compounds-manifest.")
+        result = run_add_compounds(add_compounds_request_from_args(args))
+        _print_add_compounds_result(result)
+        return 1 if manifest_has_errors(result.get("issues", [])) else 0
     if not args.output:
         parser.error("--output is required unless --check-manifest or --patch-manifest is used.")
     request = request_from_args(args)
@@ -50,6 +59,7 @@ def _build_parser() -> argparse.ArgumentParser:
     input_group.add_argument("--word-input", help="Path to a Word table with ChemDraw/ChemSketch OLE structures.")
     input_group.add_argument("--check-manifest", help="Check an existing support_information.manifest.json file.")
     input_group.add_argument("--patch-manifest", help="Patch an existing support_information.manifest.json file.")
+    input_group.add_argument("--add-compounds-manifest", help="Append new compounds to an existing SI manifest.")
     parser.add_argument("--output", "-o", help="Path to output DOCX.")
     parser.add_argument("--support-docx", help="Optional DOCX path override for --check-manifest.")
     parser.add_argument("--renumber", help="For --patch-manifest, comma-separated OLD=NEW pairs, e.g. 2a=3a,2b=3b.")
@@ -57,6 +67,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reorder", help="For --patch-manifest, comma-separated compound ids or numbers in the desired order.")
     parser.add_argument("--patched-output", help="For --patch-manifest, output path for the patched DOCX.")
     parser.add_argument("--patched-manifest-output", help="For --patch-manifest, output path for the patched manifest JSON.")
+    add_input_group = parser.add_mutually_exclusive_group()
+    add_input_group.add_argument("--add-input", help="For --add-compounds-manifest, path to new compounds CSV.")
+    add_input_group.add_argument("--add-word-input", help="For --add-compounds-manifest, path to new compounds Word table.")
+    parser.add_argument("--add-output", help="For --add-compounds-manifest, output path for the new combined DOCX.")
     parser.add_argument(
         "--no-strict-artifacts",
         action="store_true",
@@ -71,8 +85,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional YAML file with bibliography entries referenced by the compound table.",
     )
     parser.add_argument(
+        "--spectra-source",
+        help="Zip archive or folder with compound-number folders containing NMR spectra.",
+    )
+    parser.add_argument(
         "--spectra-zip",
-        help="Zip archive with compound-number folders containing NMR spectra.",
+        help="Deprecated alias for --spectra-source. Zip archive with compound-number folders containing NMR spectra.",
     )
     parser.add_argument(
         "--mnova-exe",
@@ -106,6 +124,40 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="13C peak picking threshold. Use 4 or 0.04 for 4%%. Overrides --peak-threshold.",
+    )
+    parser.add_argument(
+        "--baseline-mode",
+        choices=["auto", "off", "bernstein", "whittaker"],
+        default="auto",
+        help="Baseline correction algorithm for processed spectra.",
+    )
+    parser.add_argument(
+        "--baseline-apply-1h",
+        action="store_true",
+        help="Apply baseline correction to 1H spectra. Disabled by default.",
+    )
+    parser.add_argument(
+        "--no-baseline-13c",
+        action="store_true",
+        help="Disable baseline correction for 13C spectra. 13C correction is enabled by default.",
+    )
+    parser.add_argument(
+        "--baseline-poly-order",
+        type=int,
+        default=3,
+        help="Bernstein baseline polynomial order.",
+    )
+    parser.add_argument(
+        "--whittaker-lambda",
+        type=float,
+        default=100000.0,
+        help="Whittaker baseline lambda parameter.",
+    )
+    parser.add_argument(
+        "--whittaker-asymmetry",
+        type=float,
+        default=0.001,
+        help="Whittaker baseline asymmetry parameter.",
     )
     parser.add_argument(
         "--generate-loadings",
@@ -175,6 +227,25 @@ def _print_patch_result(result: dict) -> None:
         print("Patch check passed.")
     else:
         print("Patch check failed.")
+
+
+def _print_add_compounds_result(result: dict) -> None:
+    for issue in result.get("issues", []):
+        severity = issue.get("severity", "warning").upper()
+        code = issue.get("code", "ADD_COMPOUNDS")
+        message = issue.get("message", "")
+        print(f"[{severity}] {code}: {message}")
+    artifacts = result.get("artifacts", {})
+    if artifacts.get("support_docx"):
+        print(f"Combined DOCX: {artifacts['support_docx']}")
+    if artifacts.get("manifest"):
+        print(f"Combined manifest: {artifacts['manifest']}")
+    if artifacts.get("add_report"):
+        print(f"Add-compounds report: {Path(artifacts['add_report']).resolve()}")
+    if result.get("status") == "pass":
+        print("Add-compounds workflow passed.")
+    else:
+        print("Add-compounds workflow failed.")
 
 
 def _print_generate_result(result: dict) -> None:
