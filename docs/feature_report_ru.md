@@ -40,6 +40,12 @@
 
 Если проверка находит проблему, она не останавливает генерацию, а добавляет предупреждение в `support_warnings.txt`, manifest/run summary и, где применимо, в текст SI.
 
+Если NMR-описание было извлечено из MestReNova и H/C count не совпал со
+структурной формулой, run summary дополнительно получает diagnostic issue
+`MNOVA_1H_REPORT_REVIEW_REQUIRED` или `MNOVA_13C_REPORT_REVIEW_REQUIRED`.
+В `detail` указано, что нужно проверить auto integration/multiplet analysis,
+threshold, baseline или single-spectrum `.mnova` файл.
+
 ### Настраиваемое оформление
 
 Оформление переведено на единый Word-шаблон `SI_template.docx`.

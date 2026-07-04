@@ -33,13 +33,47 @@ def validate_nmr_counts(compounds: list[Compound]) -> None:
             found_h = count_h_from_1h_nmr(compound.h1_nmr)
             if found_h != expected_h:
                 _append_validation_issue(compound, "NMR_H_COUNT_MISMATCH", f"H expected {expected_h}, found {found_h}")
+                if _looks_mnova_nmr_source(compound, "1H"):
+                    _append_validation_issue(
+                        compound,
+                        "MNOVA_1H_REPORT_REVIEW_REQUIRED",
+                        "1H NMR was extracted from Mnova and the integral count does not match the formula.",
+                        detail=(
+                            "Check Mnova auto integration/multiplet analysis for this compound. "
+                            "If weak impurity peaks or merged multiplets were picked, adjust 1H threshold/baseline settings "
+                            "or edit the single-spectrum .mnova file manually."
+                        ),
+                        append_warning=False,
+                    )
 
         if compound.c13_nmr:
             found_c = count_c_from_13c_nmr(compound.c13_nmr)
             if found_c < expected_c:
                 _append_validation_issue(compound, "NMR_C_COUNT_MISMATCH", f"C expected {expected_c}, found {found_c}")
+                if _looks_mnova_nmr_source(compound, "13C"):
+                    _append_validation_issue(
+                        compound,
+                        "MNOVA_13C_REPORT_REVIEW_REQUIRED",
+                        "13C NMR was extracted from Mnova and fewer carbon signals were found than expected.",
+                        detail=(
+                            "Check 13C peak picking range/threshold and solvent suppression. "
+                            "Carbonyl or high-shift signals may have been missed, or weak noise peaks may need filtering."
+                        ),
+                        append_warning=False,
+                    )
             elif found_c > expected_c and not _allows_heteronuclear_split_overcount(formula, expected_c, found_c):
                 _append_validation_issue(compound, "NMR_C_COUNT_MISMATCH", f"C expected {expected_c}, found {found_c}")
+                if _looks_mnova_nmr_source(compound, "13C"):
+                    _append_validation_issue(
+                        compound,
+                        "MNOVA_13C_REPORT_REVIEW_REQUIRED",
+                        "13C NMR was extracted from Mnova and more carbon signals were found than expected.",
+                        detail=(
+                            "Check 13C peak threshold and solvent/impurity peak filtering. "
+                            "Increase the 13C threshold if weak impurity or noise peaks were included."
+                        ),
+                        append_warning=False,
+                    )
 
 
 def validate_hrms(compounds: list[Compound], tolerance_da: float = 0.005) -> None:
@@ -88,15 +122,18 @@ def _reset_validation(compounds: list[Compound]) -> None:
         compound.validation_issues = []
 
 
-def _append_validation_issue(compound: Compound, code: str, text: str) -> None:
+def _append_validation_issue(compound: Compound, code: str, text: str, *, detail: str = "", append_warning: bool = True) -> None:
     issue: Issue = {
         "code": code,
         "severity": "warning",
         "message": text,
         "compound_id": compound.id or compound.number,
     }
+    if detail:
+        issue["detail"] = detail
     compound.validation_issues.append(issue)
-    _append_warning(compound, text)
+    if append_warning:
+        _append_warning(compound, text)
 
 
 def _append_warning(compound: Compound, text: str) -> None:
@@ -223,6 +260,12 @@ def _split_top_level_commas(text: str) -> list[str]:
             start = index + 1
     result.append(text[start:])
     return [item for item in result if item.strip()]
+
+
+def _looks_mnova_nmr_source(compound: Compound, nucleus: str) -> bool:
+    if nucleus == "1H":
+        return bool(compound.h1_spectrum_path or compound.h1_mnova_path or compound.h1_image_path or compound.mnova_path)
+    return bool(compound.c13_spectrum_path or compound.c13_mnova_path or compound.c13_image_path or compound.mnova_path)
 
 
 def _normalize_chem_letters(text: str) -> str:

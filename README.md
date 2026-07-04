@@ -512,6 +512,14 @@ MestReNova запускается автоматически.
 7. Если есть расхождение, в итоговом SI добавляется красная пометка
    `Support check`.
 
+Если NMR-текст был получен из MestReNova и число H/C не совпало с формулой,
+в `support_information.run_summary.json` дополнительно появляется issue
+`MNOVA_1H_REPORT_REVIEW_REQUIRED` или `MNOVA_13C_REPORT_REVIEW_REQUIRED`.
+Это означает, что нужно открыть соответствующий single-spectrum `.mnova` файл и
+проверить auto integration, multiplet analysis, peak threshold или baseline
+settings. Такая пометка не заменяет обычный mismatch warning, а добавляет к нему
+понятное действие для ручной проверки.
+
 Важно: проверка не заменяет ручную проверку химика. Это быстрый автоматический
 контроль, который помогает найти подозрительные места.
 

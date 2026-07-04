@@ -86,6 +86,36 @@ class NmrValidationTests(unittest.TestCase):
         self.assertIn("C expected 11, found 7", compound.nmr_check_warning)
         self.assertEqual(compound.validation_issues[0]["code"], "NMR_C_COUNT_MISMATCH")
 
+    def test_mnova_derived_1h_mismatch_adds_actionable_review_issue(self) -> None:
+        compound = Compound(
+            number="x",
+            name="X",
+            formula="C2H6O",
+            h1_nmr="delta = 3.70 (q, J = 7.0 Hz, 2H).",
+            h1_mnova_path="x_1H.mnova",
+        )
+
+        validate_support([compound])
+
+        issues_by_code = {issue["code"]: issue for issue in compound.validation_issues}
+        self.assertIn("NMR_H_COUNT_MISMATCH", issues_by_code)
+        self.assertIn("MNOVA_1H_REPORT_REVIEW_REQUIRED", issues_by_code)
+        self.assertIn("auto integration", issues_by_code["MNOVA_1H_REPORT_REVIEW_REQUIRED"]["detail"])
+        self.assertIn("H expected 6, found 2", compound.nmr_check_warning)
+        self.assertNotIn("auto integration", compound.nmr_check_warning)
+
+    def test_manual_1h_mismatch_does_not_add_mnova_review_issue(self) -> None:
+        compound = Compound(
+            number="x",
+            name="X",
+            formula="C2H6O",
+            h1_nmr="delta = 3.70 (q, J = 7.0 Hz, 2H).",
+        )
+
+        validate_support([compound])
+
+        self.assertEqual({issue["code"] for issue in compound.validation_issues}, {"NMR_H_COUNT_MISMATCH"})
+
     def test_support_validation_warns_for_nmr_elemental_analysis_and_hrms_mismatch(self) -> None:
         compound = Compound(
             number="x",

@@ -243,14 +243,17 @@ def _analytical_blocks(compound) -> dict[str, bool]:
 
 
 def _compact_issues(issues: list[dict]) -> list[dict[str, str]]:
-    return [
-        {
+    compact: list[dict[str, str]] = []
+    for issue in issues:
+        item = {
             "code": str(issue.get("code", "")),
             "severity": str(issue.get("severity", "warning")),
             "message": str(issue.get("message", "")),
         }
-        for issue in issues
-    ]
+        if issue.get("detail"):
+            item["detail"] = str(issue.get("detail", ""))
+        compact.append(item)
+    return compact
 
 
 def _relative_paths(base_dir: Path, paths: dict[str, str]) -> dict[str, str]:

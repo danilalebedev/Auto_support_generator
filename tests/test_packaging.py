@@ -62,7 +62,15 @@ class PackagingTests(unittest.TestCase):
                 "spectra_config": {"extract_nmr": False},
                 "generation_config": {"check_support": False},
                 "runtime_config": {"dry_run": False},
-                "issues": [{"code": "INPUT_WARNING", "severity": "warning", "message": "2a: missing HRMS", "compound_id": "cmp_001"}],
+                "issues": [
+                    {
+                        "code": "INPUT_WARNING",
+                        "severity": "warning",
+                        "message": "2a: missing HRMS",
+                        "detail": "Fix the HRMS found value in the input table.",
+                        "compound_id": "cmp_001",
+                    }
+                ],
             }
 
             artifacts = collect_output_artifacts(state)
@@ -128,6 +136,7 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(run_summary["compounds"][0]["domain_snapshot"]["number"], "2a")
         self.assertEqual(run_summary["compounds"][0]["issue_count"], 1)
         self.assertEqual(run_summary["compounds"][0]["issues"][0]["code"], "INPUT_WARNING")
+        self.assertEqual(run_summary["compounds"][0]["issues"][0]["detail"], "Fix the HRMS found value in the input table.")
         self.assertEqual(run_summary["output_paths"]["support_docx"], str(output_path))
 
 
