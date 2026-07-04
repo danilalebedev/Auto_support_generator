@@ -132,6 +132,7 @@ def collect_output_artifacts(state: GenerateSIState) -> dict[str, str]:
     artifacts.setdefault("support_docx", str(output_path))
     artifacts.setdefault("manifest", str(output_path.with_suffix(".manifest.json")))
     dirs = output_dirs(output_path)
+    artifacts.setdefault("output_root", str(dirs["output_root"]))
 
     for key, path in {
         "docx_dir": dirs["docx_dir"],
@@ -156,6 +157,7 @@ def _output_paths(output_path: Path, artifacts: dict[str, str]) -> dict[str, str
         "run_summary": artifacts.get("run_summary", str(output_path.with_suffix(".run_summary.json"))),
     }
     for key in [
+        "output_root",
         "docx_dir",
         "input_dir",
         "spectra_dir",
