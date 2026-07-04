@@ -39,10 +39,11 @@ class MnovaRenderSpecTests(unittest.TestCase):
             mnova_path="C:/ascii/out/2a.mnova",
             render_spec=render_spec,
             single_mnova_path="C:/ascii/out/2a_1H.mnova",
+            graphics_profile_path="C:/ascii/profile/default.mngp",
         )
         parts = line.split("\t")
 
-        self.assertEqual(len(parts), 7)
+        self.assertEqual(len(parts), 8)
         parsed = json.loads(parts[5])
         self.assertEqual(parsed["target_signal_height_fraction"], 0.72)
         self.assertEqual(parsed["peak_threshold_fraction"], 0.08)
@@ -54,6 +55,7 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertEqual(parsed["whittaker_lambda"], 200000)
         self.assertEqual(parsed["whittaker_asymmetry"], 0.002)
         self.assertEqual(parts[6], "C:/ascii/out/2a_1H.mnova")
+        self.assertEqual(parts[7], "C:/ascii/profile/default.mngp")
 
     def test_empty_render_spec_is_empty_json_object(self) -> None:
         self.assertEqual(_render_spec_arg(None), "{}")
@@ -121,13 +123,16 @@ class MnovaRenderSpecTests(unittest.TestCase):
 
         self.assertIn("var renderSpec = parts.length >= 6 ? _parseRenderSpec(parts[5]) : {};", script)
         self.assertIn("var singleMnovaPath = parts.length >= 7 ? parts[6] : \"\";", script)
+        self.assertIn("var graphicsProfilePath = parts.length >= 8 ? parts[7] : \"\";", script)
         self.assertIn("_saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath", script)
+        self.assertIn("function _applyGraphicsProfile(spectrum, graphicsProfilePath, statusPath)", script)
+        self.assertIn("WARNING graphics profile not applied", script)
         self.assertIn("x_range_ppm", script)
         self.assertIn("_targetSignalHeightFraction(renderSpec", script)
         self.assertIn("_peakThresholdFraction(nucleus, renderSpec", script)
         self.assertIn("_filterMultipletReportByPeakThreshold", script)
         self.assertIn("_isIgnoredByRenderSpec(delta, renderSpec", script)
-        self.assertIn("_prepareSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {})", script)
+        self.assertIn("_prepareSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {}, tasks[i].graphicsProfilePath || \"\", statusPath)", script)
 
     def test_mnova_qs_uses_render_spec_for_baseline_processing(self) -> None:
         script = QS_SCRIPT.read_text(encoding="utf-8")

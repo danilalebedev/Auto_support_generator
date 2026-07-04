@@ -26,6 +26,7 @@ def preflight_generate_request(
     issues.extend(_check_input_path(request))
     issues.extend(_check_output_path(request.output_path))
     issues.extend(_check_loadings_files(request))
+    issues.extend(_check_mnova_graphics_profile(request))
     spectra_source = request.resolved_spectra_source
     if spectra_source:
         issues.extend(_check_spectra_source(spectra_source))
@@ -140,6 +141,19 @@ def _check_loadings_files(request: GenerateSIRequest) -> list[Issue]:
         elif path.suffix.lower() != ".docx":
             issues.append(_issue("PREFLIGHT_LOADINGS_FILE_EXTENSION", "error", f"{label} file must be a .docx file.", path))
     return issues
+
+
+def _check_mnova_graphics_profile(request: GenerateSIRequest) -> list[Issue]:
+    path = request.mnova_graphics_profile
+    if not path:
+        return []
+    if not path.exists():
+        return [_issue("PREFLIGHT_MNOVA_GRAPHICS_PROFILE_MISSING", "error", "Mnova graphics profile does not exist.", path)]
+    if not path.is_file():
+        return [_issue("PREFLIGHT_MNOVA_GRAPHICS_PROFILE_NOT_FILE", "error", "Mnova graphics profile must be a file.", path)]
+    if path.suffix.lower() != ".mngp":
+        return [_issue("PREFLIGHT_MNOVA_GRAPHICS_PROFILE_EXTENSION", "error", "Mnova graphics profile must be a .mngp file.", path)]
+    return []
 
 
 def _check_missing_spectra_source(request: GenerateSIRequest) -> list[Issue]:

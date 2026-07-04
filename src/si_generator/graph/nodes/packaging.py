@@ -49,6 +49,7 @@ def build_manifest(state: GenerateSIState) -> dict:
                 "spectra_source": request.resolved_spectra_source,
                 "template_docx": request.template_docx,
                 "references": request.references_path,
+                "mnova_graphics_profile": request.mnova_graphics_profile,
             }
         ),
         "output_paths": output_paths,

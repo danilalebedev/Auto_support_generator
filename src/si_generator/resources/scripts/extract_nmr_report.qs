@@ -695,14 +695,89 @@ function _referenceOffsetFromPeaks(spectrum, nucleus)
     return 0;
 }
 
-function _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec)
+function _tryApplyGraphicsProfileMethod(target, methodName, profilePath, statusPath)
+{
+    if (target === undefined || target === null || !profilePath) {
+        return false;
+    }
+    try {
+        if (target[methodName] !== undefined) {
+            target[methodName](profilePath);
+            _appendText(statusPath, "GRAPHICS_PROFILE method=" + methodName + " path=" + profilePath + "\n");
+            return true;
+        }
+    } catch (e) {
+        _appendText(statusPath, "WARNING graphics profile method " + methodName + " failed: " + e + "\n");
+    }
+    return false;
+}
+
+function _tryApplyGraphicsProfileProperties(target, profilePath, statusPath)
+{
+    if (target === undefined || target === null || !profilePath) {
+        return false;
+    }
+    try {
+        if (target.properties !== undefined && target.properties.load !== undefined) {
+            target.properties.load(profilePath);
+            _appendText(statusPath, "GRAPHICS_PROFILE method=properties.load path=" + profilePath + "\n");
+            return true;
+        }
+    } catch (e) {
+        _appendText(statusPath, "WARNING graphics profile properties.load failed: " + e + "\n");
+    }
+    return false;
+}
+
+function _applyGraphicsProfile(spectrum, graphicsProfilePath, statusPath)
+{
+    if (!graphicsProfilePath) {
+        return false;
+    }
+
+    var methods = [
+        "loadProperties",
+        "loadGraphicProperties",
+        "loadGraphicsProfile",
+        "applyProperties",
+        "applyGraphicProperties",
+        "applyGraphicsProfile"
+    ];
+    var targets = [spectrum];
+    var activeItem;
+    var i, j;
+
+    try {
+        activeItem = mainWindow.activeDocument.getActiveItem("NMR Spectrum");
+        if (activeItem !== undefined && activeItem !== null) {
+            targets.push(activeItem);
+        }
+    } catch (e) {
+    }
+
+    for (i = 0; i < targets.length; i++) {
+        for (j = 0; j < methods.length; j++) {
+            if (_tryApplyGraphicsProfileMethod(targets[i], methods[j], graphicsProfilePath, statusPath)) {
+                return true;
+            }
+        }
+        if (_tryApplyGraphicsProfileProperties(targets[i], graphicsProfilePath, statusPath)) {
+            return true;
+        }
+    }
+
+    _appendText(statusPath, "WARNING graphics profile not applied; this MestReNova scripting API may not expose .mngp loading: " + graphicsProfilePath + "\n");
+    return false;
+}
+
+function _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec, graphicsProfilePath, statusPath)
 {
     if (!imagePath) {
         return "";
     }
 
     try {
-        _prepareSpectrumForExport(spectrum, nucleus, renderSpec || {});
+        _prepareSpectrumForExport(spectrum, nucleus, renderSpec || {}, graphicsProfilePath || "", statusPath);
         mainWindow.activeWindow().update();
 
         var page = mainWindow.activeDocument.curPage();
@@ -714,9 +789,10 @@ function _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec)
     }
 }
 
-function _prepareSpectrumForExport(spectrum, nucleus, renderSpec)
+function _prepareSpectrumForExport(spectrum, nucleus, renderSpec, graphicsProfilePath, statusPath)
 {
     var range = _xRange(nucleus, renderSpec || {});
+    _applyGraphicsProfile(spectrum, graphicsProfilePath || "", statusPath);
     if (nucleus === "13C") {
         _clearNonPeakAnnotations(spectrum);
     } else {
@@ -807,7 +883,8 @@ function extractSpectrumReportsBatch(tasksPath, outputJsonPath, statusPath)
             var mnovaPath = parts.length >= 5 ? parts[4] : "";
             var renderSpec = parts.length >= 6 ? _parseRenderSpec(parts[5]) : {};
             var singleMnovaPath = parts.length >= 7 ? parts[6] : "";
-            tasks.push({compound: compound, nucleus: nucleus, inputPath: inputPath, imagePath: imagePath, mnovaPath: mnovaPath, renderSpec: renderSpec, singleMnovaPath: singleMnovaPath});
+            var graphicsProfilePath = parts.length >= 8 ? parts[7] : "";
+            tasks.push({compound: compound, nucleus: nucleus, inputPath: inputPath, imagePath: imagePath, mnovaPath: mnovaPath, renderSpec: renderSpec, singleMnovaPath: singleMnovaPath, graphicsProfilePath: graphicsProfilePath});
             _appendText(statusPath, "TASK " + compound + " " + nucleus + " " + inputPath + "\n");
 
             var dw = mainWindow.newWindow();
@@ -837,8 +914,8 @@ function extractSpectrumReportsBatch(tasksPath, outputJsonPath, statusPath)
                             _processForReport(spectrum, nucleus, 1, false, true, renderSpec, statusPath);
                             peakReport = _plainPeakReport(spectrum, nucleus, renderSpec);
                         }
-                        image = _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec);
-                        singleMnova = _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath, renderSpec, statusPath);
+                        image = _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec, graphicsProfilePath, statusPath);
+                        singleMnova = _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath, renderSpec, graphicsProfilePath, statusPath);
                     }
                 }
             } catch (taskError) {
@@ -888,7 +965,7 @@ function _importableNmrPath(path)
     return text.replace(/\/fid$/i, "");
 }
 
-function _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath, renderSpec, statusPath)
+function _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath, renderSpec, graphicsProfilePath, statusPath)
 {
     if (!singleMnovaPath) {
         return "";
@@ -896,7 +973,7 @@ function _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaP
 
     try {
         _appendText(statusPath, "SAVE_SINGLE_MNOVA " + compound + " " + nucleus + " " + singleMnovaPath + "\n");
-        _prepareSpectrumForExport(spectrum, nucleus, renderSpec || {});
+        _prepareSpectrumForExport(spectrum, nucleus, renderSpec || {}, graphicsProfilePath || "", statusPath);
         mainWindow.activeWindow().update();
         serialization.save(singleMnovaPath, "mnova");
         _appendText(statusPath, "OK_SINGLE_MNOVA " + compound + " " + nucleus + "\n");
@@ -964,7 +1041,7 @@ function _saveProcessedMnovaFile(compound, tasks, statusPath)
             if (nucleus === "13C") {
                 _processForReport(spectrum, nucleus, 1, false, true, tasks[i].renderSpec || {}, statusPath);
             }
-            _prepareSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {});
+            _prepareSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {}, tasks[i].graphicsProfilePath || "", statusPath);
         }
 
         serialization.save(mnovaPath, "mnova");

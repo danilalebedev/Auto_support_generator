@@ -32,6 +32,7 @@ class MnovaTask:
     mnova_path: Path | None = None
     render_spec: dict[str, object] | None = None
     single_mnova_path: Path | None = None
+    graphics_profile_path: Path | None = None
 
 
 def extract_report(input_path: Path, output_path: Path, nucleus: str, timeout: int = 120) -> Path:
@@ -67,6 +68,7 @@ def extract_reports_batch(
     run_output_json_path = run_dir / "mnova_batch_reports.json"
     run_status_path = run_dir / "mnova_batch.status.txt"
     output_map: dict[tuple[str, str], dict[str, Path]] = {}
+    graphics_profile_map: dict[Path, Path] = {}
 
     for path in [tasks_path, output_json_path, status_path]:
         if path.exists():
@@ -82,6 +84,11 @@ def extract_reports_batch(
             staged_single_mnova = (
                 run_dir / "single_mnova" / _safe_token(task.compound) / f"{_safe_token(task.compound)}_{task.nucleus}.mnova"
                 if task.single_mnova_path
+                else None
+            )
+            staged_graphics_profile = (
+                _stage_graphics_profile(task.graphics_profile_path, run_dir / "profiles", graphics_profile_map)
+                if task.graphics_profile_path
                 else None
             )
             output_map[key] = {}
@@ -100,6 +107,7 @@ def extract_reports_batch(
             image_path = _mnova_arg(staged_image) if staged_image else ""
             mnova_path = _mnova_arg(staged_mnova) if staged_mnova else ""
             single_mnova_path = _mnova_arg(staged_single_mnova) if staged_single_mnova else ""
+            graphics_profile_path = _mnova_arg(staged_graphics_profile) if staged_graphics_profile else ""
             lines.append(
                 _format_task_line(
                     task.compound,
@@ -109,6 +117,7 @@ def extract_reports_batch(
                     mnova_path=mnova_path,
                     render_spec=task.render_spec,
                     single_mnova_path=single_mnova_path,
+                    graphics_profile_path=graphics_profile_path,
                 )
             )
         run_tasks_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -188,6 +197,25 @@ def _stage_spectrum_input(input_path: Path, inputs_root: Path, index: int) -> Pa
     return target
 
 
+def _stage_graphics_profile(
+    profile_path: Path,
+    profiles_root: Path,
+    staged_profiles: dict[Path, Path],
+) -> Path:
+    source = profile_path.resolve()
+    if source in staged_profiles:
+        return staged_profiles[source]
+    profiles_root.mkdir(parents=True, exist_ok=True)
+    target = profiles_root / f"{_safe_token(source.stem)}{source.suffix.lower() or '.mngp'}"
+    counter = 1
+    while target.exists() and source not in staged_profiles:
+        target = profiles_root / f"{_safe_token(source.stem)}_{counter}{source.suffix.lower() or '.mngp'}"
+        counter += 1
+    shutil.copy2(source, target)
+    staged_profiles[source] = target
+    return target
+
+
 def _copy_mnova_output(source: str, destination: Path | None) -> str:
     if not source:
         return ""
@@ -238,6 +266,7 @@ def _format_task_line(
     mnova_path: str = "",
     render_spec: dict[str, object] | None = None,
     single_mnova_path: str = "",
+    graphics_profile_path: str = "",
 ) -> str:
     return "\t".join(
         [
@@ -248,6 +277,7 @@ def _format_task_line(
             mnova_path,
             _render_spec_arg(render_spec),
             single_mnova_path,
+            graphics_profile_path,
         ]
     )
 

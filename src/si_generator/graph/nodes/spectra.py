@@ -52,6 +52,7 @@ def _copy_input_artifacts(request, input_dir: Path) -> dict[str, str]:
         "references_copy": request.references_path,
         "loadings_schema_copy": request.loadings_schema_docx,
         "loadings_scope_copy": request.loadings_scope_docx,
+        "mnova_graphics_profile_copy": request.mnova_graphics_profile,
     }.items():
         if not source:
             continue
@@ -110,6 +111,7 @@ def mnova_batch_node(state: GenerateSIState) -> dict:
         output_root_for(state.get("output_path", request.output_path)) / "logs" / "mnova_batch",
         output_root=output_root_for(state.get("output_path", request.output_path)),
         mnova_exe=mnova_exe,
+        mnova_graphics_profile_path=spectra_config.get("mnova_graphics_profile_path"),
         render_specs_by_compound=state.get("spectra_plan"),
     )
     return {"compounds": state.get("compounds", {})}

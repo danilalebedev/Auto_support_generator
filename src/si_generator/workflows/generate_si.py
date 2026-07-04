@@ -38,6 +38,7 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
         loadings_schema_docx=Path(args.loadings_schema_docx) if getattr(args, "loadings_schema_docx", None) else None,
         loadings_scope_docx=Path(args.loadings_scope_docx) if getattr(args, "loadings_scope_docx", None) else None,
         mnova_exe=Path(args.mnova_exe) if args.mnova_exe else None,
+        mnova_graphics_profile=Path(args.mnova_graphics_profile) if getattr(args, "mnova_graphics_profile", None) else None,
         no_extract_nmr=bool(args.no_extract_nmr),
         insert_spectra_as=_spectrum_embed_mode(getattr(args, "insert_spectra_as", "png")),
         peak_threshold_fraction=_peak_threshold_arg(getattr(args, "peak_threshold", None)),

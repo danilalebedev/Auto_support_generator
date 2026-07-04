@@ -25,6 +25,7 @@ def build_spectra_config(
     extract_nmr: bool = True,
     insert_spectra_as: SpectrumEmbedMode = "png",
     mnova_executable_path: str | None = None,
+    mnova_graphics_profile_path: str | None = None,
     peak_threshold_fraction: float | None = None,
     peak_threshold_fraction_1h: float | None = None,
     peak_threshold_fraction_13c: float | None = None,
@@ -60,6 +61,8 @@ def build_spectra_config(
     }
     if mnova_executable_path:
         config["mnova_executable_path"] = mnova_executable_path
+    if mnova_graphics_profile_path:
+        config["mnova_graphics_profile_path"] = mnova_graphics_profile_path
     return config
 
 

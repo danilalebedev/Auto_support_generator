@@ -125,6 +125,7 @@ def generate_new_support_node(state: AddCompoundsState) -> dict:
         references_path=request.references_path,
         spectra_source=request.resolved_spectra_source,
         mnova_exe=request.mnova_exe,
+        mnova_graphics_profile=request.mnova_graphics_profile,
         no_extract_nmr=request.no_extract_nmr,
         insert_spectra_as=request.insert_spectra_as,
         peak_threshold_fraction=request.peak_threshold_fraction,

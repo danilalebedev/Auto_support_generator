@@ -19,6 +19,7 @@ def fill_nmr_from_mnova(
     output_dir: str | Path,
     output_root: str | Path | None = None,
     mnova_exe: str | Path | None = None,
+    mnova_graphics_profile_path: str | Path | None = None,
     render_specs_by_compound: dict[str, dict[str, SpectrumRenderSpec]] | None = None,
 ) -> None:
     base_dir = Path(base_dir).resolve()
@@ -30,6 +31,7 @@ def fill_nmr_from_mnova(
     image_root = dirs["spectra_dir"] / "images"
     processed_root = dirs["processed_mnova_dir"]
     reports_root = dirs["mnova_reports_dir"]
+    mnova_graphics_profile = Path(mnova_graphics_profile_path).resolve() if mnova_graphics_profile_path else None
     for compound in compounds:
         compound_specs = (render_specs_by_compound or {}).get(compound.id or compound.number, {})
         mnova_path = processed_root / compound.number / f"{compound.number}.mnova"
@@ -48,6 +50,7 @@ def fill_nmr_from_mnova(
                     mnova_path,
                     dict(compound_specs.get("1H", {})),
                     single_mnova_path,
+                    mnova_graphics_profile,
                 )
             )
         if compound.c13_spectrum_path:
@@ -64,6 +67,7 @@ def fill_nmr_from_mnova(
                     mnova_path,
                     dict(compound_specs.get("13C", {})),
                     single_mnova_path,
+                    mnova_graphics_profile,
                 )
             )
 

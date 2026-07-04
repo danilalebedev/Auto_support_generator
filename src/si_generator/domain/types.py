@@ -205,6 +205,7 @@ class SpectraConfig(TypedDict, total=False):
     ignore_regions_ppm: dict[str, list[tuple[float, float]]]
     peak_picking: PeakPickingPolicy
     mnova_executable_path: str
+    mnova_graphics_profile_path: str
     mnova_script_path: str
     keep_intermediate_reports: bool
 

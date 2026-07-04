@@ -97,6 +97,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional path to MestReNova.exe. If omitted, the program searches PATH, registry, and common install folders.",
     )
     parser.add_argument(
+        "--mnova-graphics-profile",
+        help="Optional .mngp MestReNova NMR graphic properties file used for spectrum display/export formatting.",
+    )
+    parser.add_argument(
         "--no-extract-nmr",
         action="store_true",
         help="Do not run Mnova even if h1_spectrum_path/c13_spectrum_path columns are present.",

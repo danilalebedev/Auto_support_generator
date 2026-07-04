@@ -23,6 +23,7 @@ class GenerateSIRequest:
     loadings_schema_docx: Path | None = None
     loadings_scope_docx: Path | None = None
     mnova_exe: Path | None = None
+    mnova_graphics_profile: Path | None = None
     no_extract_nmr: bool = False
     insert_spectra_as: SpectrumEmbedMode = "png"
     peak_threshold_fraction: float | None = None
@@ -84,6 +85,7 @@ class AddCompoundsRequest:
     spectra_source: Path | None = None
     spectra_zip: Path | None = None
     mnova_exe: Path | None = None
+    mnova_graphics_profile: Path | None = None
     no_extract_nmr: bool = False
     insert_spectra_as: SpectrumEmbedMode = "png"
     peak_threshold_fraction: float | None = None

@@ -43,6 +43,7 @@ class SpectraConfigTests(unittest.TestCase):
             extract_nmr=False,
             insert_spectra_as="mnova",
             mnova_executable_path="C:/Tools/MestReNova.exe",
+            mnova_graphics_profile_path="C:/profiles/default.mngp",
             peak_threshold_fraction_1h=0.08,
             peak_threshold_fraction_13c=0.035,
             baseline_mode="whittaker",
@@ -56,6 +57,7 @@ class SpectraConfigTests(unittest.TestCase):
         self.assertFalse(config["extract_nmr"])
         self.assertEqual(config["insert_spectra_as"], "mnova")
         self.assertEqual(config["mnova_executable_path"], "C:/Tools/MestReNova.exe")
+        self.assertEqual(config["mnova_graphics_profile_path"], "C:/profiles/default.mngp")
         self.assertEqual(config["peak_threshold_fraction_1h"], 0.08)
         self.assertEqual(config["peak_threshold_fraction_13c"], 0.035)
         self.assertEqual(config["baseline_mode"], "whittaker")

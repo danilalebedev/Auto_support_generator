@@ -33,11 +33,13 @@ class GuiWorkflowTests(unittest.TestCase):
             spectra = root / "spectra.zip"
             schema = root / "Reaction_schema.docx"
             scope = root / "Scope.docx"
+            graphics_profile = root / "default.mngp"
             output = root / "support_information.docx"
             table.write_text("placeholder", encoding="utf-8")
             spectra.write_text("placeholder", encoding="utf-8")
             schema.write_text("placeholder", encoding="utf-8")
             scope.write_text("placeholder", encoding="utf-8")
+            graphics_profile.write_text("placeholder", encoding="utf-8")
 
             request = _build_generate_request(
                 input_kind="word",
@@ -47,6 +49,7 @@ class GuiWorkflowTests(unittest.TestCase):
                 references_text="",
                 loadings_schema_text=str(schema),
                 loadings_scope_text=str(scope),
+                mnova_graphics_profile_text=str(graphics_profile),
                 peak_threshold_1h_percent_text="8",
                 peak_threshold_13c_percent_text="3,5",
                 baseline_mode_text="whittaker",
@@ -66,6 +69,7 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(request.resolved_spectra_source, spectra)
         self.assertEqual(request.loadings_schema_docx, schema)
         self.assertEqual(request.loadings_scope_docx, scope)
+        self.assertEqual(request.mnova_graphics_profile, graphics_profile)
         self.assertEqual(request.peak_threshold_fraction_1h, 0.08)
         self.assertEqual(request.peak_threshold_fraction_13c, 0.035)
         self.assertEqual(request.baseline_mode, "whittaker")
@@ -191,6 +195,22 @@ class GuiWorkflowTests(unittest.TestCase):
                     input_path_text=str(table),
                     output_docx_text=str(root / "support_information.docx"),
                     mnova_exe_text=str(root),
+                )
+
+    def test_rejects_wrong_mnova_graphics_profile_extension(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            table = root / "input.docx"
+            profile = root / "default.txt"
+            table.write_text("placeholder", encoding="utf-8")
+            profile.write_text("placeholder", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "Mnova graphics .mngp must have"):
+                _build_generate_request(
+                    input_kind="word",
+                    input_path_text=str(table),
+                    output_docx_text=str(root / "support_information.docx"),
+                    mnova_graphics_profile_text=str(profile),
                 )
 
     def test_builds_result_summary_from_graph_state_artifacts(self) -> None:
@@ -450,6 +470,7 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(updates["references_file"], "")
         self.assertEqual(updates["loadings_schema_docx"], "")
         self.assertEqual(updates["loadings_scope_docx"], "")
+        self.assertEqual(updates["mnova_graphics_profile"], "")
         self.assertEqual(updates["existing_manifest"], "")
         self.assertEqual(updates["patch_renumber"], "")
         self.assertNotIn("mnova_exe", updates)

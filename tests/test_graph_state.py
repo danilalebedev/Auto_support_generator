@@ -64,6 +64,7 @@ class GraphStateTests(unittest.TestCase):
             input_kind="word",
             output_path=Path("output/support_information.docx"),
             mnova_exe=Path("C:/Tools/MestReNova.exe"),
+            mnova_graphics_profile=Path("C:/Profiles/default.mngp"),
             no_extract_nmr=True,
             no_check_support=True,
             peak_threshold_fraction_1h=0.08,
@@ -90,6 +91,7 @@ class GraphStateTests(unittest.TestCase):
         self.assertEqual(result["spectra_config"]["whittaker_lambda"], 300000.0)
         self.assertEqual(result["spectra_config"]["whittaker_asymmetry"], 0.003)
         self.assertEqual(result["spectra_config"]["mnova_executable_path"], "C:\\Tools\\MestReNova.exe")
+        self.assertEqual(result["spectra_config"]["mnova_graphics_profile_path"], "C:\\Profiles\\default.mngp")
         self.assertFalse(result["generation_config"]["check_support"])
         self.assertTrue(result["generation_config"]["include_ir"])
         self.assertTrue(result["generation_config"]["include_elemental_analysis"])

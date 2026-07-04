@@ -51,6 +51,7 @@ class SIGeneratorApp:
         self.loadings_schema_docx = StringVar()
         self.loadings_scope_docx = StringVar()
         self.mnova_exe = StringVar()
+        self.mnova_graphics_profile = StringVar()
         self.output_docx = StringVar(value=str(default_output_path()))
         self.output_folder = StringVar(value=str(default_output_path().parent))
         self.input_kind = StringVar(value="word")
@@ -176,6 +177,17 @@ class SIGeneratorApp:
             lambda: self._browse_file(self.mnova_exe, [("MestReNova", "*.exe"), ("All files", "*.*")]),
             optional=True,
             extra_button=("Detect", self._detect_mnova),
+        )
+        self._file_row(
+            files,
+            3,
+            "Mnova graphics .mngp",
+            self.mnova_graphics_profile,
+            lambda: self._browse_file(
+                self.mnova_graphics_profile,
+                [("MestReNova graphic properties", "*.mngp"), ("All files", "*.*")],
+            ),
+            optional=True,
         )
 
         options = ttk.LabelFrame(advanced, text="Processing", padding=12)
@@ -583,6 +595,7 @@ class SIGeneratorApp:
                 template_docx_text=self.template_docx.get(),
                 references_text=self.references_file.get(),
                 mnova_exe_text=self.mnova_exe.get(),
+                mnova_graphics_profile_text=self.mnova_graphics_profile.get(),
                 insert_spectra_as=self.insert_spectra_as.get(),
                 peak_threshold_1h_percent_text=self.peak_threshold_1h_percent.get(),
                 peak_threshold_13c_percent_text=self.peak_threshold_13c_percent.get(),
@@ -635,6 +648,7 @@ class SIGeneratorApp:
             loadings_schema_text=self.loadings_schema_docx.get(),
             loadings_scope_text=self.loadings_scope_docx.get(),
             mnova_exe_text=self.mnova_exe.get(),
+            mnova_graphics_profile_text=self.mnova_graphics_profile.get(),
             insert_spectra_as=self.insert_spectra_as.get(),
             peak_threshold_1h_percent_text=self.peak_threshold_1h_percent.get(),
             peak_threshold_13c_percent_text=self.peak_threshold_13c_percent.get(),
@@ -841,6 +855,7 @@ class SIGeneratorApp:
             "loadings_schema_docx": self.loadings_schema_docx,
             "loadings_scope_docx": self.loadings_scope_docx,
             "mnova_exe": self.mnova_exe,
+            "mnova_graphics_profile": self.mnova_graphics_profile,
             "output_docx": self.output_docx,
             "output_folder": self.output_folder,
             "peak_threshold_1h_percent": self.peak_threshold_1h_percent,
@@ -987,6 +1002,7 @@ def _build_generate_request(
     loadings_schema_text: str = "",
     loadings_scope_text: str = "",
     mnova_exe_text: str = "",
+    mnova_graphics_profile_text: str = "",
     insert_spectra_as: str = "png",
     peak_threshold_percent_text: str = "",
     peak_threshold_1h_percent_text: str = "",
@@ -1023,6 +1039,11 @@ def _build_generate_request(
         loadings_schema_docx=loadings_schema,
         loadings_scope_docx=loadings_scope,
         mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe", suffixes=(".exe",)),
+        mnova_graphics_profile=_optional_existing_file(
+            mnova_graphics_profile_text,
+            "Mnova graphics .mngp",
+            suffixes=(".mngp",),
+        ),
         insert_spectra_as=_validated_spectrum_mode(insert_spectra_as),
         peak_threshold_fraction=shared_peak_threshold,
         peak_threshold_fraction_1h=_validated_peak_threshold_fraction(
@@ -1063,6 +1084,7 @@ def _build_add_compounds_request(
     template_docx_text: str = "",
     references_text: str = "",
     mnova_exe_text: str = "",
+    mnova_graphics_profile_text: str = "",
     insert_spectra_as: str = "png",
     peak_threshold_percent_text: str = "",
     peak_threshold_1h_percent_text: str = "",
@@ -1092,6 +1114,11 @@ def _build_add_compounds_request(
         template_docx=_optional_existing_file(template_docx_text, "SI template .docx", suffixes=(".docx",)),
         references_path=_optional_existing_file(references_text, "References .yml", suffixes=(".yml", ".yaml")),
         mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe", suffixes=(".exe",)),
+        mnova_graphics_profile=_optional_existing_file(
+            mnova_graphics_profile_text,
+            "Mnova graphics .mngp",
+            suffixes=(".mngp",),
+        ),
         insert_spectra_as=_validated_spectrum_mode(insert_spectra_as),
         peak_threshold_fraction=shared_peak_threshold,
         peak_threshold_fraction_1h=_validated_peak_threshold_fraction(
@@ -1316,6 +1343,7 @@ def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) ->
         "references_file": "",
         "loadings_schema_docx": "",
         "loadings_scope_docx": "",
+        "mnova_graphics_profile": "",
         "existing_manifest": "",
         "check_support_docx": "",
         "patch_output_docx": "",

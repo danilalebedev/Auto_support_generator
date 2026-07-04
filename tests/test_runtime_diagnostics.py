@@ -141,6 +141,26 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(issue_has_errors(issues))
         self.assertIn("PREFLIGHT_LOADINGS_FILES_INCOMPLETE", {issue["code"] for issue in issues})
 
+    def test_preflight_reports_invalid_mnova_graphics_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_docx = root / "input.docx"
+            profile = root / "default.txt"
+            input_docx.write_bytes(b"placeholder")
+            profile.write_bytes(b"placeholder")
+            request = GenerateSIRequest(
+                input_path=input_docx,
+                input_kind="word",
+                output_path=root / "support_information.docx",
+                insert_spectra_as="none",
+                mnova_graphics_profile=profile,
+            )
+
+            issues = preflight_generate_request(request, mnova_finder=_raising_mnova_finder)
+
+        self.assertTrue(issue_has_errors(issues))
+        self.assertIn("PREFLIGHT_MNOVA_GRAPHICS_PROFILE_EXTENSION", {issue["code"] for issue in issues})
+
     def test_preflight_requires_mnova_when_spectra_will_be_extracted(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
