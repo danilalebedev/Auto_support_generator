@@ -31,7 +31,8 @@ def check_manifest(
     strict_artifacts: bool = True,
 ) -> list[Issue]:
     issues: list[Issue] = []
-    base_dir = Path(manifest_path).resolve().parent if manifest_path else Path.cwd()
+    manifest_file = Path(manifest_path).resolve() if manifest_path else None
+    base_dir = _manifest_base_dir(manifest, manifest_file)
 
     for key in REQUIRED_TOP_LEVEL_KEYS:
         if key not in manifest:
@@ -319,6 +320,25 @@ def _resolve_manifest_path(path: str | Path, base_dir: Path) -> Path:
     if not resolved.is_absolute():
         resolved = base_dir / resolved
     return resolved.resolve()
+
+
+def _manifest_base_dir(manifest: dict[str, Any], manifest_path: Path | None) -> Path:
+    for source in (manifest.get("artifacts", {}), manifest.get("output_paths", {})):
+        if not isinstance(source, dict):
+            continue
+        value = source.get("output_root")
+        if not value:
+            continue
+        path = Path(value)
+        if path.is_absolute() and path.exists():
+            return path.resolve()
+
+    if not manifest_path:
+        return Path.cwd()
+    parent = manifest_path.parent
+    if parent.name.lower() == "docx" and parent.parent != parent:
+        return parent.parent.resolve()
+    return parent.resolve()
 
 
 def _issue(code: str, severity: str, message: str, *, compound_id: str = "", path: str = "") -> Issue:

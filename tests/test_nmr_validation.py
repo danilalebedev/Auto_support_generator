@@ -57,6 +57,35 @@ class NmrValidationTests(unittest.TestCase):
         self.assertEqual(compound.nmr_check_warning, "")
         self.assertEqual(compound.validation_issues, [])
 
+    def test_13c_validation_allows_fluorine_coupling_peak_overcount(self) -> None:
+        compound = Compound(
+            number="x",
+            name="X",
+            formula="C11H10BrFO2",
+            c13_nmr=(
+                "δ = 166.8, 161.8, 160.2, 139.7, 139.6, 136.0, 130.4, 130.3, "
+                "124.4, 124.3, 123.0, 123.0, 122.2, 117.0, 116.9, 52.1, 21.6, 21.6."
+            ),
+        )
+
+        validate_support([compound])
+
+        self.assertEqual(compound.nmr_check_warning, "")
+        self.assertEqual(compound.validation_issues, [])
+
+    def test_13c_validation_still_warns_when_fluorinated_spectrum_misses_carbons(self) -> None:
+        compound = Compound(
+            number="x",
+            name="X",
+            formula="C11H10BrFO2",
+            c13_nmr="δ = 166.8, 139.7, 136.0, 130.4, 124.4, 52.1, 21.6.",
+        )
+
+        validate_support([compound])
+
+        self.assertIn("C expected 11, found 7", compound.nmr_check_warning)
+        self.assertEqual(compound.validation_issues[0]["code"], "NMR_C_COUNT_MISMATCH")
+
     def test_support_validation_warns_for_nmr_elemental_analysis_and_hrms_mismatch(self) -> None:
         compound = Compound(
             number="x",

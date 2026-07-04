@@ -84,6 +84,39 @@ class CheckWorkflowTests(unittest.TestCase):
 
         self.assertFalse(manifest_has_errors(issues))
 
+    def test_manifest_check_resolves_per_run_relative_paths_from_output_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "runs" / "20260704_120000_input"
+            docx_dir = run_root / "docx"
+            logs_dir = run_root / "logs"
+            input_dir = run_root / "input"
+            support_docx = docx_dir / "support_information.docx"
+            manifest_path = docx_dir / "support_information.manifest.json"
+            input_copy = input_dir / "test_input.docx"
+            input_warning = logs_dir / "input_warnings.txt"
+            support_docx.parent.mkdir(parents=True)
+            input_copy.parent.mkdir(parents=True)
+            input_warning.parent.mkdir(parents=True)
+            Document().save(support_docx)
+            input_copy.write_text("input", encoding="utf-8")
+            input_warning.write_text("warning", encoding="utf-8")
+            manifest = {
+                "run_id": "run",
+                "artifacts": {"output_root": str(run_root), "support_docx": str(support_docx)},
+                "relative_paths": {
+                    "output_root": ".",
+                    "support_docx": "docx/support_information.docx",
+                    "compound_table_copy": "input/test_input.docx",
+                    "input_warnings": "logs/input_warnings.txt",
+                },
+                "order": [],
+                "compounds": {},
+            }
+
+            issues = check_manifest(manifest, manifest_path=manifest_path)
+
+        self.assertFalse(manifest_has_errors(issues))
+
     def test_manifest_check_validates_docx_bookmarks_when_present(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

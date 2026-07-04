@@ -36,10 +36,9 @@ def validate_nmr_counts(compounds: list[Compound]) -> None:
 
         if compound.c13_nmr:
             found_c = count_c_from_13c_nmr(compound.c13_nmr)
-            fluorine_split_allowance = formula.get("F", 0)
             if found_c < expected_c:
                 _append_validation_issue(compound, "NMR_C_COUNT_MISMATCH", f"C expected {expected_c}, found {found_c}")
-            elif found_c > expected_c + fluorine_split_allowance:
+            elif found_c > expected_c and not _allows_heteronuclear_split_overcount(formula, expected_c, found_c):
                 _append_validation_issue(compound, "NMR_C_COUNT_MISMATCH", f"C expected {expected_c}, found {found_c}")
 
 
@@ -124,6 +123,22 @@ def count_c_from_13c_nmr(text: str) -> int:
     if assigned_count:
         return assigned_count
     return _count_13c_peak_items(data)
+
+
+def _allows_heteronuclear_split_overcount(formula: dict[str, int], expected_c: int, found_c: int) -> bool:
+    """Avoid false positives for plain 13C lists where C-F couplings split peaks.
+
+    Mnova often exports fluorinated 13C spectra as raw peak positions instead of
+    chemical-carbon assignments. Several carbons can appear as doublets, so the
+    peak count may exceed the formula carbon count even when no carbon is
+    missing. Missing-carbon checks stay strict because those are the actionable
+    SI errors this validator is meant to catch.
+    """
+
+    fluorines = formula.get("F", 0)
+    if fluorines <= 0 or expected_c <= 0:
+        return False
+    return found_c <= expected_c * (fluorines + 1)
 
 
 def _count_c_assignment(env: str) -> int:
