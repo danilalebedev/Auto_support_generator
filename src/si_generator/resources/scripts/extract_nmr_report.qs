@@ -379,39 +379,52 @@ function _configureBaselineProcessing(processing, nucleus, renderSpec, statusPat
 {
     var mode = _baselineMode(renderSpec || {});
     var context = nucleus + " " + mode;
+    var lambdaValue, asymmetryValue, polyOrder;
 
     if (!_baselineApply(nucleus, renderSpec || {}) || mode === "off") {
+        if (statusPath) {
+            _appendText(statusPath, "BASELINE " + nucleus + " mode=" + mode + " apply=false\n");
+        }
         return false;
     }
 
     _setBaselineParameter(processing, "BC.Apply", true, statusPath, context);
     if (mode === "whittaker") {
+        lambdaValue = _positiveBaselineNumber(renderSpec ? renderSpec.whittaker_lambda : undefined, 100000);
+        asymmetryValue = _positiveBaselineNumber(renderSpec ? renderSpec.whittaker_asymmetry : undefined, 0.001);
         _setBaselineParameter(processing, "BC.algorithm", "Whittaker", statusPath, context);
         _setAnyBaselineParameter(
             processing,
             ["BC.Whittaker.Lambda", "BC.whittaker.lambda", "BC.Lambda", "BC.lambda"],
-            _positiveBaselineNumber(renderSpec ? renderSpec.whittaker_lambda : undefined, 100000),
+            lambdaValue,
             statusPath,
             context + " lambda"
         );
         _setAnyBaselineParameter(
             processing,
             ["BC.Whittaker.Asymmetry", "BC.whittaker.asymmetry", "BC.Asymmetry", "BC.asymmetry"],
-            _positiveBaselineNumber(renderSpec ? renderSpec.whittaker_asymmetry : undefined, 0.001),
+            asymmetryValue,
             statusPath,
             context + " asymmetry"
         );
+        if (statusPath) {
+            _appendText(statusPath, "BASELINE " + nucleus + " mode=whittaker apply=true lambda=" + lambdaValue + " asymmetry=" + asymmetryValue + "\n");
+        }
         return true;
     }
 
+    polyOrder = _positiveBaselineInt(renderSpec ? renderSpec.baseline_poly_order : undefined, 3);
     _setBaselineParameter(processing, "BC.algorithm", "Bernstein", statusPath, context);
     _setBaselineParameter(
         processing,
         "BC.PolyOrder",
-        _positiveBaselineInt(renderSpec ? renderSpec.baseline_poly_order : undefined, 3),
+        polyOrder,
         statusPath,
         context + " poly_order"
     );
+    if (statusPath) {
+        _appendText(statusPath, "BASELINE " + nucleus + " mode=bernstein apply=true poly_order=" + polyOrder + "\n");
+    }
     return true;
 }
 

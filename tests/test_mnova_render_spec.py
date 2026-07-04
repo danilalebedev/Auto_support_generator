@@ -139,6 +139,9 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertIn("renderSpec.whittaker_lambda", script)
         self.assertIn("renderSpec.whittaker_asymmetry", script)
         self.assertIn("WARNING baseline parameter", script)
+        self.assertIn("BASELINE \" + nucleus + \" mode=whittaker apply=true lambda=", script)
+        self.assertIn("BASELINE \" + nucleus + \" mode=bernstein apply=true poly_order=", script)
+        self.assertIn("BASELINE \" + nucleus + \" mode=\" + mode + \" apply=false", script)
         self.assertIn("_processForReport(spectrum, nucleus, undefined, true, false, renderSpec, statusPath)", script)
         self.assertIn("_processForReport(spectrum, nucleus, 1, false, true, renderSpec, statusPath)", script)
 
