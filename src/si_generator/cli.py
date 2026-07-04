@@ -169,6 +169,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Calculate reagent loadings from table columns or the loadings workflow files.",
     )
     parser.add_argument(
+        "--calculate-elemental-analysis",
+        action="store_true",
+        help="Calculate and render theoretical elemental analysis for every compound with a formula.",
+    )
+    parser.add_argument(
         "--loadings-schema-docx",
         help="Optional Reaction_schema.docx path for reagent loadings.",
     )

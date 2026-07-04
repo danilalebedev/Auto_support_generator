@@ -138,6 +138,7 @@ def generate_new_support_node(state: AddCompoundsState) -> dict:
         whittaker_lambda=request.whittaker_lambda,
         whittaker_asymmetry=request.whittaker_asymmetry,
         generate_loadings=request.generate_loadings,
+        calculate_elemental_analysis=request.calculate_elemental_analysis,
         no_check_support=request.no_check_support,
     )
 

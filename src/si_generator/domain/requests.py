@@ -36,6 +36,7 @@ class GenerateSIRequest:
     whittaker_lambda: float = 100000.0
     whittaker_asymmetry: float = 0.001
     generate_loadings: bool = False
+    calculate_elemental_analysis: bool = False
     extract_structure_metadata: bool = False
     only: tuple[str, ...] = ()
     insert_chemdraw: bool = False
@@ -98,6 +99,7 @@ class AddCompoundsRequest:
     whittaker_lambda: float = 100000.0
     whittaker_asymmetry: float = 0.001
     generate_loadings: bool = False
+    calculate_elemental_analysis: bool = False
     no_check_support: bool = False
     strict_artifacts: bool = True
 

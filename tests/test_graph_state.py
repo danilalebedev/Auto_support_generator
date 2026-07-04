@@ -75,6 +75,7 @@ class GraphStateTests(unittest.TestCase):
             baseline_poly_order=4,
             whittaker_lambda=300000,
             whittaker_asymmetry=0.003,
+            calculate_elemental_analysis=True,
         )
 
         result = load_settings_node({"request": request})
@@ -93,9 +94,9 @@ class GraphStateTests(unittest.TestCase):
         self.assertEqual(result["spectra_config"]["mnova_executable_path"], "C:\\Tools\\MestReNova.exe")
         self.assertEqual(result["spectra_config"]["mnova_graphics_profile_path"], "C:\\Profiles\\default.mngp")
         self.assertFalse(result["generation_config"]["check_support"])
+        self.assertTrue(result["generation_config"]["calculate_elemental_analysis"])
         self.assertTrue(result["generation_config"]["include_ir"])
         self.assertTrue(result["generation_config"]["include_elemental_analysis"])
-        self.assertFalse(result["generation_config"]["calculate_elemental_analysis"])
         self.assertFalse(result["runtime_config"]["dry_run"])
 
     def test_settings_node_enables_references_when_reference_file_is_present(self) -> None:

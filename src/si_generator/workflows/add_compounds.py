@@ -44,6 +44,7 @@ def add_compounds_request_from_args(args: Namespace) -> AddCompoundsRequest:
         whittaker_lambda=float(getattr(args, "whittaker_lambda", 100000.0) or 100000.0),
         whittaker_asymmetry=float(getattr(args, "whittaker_asymmetry", 0.001) or 0.001),
         generate_loadings=bool(getattr(args, "generate_loadings", False)),
+        calculate_elemental_analysis=bool(getattr(args, "calculate_elemental_analysis", False)),
         no_check_support=bool(getattr(args, "no_check_support", False)),
         strict_artifacts=not bool(getattr(args, "no_strict_artifacts", False)),
     )

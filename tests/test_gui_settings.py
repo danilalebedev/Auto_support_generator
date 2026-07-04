@@ -24,6 +24,7 @@ class GuiSettingsTests(unittest.TestCase):
                     "mnova_graphics_profile": Path("default.mngp"),
                     "check_support": "false",
                     "generate_loadings": "yes",
+                    "calculate_elemental_analysis": "true",
                 }
             }
         )
@@ -40,6 +41,7 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertNotIn("insert_spectra_as", settings)
         self.assertFalse(settings["check_support"])
         self.assertTrue(settings["generate_loadings"])
+        self.assertTrue(settings["calculate_elemental_analysis"])
 
     def test_saves_and_loads_settings_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -59,6 +61,7 @@ class GuiSettingsTests(unittest.TestCase):
                     "mnova_graphics_profile": "C:/data/profiles/default.mngp",
                     "check_support": True,
                     "generate_loadings": False,
+                    "calculate_elemental_analysis": True,
                 },
                 path=path,
             )
@@ -77,6 +80,7 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(loaded["mnova_graphics_profile"], "C:/data/profiles/default.mngp")
         self.assertTrue(loaded["check_support"])
         self.assertFalse(loaded["generate_loadings"])
+        self.assertTrue(loaded["calculate_elemental_analysis"])
 
     def test_load_returns_empty_settings_for_corrupt_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

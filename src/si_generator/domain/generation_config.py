@@ -6,6 +6,7 @@ from .types import GenerationConfig
 def build_generation_config(
     *,
     generate_loadings: bool = False,
+    calculate_elemental_analysis: bool = False,
     has_references: bool = False,
     check_support: bool = True,
 ) -> GenerationConfig:
@@ -13,7 +14,7 @@ def build_generation_config(
         "generate_loadings": generate_loadings,
         "include_ir": True,
         "include_elemental_analysis": True,
-        "calculate_elemental_analysis": False,
+        "calculate_elemental_analysis": calculate_elemental_analysis,
         "include_references": has_references,
         "include_xrd": False,
         "check_support": check_support,

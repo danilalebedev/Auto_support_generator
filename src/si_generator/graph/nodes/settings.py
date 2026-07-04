@@ -28,6 +28,7 @@ def load_settings_node(state: GenerateSIState) -> dict:
         ),
         "generation_config": build_generation_config(
             generate_loadings=request.generate_loadings,
+            calculate_elemental_analysis=request.calculate_elemental_analysis,
             has_references=bool(request.references_path),
             check_support=not request.no_check_support,
         ),

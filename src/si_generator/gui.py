@@ -66,6 +66,7 @@ class SIGeneratorApp:
         self.whittaker_asymmetry = StringVar(value=f"{DEFAULT_WHITTAKER_ASYMMETRY:g}")
         self.check_support = BooleanVar(value=True)
         self.generate_loadings = BooleanVar(value=False)
+        self.calculate_elemental_analysis = BooleanVar(value=False)
         self.status_text = StringVar(value="Ready")
         self.result_support = StringVar(value="")
         self.result_output_folder = StringVar(value="")
@@ -202,6 +203,11 @@ class SIGeneratorApp:
             text="Check support (NMR, HRMS, elemental analysis)",
             variable=self.check_support,
         ).grid(row=1, column=0, columnspan=2, sticky="w", pady=4)
+        ttk.Checkbutton(
+            options,
+            text="Calculate elemental analysis",
+            variable=self.calculate_elemental_analysis,
+        ).grid(row=2, column=0, columnspan=2, sticky="w", pady=4)
         ttk.Label(options, text="Spectra appendix").grid(row=1, column=2, sticky="e", padx=(12, 8), pady=4)
         ttk.Combobox(
             options,
@@ -210,10 +216,10 @@ class SIGeneratorApp:
             state="readonly",
             width=8,
         ).grid(row=1, column=3, sticky="w", pady=4)
-        ttk.Label(options, text="1H threshold (%)").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(options, textvariable=self.peak_threshold_1h_percent, width=8).grid(row=2, column=1, sticky="w", pady=4)
-        ttk.Label(options, text="13C threshold (%)").grid(row=2, column=2, sticky="e", padx=(12, 8), pady=4)
-        ttk.Entry(options, textvariable=self.peak_threshold_13c_percent, width=8).grid(row=2, column=3, sticky="w", pady=4)
+        ttk.Label(options, text="1H threshold (%)").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(options, textvariable=self.peak_threshold_1h_percent, width=8).grid(row=3, column=1, sticky="w", pady=4)
+        ttk.Label(options, text="13C threshold (%)").grid(row=3, column=2, sticky="e", padx=(12, 8), pady=4)
+        ttk.Entry(options, textvariable=self.peak_threshold_13c_percent, width=8).grid(row=3, column=3, sticky="w", pady=4)
 
         baseline = ttk.LabelFrame(advanced, text="Baseline correction", padding=12)
         baseline.grid(row=2, column=0, sticky="ew", pady=(10, 0))
@@ -606,6 +612,7 @@ class SIGeneratorApp:
                 whittaker_lambda_text=self.whittaker_lambda.get(),
                 whittaker_asymmetry_text=self.whittaker_asymmetry.get(),
                 generate_loadings=self.generate_loadings.get(),
+                calculate_elemental_analysis=self.calculate_elemental_analysis.get(),
                 check_support=self.check_support.get(),
             )
         except ValueError as exc:
@@ -659,6 +666,7 @@ class SIGeneratorApp:
             whittaker_lambda_text=self.whittaker_lambda.get(),
             whittaker_asymmetry_text=self.whittaker_asymmetry.get(),
             generate_loadings=self.generate_loadings.get(),
+            calculate_elemental_analysis=self.calculate_elemental_analysis.get(),
             check_support=self.check_support.get(),
         )
 
@@ -900,6 +908,7 @@ class SIGeneratorApp:
         return {
             "check_support": self.check_support,
             "generate_loadings": self.generate_loadings,
+            "calculate_elemental_analysis": self.calculate_elemental_analysis,
             "baseline_apply_1h": self.baseline_apply_1h,
             "baseline_apply_13c": self.baseline_apply_13c,
         }
@@ -1014,6 +1023,7 @@ def _build_generate_request(
     whittaker_lambda_text: str = f"{DEFAULT_WHITTAKER_LAMBDA:g}",
     whittaker_asymmetry_text: str = f"{DEFAULT_WHITTAKER_ASYMMETRY:g}",
     generate_loadings: bool = False,
+    calculate_elemental_analysis: bool = False,
     check_support: bool = True,
 ) -> GenerateSIRequest:
     input_suffixes = (".csv",) if input_kind == "csv" else (".docx",)
@@ -1061,6 +1071,7 @@ def _build_generate_request(
         whittaker_lambda=_validated_positive_float(whittaker_lambda_text, "Whittaker lambda"),
         whittaker_asymmetry=_validated_fraction(whittaker_asymmetry_text, "Whittaker asymmetry"),
         generate_loadings=generate_loadings,
+        calculate_elemental_analysis=calculate_elemental_analysis,
         no_check_support=not check_support,
     )
 
@@ -1096,6 +1107,7 @@ def _build_add_compounds_request(
     whittaker_lambda_text: str = f"{DEFAULT_WHITTAKER_LAMBDA:g}",
     whittaker_asymmetry_text: str = f"{DEFAULT_WHITTAKER_ASYMMETRY:g}",
     generate_loadings: bool = False,
+    calculate_elemental_analysis: bool = False,
     check_support: bool = True,
 ) -> AddCompoundsRequest:
     input_suffixes = (".csv",) if input_kind == "csv" else (".docx",)
@@ -1136,6 +1148,7 @@ def _build_add_compounds_request(
         whittaker_lambda=_validated_positive_float(whittaker_lambda_text, "Whittaker lambda"),
         whittaker_asymmetry=_validated_fraction(whittaker_asymmetry_text, "Whittaker asymmetry"),
         generate_loadings=generate_loadings,
+        calculate_elemental_analysis=calculate_elemental_analysis,
         no_check_support=not check_support,
     )
 

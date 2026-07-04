@@ -59,6 +59,7 @@ class GuiWorkflowTests(unittest.TestCase):
                 whittaker_lambda_text="250000",
                 whittaker_asymmetry_text="0,002",
                 generate_loadings=True,
+                calculate_elemental_analysis=True,
                 check_support=False,
             )
 
@@ -79,6 +80,7 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(request.whittaker_lambda, 250000.0)
         self.assertEqual(request.whittaker_asymmetry, 0.002)
         self.assertTrue(request.generate_loadings)
+        self.assertTrue(request.calculate_elemental_analysis)
         self.assertTrue(request.no_check_support)
 
     def test_builds_graph_request_from_folder_spectra_source(self) -> None:
@@ -370,12 +372,14 @@ class GuiWorkflowTests(unittest.TestCase):
                 input_kind="csv",
                 input_path_text=str(new_table),
                 output_docx_text=str(output),
+                calculate_elemental_analysis=True,
             )
 
         self.assertEqual(request.manifest_path, manifest)
         self.assertEqual(request.input_path, new_table)
         self.assertEqual(request.input_kind, "csv")
         self.assertEqual(request.output_docx, output)
+        self.assertTrue(request.calculate_elemental_analysis)
 
     def test_report_overview_ignores_missing_or_invalid_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

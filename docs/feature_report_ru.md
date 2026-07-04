@@ -46,6 +46,11 @@
 В `detail` указано, что нужно проверить auto integration/multiplet analysis,
 threshold, baseline или single-spectrum `.mnova` файл.
 
+Опция `Calculate elemental analysis` в Advanced генерирует теоретическую строку
+`Anal. Calcd ...` для всех соединений с формулой. Если found-значения уже
+заданы в таблице, они сохраняются и проверяются; если не заданы, в SI попадает
+только расчетная часть.
+
 ### Настраиваемое оформление
 
 Оформление переведено на единый Word-шаблон `SI_template.docx`.
