@@ -760,7 +760,7 @@ class SIGeneratorApp:
             result = run_add_compounds(request)
             for issue in result.get("issues", []):
                 self._log_queue.put(f"[{issue.get('severity', 'warning').upper()}] {issue.get('code', 'ADD')}: {issue.get('message', '')}\n")
-            summary = _build_patch_summary(result)
+            summary = _build_add_compounds_summary(result)
             if summary.get("run_summary"):
                 self._log_queue.put(f"Add compounds report: {summary['run_summary']}\n")
             if manifest_has_errors(result.get("issues", [])):
@@ -1197,6 +1197,22 @@ def _build_patch_request(
 def _build_patch_summary(state: dict[str, Any]) -> dict[str, str]:
     artifacts = state.get("artifacts", {})
     report_path = _resolved_artifact(artifacts, "patch_report")
+    summary = {
+        "support_docx": _resolved_artifact(artifacts, "support_docx"),
+        "manifest": _resolved_artifact(artifacts, "manifest"),
+        "run_summary": report_path,
+        "logs_dir": _resolved_artifact(artifacts, "logs_dir"),
+        "output_folder": _resolved_artifact(artifacts, "output_root"),
+        "overview": _report_overview(report_path),
+    }
+    if not summary["output_folder"]:
+        summary["output_folder"] = _summary_output_folder(summary)
+    return {key: value for key, value in summary.items() if value}
+
+
+def _build_add_compounds_summary(state: dict[str, Any]) -> dict[str, str]:
+    artifacts = state.get("artifacts", {})
+    report_path = _resolved_artifact(artifacts, "add_report")
     summary = {
         "support_docx": _resolved_artifact(artifacts, "support_docx"),
         "manifest": _resolved_artifact(artifacts, "manifest"),

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from si_generator.gui import (
     _build_add_compounds_request,
+    _build_add_compounds_summary,
     _build_check_summary,
     _build_check_request,
     _build_generate_request,
@@ -360,6 +361,29 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(summary["manifest"], str(manifest.resolve()))
         self.assertEqual(summary["run_summary"], str(report.resolve()))
         self.assertEqual(summary["overview"], "Status: fail | Errors: 1 | Warnings: 2")
+
+    def test_builds_add_compounds_summary_from_add_report_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            support = root / "combined.docx"
+            manifest = root / "combined.manifest.json"
+            report = root / "combined.add_report.json"
+            report.write_text('{"status":"pass","issue_counts":{}}', encoding="utf-8")
+
+            summary = _build_add_compounds_summary(
+                {
+                    "artifacts": {
+                        "support_docx": str(support),
+                        "manifest": str(manifest),
+                        "add_report": str(report),
+                    }
+                }
+            )
+
+        self.assertEqual(summary["support_docx"], str(support.resolve()))
+        self.assertEqual(summary["manifest"], str(manifest.resolve()))
+        self.assertEqual(summary["run_summary"], str(report.resolve()))
+        self.assertEqual(summary["overview"], "Status: pass | Issues: 0")
 
     def test_builds_add_compounds_request_from_csv_table(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
