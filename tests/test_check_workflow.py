@@ -117,6 +117,40 @@ class CheckWorkflowTests(unittest.TestCase):
 
         self.assertFalse(manifest_has_errors(issues))
 
+    def test_manifest_check_prefers_new_absolute_support_docx_over_existing_old_relative_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            old_run_root = Path(tmp) / "old_run"
+            old_docx = old_run_root / "docx" / "support_information.docx"
+            new_docx = Path(tmp) / "support_information_added.docx"
+            manifest_path = Path(tmp) / "support_information_added.manifest.json"
+            old_docx.parent.mkdir(parents=True)
+            Document().save(old_docx)
+            compound = Compound(id="added_cmp_001_1", number="3a", name="Added")
+            build_document_from_model(build_si_document_model([compound]), new_docx)
+            manifest = {
+                "run_id": "run",
+                "artifacts": {
+                    "output_root": str(old_run_root),
+                    "support_docx": str(new_docx),
+                },
+                "relative_paths": {
+                    "support_docx": "docx/support_information.docx",
+                },
+                "order": ["added_cmp_001_1"],
+                "compounds": {
+                    "added_cmp_001_1": {
+                        "id": "added_cmp_001_1",
+                        "number": "3a",
+                        "docx_block_id": "compound:added_cmp_001_1",
+                        "docx_bookmark": bookmark_name_for_block_id("compound:added_cmp_001_1"),
+                    }
+                },
+            }
+
+            issues = check_manifest(manifest, manifest_path=manifest_path, strict_artifacts=False)
+
+        self.assertFalse(manifest_has_errors(issues))
+
     def test_manifest_check_validates_docx_bookmarks_when_present(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

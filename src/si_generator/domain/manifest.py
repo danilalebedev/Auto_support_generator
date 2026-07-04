@@ -279,9 +279,9 @@ def _check_artifact_paths(manifest: dict[str, Any], base_dir: Path) -> list[Issu
 
 def _manifest_path(manifest: dict[str, Any], key: str, base_dir: Path) -> Path | None:
     candidates = _path_candidates(
-        manifest.get("relative_paths", {}),
         manifest.get("artifacts", {}),
         manifest.get("output_paths", {}),
+        manifest.get("relative_paths", {}),
         key=key,
     )
     return _first_existing_or_first(candidates, base_dir)
