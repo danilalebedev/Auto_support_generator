@@ -17,6 +17,7 @@ class GuiSettingsTests(unittest.TestCase):
                     "unknown": "ignored",
                     "input_kind": "WORD",
                     "insert_spectra_as": "invalid",
+                    "theme_mode": "DARK",
                     "target_signal_height_percent": "72",
                     "h1_ppm_min": "-0.5",
                     "h1_ppm_max": "11.5",
@@ -37,6 +38,7 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(settings["input_path"], "input.docx")
         self.assertEqual(settings["output_folder"], str(Path("output/runs/demo")))
         self.assertEqual(settings["input_kind"], "word")
+        self.assertEqual(settings["theme_mode"], "dark")
         self.assertEqual(settings["target_signal_height_percent"], "72")
         self.assertEqual(settings["h1_ppm_min"], "-0.5")
         self.assertEqual(settings["h1_ppm_max"], "11.5")
@@ -64,6 +66,7 @@ class GuiSettingsTests(unittest.TestCase):
                     "output_folder": "C:/data/output",
                     "input_kind": "csv",
                     "insert_spectra_as": "mnova",
+                    "theme_mode": "dark",
                     "target_signal_height_percent": "85",
                     "h1_ppm_min": "-1",
                     "h1_ppm_max": "12",
@@ -88,6 +91,7 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(loaded["output_folder"], "C:/data/output")
         self.assertEqual(loaded["input_kind"], "csv")
         self.assertEqual(loaded["insert_spectra_as"], "mnova")
+        self.assertEqual(loaded["theme_mode"], "dark")
         self.assertEqual(loaded["target_signal_height_percent"], "85")
         self.assertEqual(loaded["h1_ppm_min"], "-1")
         self.assertEqual(loaded["h1_ppm_max"], "12")

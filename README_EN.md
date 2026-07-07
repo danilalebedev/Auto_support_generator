@@ -29,7 +29,7 @@ Russian documentation is available in [README_RU.md](README_RU.md).
 6. When the run finishes, click `Open output folder` or `Open last output`.
 7. Open `docx/support_information.docx`.
 
-For a normal project, the `Generate` tab usually needs only three fields:
+For a normal project, the `Generate SI` page usually needs only three fields:
 
 | Field | What to select |
 | --- | --- |
@@ -38,6 +38,8 @@ For a normal project, the `Generate` tab usually needs only three fields:
 | `Output folder` | folder where generated files should be saved |
 
 Most other settings can be left at their defaults.
+
+The GUI uses a Fluent-style left sidebar. Use the navigation items on the left to switch between generation, processing settings, checking, patching and adding compounds. Use the `Dark theme` switch at the bottom of the sidebar to toggle light/dark mode; the choice is saved locally.
 
 ## Main Features
 
@@ -77,7 +79,7 @@ Important notes:
 
 - ChemDraw must be installed as a desktop application and must support OLE/COM editing of structures.
 - MestReNova should be launched manually at least once before automation, so licensing and first-run settings are initialized.
-- If MestReNova is not detected automatically, specify the path to `MestReNova.exe` in the GUI on the `Advanced` tab.
+- If MestReNova is not detected automatically, specify the path to `MestReNova.exe` in the GUI on the `Processing` page.
 - Unicode paths are supported. For ChemDraw/MestReNova automation, working files may be copied temporarily into `C:\Users\Public\AutoSupportGenerator\temp` because external desktop programs do not always handle Unicode paths reliably.
 
 ## Installing the Packaged Version
@@ -139,7 +141,7 @@ The folder name must match the compound number in the table. Experiment folders 
 
 ### 3. Run the GUI
 
-On the `Generate` tab select:
+On the `Generate SI` page select:
 
 - `Compound table`;
 - `Spectra source`;
@@ -157,7 +159,7 @@ output/runs/<date>_<input_name>/docx/support_information.docx
 
 If warnings were produced, open `Open report` or inspect the `logs` folder.
 
-## GUI: Generate Tab
+## GUI: Generate SI Page
 
 ### Simple
 
@@ -196,9 +198,9 @@ The run log shows:
 
 If something fails, check `Run Log` first.
 
-## GUI: Advanced Tab
+## GUI: Processing Page
 
-The `Advanced` tab contains optional files and processing controls.
+The `Processing` page contains optional files and processing controls.
 
 ### Optional Inputs
 
@@ -264,9 +266,9 @@ For normal work, default values are recommended. Whittaker settings are expert s
 
 If reagent loading calculations are not needed, leave this block unchanged.
 
-## GUI: Check Support Tab
+## GUI: Check Support Page
 
-This tab checks an already generated SI without regenerating it.
+This page checks an already generated SI without regenerating it.
 
 | Field | What to select |
 | --- | --- |
@@ -275,9 +277,9 @@ This tab checks an already generated SI without regenerating it.
 
 The result is saved as a `*.check_report.json` file.
 
-## GUI: Patch SI Tab
+## GUI: Patch SI Page
 
-This tab edits an existing SI without full regeneration.
+This page edits an existing SI without full regeneration.
 
 | Field | Meaning |
 | --- | --- |
@@ -298,9 +300,9 @@ Reorder:  2b,2a,2c
 
 Patch workflow always creates a new `.docx`, a new manifest and a report. The old SI is not modified in place.
 
-## GUI: Add Compounds Tab
+## GUI: Add Compounds Page
 
-This tab appends new compounds to an existing SI.
+This page appends new compounds to an existing SI.
 
 | Field | Meaning |
 | --- | --- |
@@ -723,7 +725,7 @@ Common CLI parameters:
 
 ### MestReNova was not found
 
-Use `Advanced -> MestReNova .exe -> Browse...` and select:
+Use `Processing -> MestReNova .exe -> Browse...` and select:
 
 ```text
 C:\Program Files\Mestrelab Research S.L\MestReNova\MestReNova.exe

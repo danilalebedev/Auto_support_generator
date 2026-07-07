@@ -31,7 +31,7 @@ from .domain.types import SpectrumEmbedMode
 from .external_tools import find_mnova_executable
 from .gui_settings import load_gui_settings, save_gui_settings
 from .runtime_diagnostics import format_preflight_issues, issue_has_errors, preflight_generate_request
-from .runtime_paths import default_output_path, examples_dir
+from .runtime_paths import bundled_resource_path, default_output_path, examples_dir
 from .workflows.check_si import run_check_si
 from .workflows.generate_si import output_path_from_state, run_generate_si
 from .workflows.patch_si import run_patch_si
@@ -46,12 +46,50 @@ STARTER_FILE_RELATIVE_PATHS = (
 )
 
 
+THEME_PALETTES = {
+    "light": {
+        "app_bg": "#f5f7fb",
+        "sidebar_bg": "#eef3fb",
+        "sidebar_hover": "#dde8f8",
+        "sidebar_selected": "#d4e6ff",
+        "card_bg": "#ffffff",
+        "border": "#d8dee9",
+        "text": "#18202c",
+        "muted": "#607086",
+        "accent": "#1668dc",
+        "accent_hover": "#0f5cc6",
+        "success": "#0f7b4f",
+        "input_bg": "#ffffff",
+        "log_bg": "#ffffff",
+        "log_fg": "#172033",
+        "disabled_bg": "#e7ebf2",
+    },
+    "dark": {
+        "app_bg": "#111827",
+        "sidebar_bg": "#0b1220",
+        "sidebar_hover": "#1b2a41",
+        "sidebar_selected": "#17345f",
+        "card_bg": "#182235",
+        "border": "#314057",
+        "text": "#edf2f7",
+        "muted": "#aab6c8",
+        "accent": "#4f9cff",
+        "accent_hover": "#78b5ff",
+        "success": "#4dd4a3",
+        "input_bg": "#0f172a",
+        "log_bg": "#0b1020",
+        "log_fg": "#dbeafe",
+        "disabled_bg": "#263246",
+    },
+}
+
+
 class SIGeneratorApp:
     def __init__(self, root: Tk) -> None:
         self.root = root
         self.root.title("Auto Support Generator")
-        self.root.geometry("720x480")
-        self.root.minsize(720, 480)
+        self.root.geometry("1120x720")
+        self.root.minsize(860, 560)
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
 
@@ -66,6 +104,8 @@ class SIGeneratorApp:
         self.mnova_graphics_profile = StringVar()
         self.output_docx = StringVar(value=str(default_output_path()))
         self.output_folder = StringVar(value=str(default_output_path().parent))
+        self.theme_mode = StringVar(value="light")
+        self.dark_theme = BooleanVar(value=False)
         self.input_kind = StringVar(value="word")
         self.insert_spectra_as = StringVar(value="png")
         self.target_signal_height_percent = StringVar(value=_format_fraction_percent(DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION))
@@ -103,63 +143,197 @@ class SIGeneratorApp:
         self.add_spectra_source = StringVar(value="")
         self.add_output_docx = StringVar(value="")
         self.add_input_kind = StringVar(value="word")
+        self.page_title = StringVar(value="Generate SI")
+        self.page_subtitle = StringVar(value="Create formatted Supporting Information from a compound table and spectra.")
 
         self._is_running = False
         self._last_output_folder: Path | None = None
         self._log_queue: queue.Queue[Any] = queue.Queue()
+        self._theme = THEME_PALETTES["light"]
+        self._nav_buttons: dict[str, ttk.Button] = {}
+        self._page_frames: dict[str, ttk.Frame] = {}
+        self._scrollable_frames: list[_ScrollableFrame] = []
+        self._logo_mark_source: tk.PhotoImage | None = None
+        self._logo_mark_image: tk.PhotoImage | None = None
 
         self._load_saved_settings()
+        if self.theme_mode.get() not in THEME_PALETTES:
+            self.theme_mode.set("light")
+        self.dark_theme.set(self.theme_mode.get() == "dark")
         self._configure_style()
+        self._load_logo_assets()
         self._build_ui()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._poll_log_queue()
 
     def _configure_style(self) -> None:
+        self._theme = THEME_PALETTES.get(self.theme_mode.get(), THEME_PALETTES["light"])
+        theme = self._theme
         style = ttk.Style(self.root)
         try:
             style.theme_use("clam")
         except Exception:
             pass
-        style.configure(".", font=("Segoe UI", 10))
-        style.configure("Title.TLabel", font=("Segoe UI", 18, "bold"))
-        style.configure("Muted.TLabel", foreground="#5f6b7a")
-        style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"))
-        style.configure("TLabelframe.Label", font=("Segoe UI", 10, "bold"))
-        style.configure("Status.TLabel", foreground="#355070")
+        self.root.configure(bg=theme["app_bg"])
+        style.configure(".", font=("Segoe UI", 10), background=theme["app_bg"], foreground=theme["text"])
+        style.configure("TFrame", background=theme["app_bg"])
+        style.configure("App.TFrame", background=theme["app_bg"])
+        style.configure("Sidebar.TFrame", background=theme["sidebar_bg"])
+        style.configure("Card.TFrame", background=theme["card_bg"])
+        style.configure("TLabel", background=theme["card_bg"], foreground=theme["text"])
+        style.configure("Sidebar.TLabel", background=theme["sidebar_bg"], foreground=theme["text"])
+        style.configure("SidebarMuted.TLabel", background=theme["sidebar_bg"], foreground=theme["muted"])
+        style.configure("Title.TLabel", background=theme["app_bg"], foreground=theme["text"], font=("Segoe UI", 20, "bold"))
+        style.configure("SectionTitle.TLabel", background=theme["app_bg"], foreground=theme["text"], font=("Segoe UI", 13, "bold"))
+        style.configure("Muted.TLabel", background=theme["app_bg"], foreground=theme["muted"])
+        style.configure("Status.TLabel", background=theme["app_bg"], foreground=theme["success"])
+        style.configure("TCheckbutton", background=theme["app_bg"], foreground=theme["text"])
+        style.map("TCheckbutton", background=[("active", theme["app_bg"])], foreground=[("disabled", theme["muted"])])
+        style.configure("TRadiobutton", background=theme["app_bg"], foreground=theme["text"])
+        style.map("TRadiobutton", background=[("active", theme["app_bg"])], foreground=[("disabled", theme["muted"])])
+        style.configure("TEntry", fieldbackground=theme["input_bg"], foreground=theme["text"], insertcolor=theme["text"])
+        style.map("TEntry", fieldbackground=[("readonly", theme["input_bg"]), ("disabled", theme["disabled_bg"])])
+        style.configure("TCombobox", fieldbackground=theme["input_bg"], foreground=theme["text"], arrowcolor=theme["muted"])
+        style.map("TCombobox", fieldbackground=[("readonly", theme["input_bg"])], foreground=[("readonly", theme["text"])])
+        style.configure(
+            "Card.TLabelframe",
+            background=theme["card_bg"],
+            bordercolor=theme["border"],
+            lightcolor=theme["border"],
+            darkcolor=theme["border"],
+            relief="solid",
+        )
+        style.configure(
+            "Card.TLabelframe.Label",
+            background=theme["app_bg"],
+            foreground=theme["text"],
+            font=("Segoe UI", 10, "bold"),
+        )
+        style.configure("TLabelframe.Label", background=theme["app_bg"], foreground=theme["text"], font=("Segoe UI", 10, "bold"))
+        style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=(14, 8), background=theme["accent"], foreground="#ffffff")
+        style.map("Accent.TButton", background=[("active", theme["accent_hover"]), ("disabled", theme["disabled_bg"])], foreground=[("disabled", theme["muted"])])
+        style.configure("TButton", padding=(10, 6))
+        style.configure("Sidebar.TButton", anchor="w", padding=(14, 10), background=theme["sidebar_bg"], foreground=theme["text"], borderwidth=0)
+        style.map("Sidebar.TButton", background=[("active", theme["sidebar_hover"])], foreground=[("disabled", theme["muted"])])
+        style.configure("ActiveSidebar.TButton", anchor="w", padding=(14, 10), background=theme["sidebar_selected"], foreground=theme["text"], borderwidth=0)
+        style.map("ActiveSidebar.TButton", background=[("active", theme["sidebar_selected"])])
+        style.configure("SidebarAction.TButton", anchor="center", padding=(10, 7), background=theme["sidebar_hover"], foreground=theme["text"], borderwidth=0)
+        style.map("SidebarAction.TButton", background=[("active", theme["sidebar_selected"])])
+        self._apply_theme_to_non_ttk_widgets()
+
+    def _load_logo_assets(self) -> None:
+        logo_path = bundled_resource_path("assets/auto_support_generator_mark.png", package_file=__file__)
+        if not logo_path.exists():
+            return
+        try:
+            self._logo_mark_source = tk.PhotoImage(file=str(logo_path))
+            self._logo_mark_image = self._logo_mark_source.subsample(2, 2)
+            self.root.iconphoto(True, self._logo_mark_source)
+        except tk.TclError:
+            self._logo_mark_source = None
+            self._logo_mark_image = None
 
     def _build_ui(self) -> None:
-        outer = ttk.Frame(self.root, padding=14)
+        outer = ttk.Frame(self.root, style="App.TFrame")
         outer.grid(row=0, column=0, sticky="nsew")
-        outer.columnconfigure(0, weight=1)
-        outer.rowconfigure(1, weight=1)
+        outer.columnconfigure(0, weight=0, minsize=260)
+        outer.columnconfigure(1, weight=1)
+        outer.rowconfigure(0, weight=1)
 
-        header = ttk.Frame(outer)
-        header.grid(row=0, column=0, sticky="ew", pady=(0, 10))
-        header.columnconfigure(0, weight=1)
-        ttk.Label(header, text="Auto Support Generator", style="Title.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(header, text="Compound table + spectra source -> formatted Supporting Information", style="Muted.TLabel").grid(
-            row=1, column=0, sticky="w", pady=(2, 0)
+        self._build_sidebar(outer)
+        self._build_content_shell(outer)
+        self._show_page("generate")
+        self._apply_theme_to_non_ttk_widgets()
+
+    def _build_sidebar(self, parent: ttk.Frame) -> None:
+        sidebar = ttk.Frame(parent, style="Sidebar.TFrame", padding=(18, 18, 16, 18))
+        sidebar.grid(row=0, column=0, sticky="nsew")
+        sidebar.columnconfigure(0, weight=1)
+        sidebar.rowconfigure(7, weight=1)
+
+        brand = ttk.Frame(sidebar, style="Sidebar.TFrame")
+        brand.grid(row=0, column=0, sticky="ew", pady=(0, 18))
+        brand.columnconfigure(1, weight=1)
+        if self._logo_mark_image is not None:
+            ttk.Label(brand, image=self._logo_mark_image, style="Sidebar.TLabel").grid(row=0, column=0, rowspan=2, sticky="w", padx=(0, 10))
+        ttk.Label(brand, text="Auto Support", style="Sidebar.TLabel", font=("Segoe UI", 15, "bold")).grid(row=0, column=1, sticky="sw")
+        ttk.Label(brand, text="Generator", style="SidebarMuted.TLabel", font=("Segoe UI", 12, "bold")).grid(row=1, column=1, sticky="nw")
+
+        nav_items = (
+            ("generate", "Generate SI", "Main workflow"),
+            ("advanced", "Processing", "NMR and templates"),
+            ("check", "Check support", "Validate existing SI"),
+            ("patch", "Patch SI", "Renumber or remove"),
+            ("add", "Add compounds", "Append new entries"),
         )
-        ttk.Button(header, text="Load example", command=self._load_examples).grid(row=0, column=1, rowspan=2, sticky="e", padx=(12, 0))
-        ttk.Button(header, text="Copy starter files", command=self._copy_starter_files).grid(row=0, column=2, rowspan=2, sticky="e", padx=(8, 0))
-        ttk.Button(header, text="Open examples", command=self._open_examples_folder).grid(row=0, column=3, rowspan=2, sticky="e", padx=(8, 0))
+        for index, (page, title, subtitle) in enumerate(nav_items, start=1):
+            text = f"{title}\n{subtitle}"
+            button = ttk.Button(sidebar, text=text, style="Sidebar.TButton", command=lambda page=page: self._show_page(page))
+            button.grid(row=index, column=0, sticky="ew", pady=3)
+            self._nav_buttons[page] = button
 
-        notebook = ttk.Notebook(outer)
-        notebook.grid(row=1, column=0, sticky="nsew")
+        quick = ttk.Frame(sidebar, style="Sidebar.TFrame")
+        quick.grid(row=8, column=0, sticky="ew", pady=(14, 0))
+        quick.columnconfigure(0, weight=1)
+        ttk.Button(quick, text="Load example", command=self._load_examples, style="SidebarAction.TButton").grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        ttk.Button(quick, text="Copy starter files", command=self._copy_starter_files, style="SidebarAction.TButton").grid(row=1, column=0, sticky="ew", pady=(0, 6))
+        ttk.Button(quick, text="Open examples", command=self._open_examples_folder, style="SidebarAction.TButton").grid(row=2, column=0, sticky="ew")
+        ttk.Checkbutton(quick, text="Dark theme", variable=self.dark_theme, command=self._toggle_theme).grid(row=3, column=0, sticky="w", pady=(14, 0))
 
-        generate_tab = ttk.Frame(notebook, padding=12)
-        generate_tab.columnconfigure(0, weight=1)
-        generate_tab.rowconfigure(2, weight=1)
-        notebook.add(generate_tab, text="Generate")
+    def _build_content_shell(self, parent: ttk.Frame) -> None:
+        main = ttk.Frame(parent, style="App.TFrame", padding=(18, 18, 18, 14))
+        main.grid(row=0, column=1, sticky="nsew")
+        main.columnconfigure(0, weight=1)
+        main.rowconfigure(1, weight=1)
 
-        simple = ttk.LabelFrame(generate_tab, text="Simple", padding=12)
+        header = ttk.Frame(main, style="App.TFrame")
+        header.grid(row=0, column=0, sticky="ew", pady=(0, 14))
+        header.columnconfigure(0, weight=1)
+        ttk.Label(header, textvariable=self.page_title, style="Title.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(header, textvariable=self.page_subtitle, style="Muted.TLabel").grid(row=1, column=0, sticky="w", pady=(2, 0))
+        ttk.Button(header, text="Generate SI", command=self._start_generation, style="Accent.TButton").grid(row=0, column=1, rowspan=2, sticky="e", padx=(12, 0))
+
+        page_host = ttk.Frame(main, style="App.TFrame")
+        page_host.grid(row=1, column=0, sticky="nsew")
+        page_host.columnconfigure(0, weight=1)
+        page_host.rowconfigure(0, weight=1)
+        self._build_generate_page(page_host)
+        self._build_advanced_page(page_host)
+        self._build_check_page(page_host)
+        self._build_patch_page(page_host)
+        self._build_add_page(page_host)
+
+        footer = ttk.Frame(main, style="App.TFrame")
+        footer.grid(row=2, column=0, sticky="ew", pady=(12, 0))
+        footer.columnconfigure(0, weight=1)
+        ttk.Label(footer, textvariable=self.status_text, style="Status.TLabel").grid(row=0, column=0, sticky="w")
+        self.progress = ttk.Progressbar(footer, mode="indeterminate", length=150)
+        self.progress.grid(row=0, column=1, sticky="e", padx=(12, 0))
+        ttk.Button(footer, text="Open last output", command=self._open_output_folder).grid(row=0, column=2, sticky="e", padx=(8, 0))
+        ttk.Button(footer, text="Clear log", command=lambda: self.log.clear()).grid(row=0, column=3, sticky="e", padx=(8, 0))
+        self.run_button = ttk.Button(footer, text="Generate SI", command=self._start_generation, style="Accent.TButton")
+        self.run_button.grid(row=0, column=4, sticky="e", padx=(8, 0))
+
+    def _make_page(self, parent: ttk.Frame, key: str) -> ttk.Frame:
+        page = ttk.Frame(parent, style="App.TFrame")
+        page.grid(row=0, column=0, sticky="nsew")
+        page.grid_remove()
+        page.columnconfigure(0, weight=1)
+        self._page_frames[key] = page
+        return page
+
+    def _build_generate_page(self, parent: ttk.Frame) -> None:
+        page = self._make_page(parent, "generate")
+        page.rowconfigure(2, weight=1)
+
+        simple = ttk.LabelFrame(page, text="Simple", padding=12, style="Card.TLabelframe")
         simple.grid(row=0, column=0, sticky="ew")
         simple.columnconfigure(1, weight=1)
         self._file_row(simple, 0, "Compound table", self.input_path, self._browse_input)
         self._source_row(simple, 1, "Spectra source", self.spectra_source, self._browse_spectra_source, self._browse_spectra_folder)
         self._folder_row(simple, 2, "Output folder", self.output_folder, self._browse_output_folder)
 
-        results = ttk.LabelFrame(generate_tab, text="Results", padding=12)
+        results = ttk.LabelFrame(page, text="Results", padding=12, style="Card.TLabelframe")
         results.grid(row=1, column=0, sticky="ew", pady=(10, 0))
         results.columnconfigure(1, weight=1)
         self._result_row(results, 0, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"), "Open support")
@@ -168,22 +342,26 @@ class SIGeneratorApp:
         self._result_row(results, 3, "Report", self.result_report, lambda: self._open_result_path(self.result_report, "Report"), "Open report")
         ttk.Label(results, textvariable=self.result_overview, style="Muted.TLabel").grid(row=4, column=0, columnspan=3, sticky="ew", pady=(6, 0))
 
-        log_frame = ttk.LabelFrame(generate_tab, text="Run Log", padding=8)
+        log_frame = ttk.LabelFrame(page, text="Run Log", padding=8, style="Card.TLabelframe")
         log_frame.grid(row=2, column=0, sticky="nsew", pady=(10, 0))
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
-        self.log = _LogText(log_frame, height=4)
+        self.log = _LogText(log_frame, height=8)
         self.log.grid(row=0, column=0, sticky="nsew")
         scroll = ttk.Scrollbar(log_frame, command=self.log.yview)
         scroll.grid(row=0, column=1, sticky="ns")
         self.log.configure(yscrollcommand=scroll.set)
 
-        advanced_scroll = _ScrollableFrame(notebook, padding=12)
+    def _build_advanced_page(self, parent: ttk.Frame) -> None:
+        page = self._make_page(parent, "advanced")
+        page.rowconfigure(0, weight=1)
+        advanced_scroll = _ScrollableFrame(page, padding=2)
+        self._scrollable_frames.append(advanced_scroll)
+        advanced_scroll.grid(row=0, column=0, sticky="nsew")
         advanced = advanced_scroll.content
         advanced.columnconfigure(0, weight=1)
-        notebook.add(advanced_scroll, text="Advanced")
 
-        files = ttk.LabelFrame(advanced, text="Optional inputs", padding=12)
+        files = ttk.LabelFrame(advanced, text="Optional inputs", padding=12, style="Card.TLabelframe")
         files.grid(row=0, column=0, sticky="ew")
         files.columnconfigure(1, weight=1)
         self._file_row(files, 0, "SI template .docx", self.template_docx, lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
@@ -208,7 +386,7 @@ class SIGeneratorApp:
             optional=True,
         )
 
-        options = ttk.LabelFrame(advanced, text="Processing", padding=12)
+        options = ttk.LabelFrame(advanced, text="Processing", padding=12, style="Card.TLabelframe")
         options.grid(row=1, column=0, sticky="ew", pady=(10, 0))
         ttk.Label(options, text="Compound table type").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
         kind = ttk.Frame(options)
@@ -252,7 +430,7 @@ class SIGeneratorApp:
         ttk.Label(c13_range, text=" to ").pack(side="left")
         ttk.Entry(c13_range, textvariable=self.c13_ppm_max, width=8).pack(side="left")
 
-        baseline = ttk.LabelFrame(advanced, text="Baseline correction", padding=12)
+        baseline = ttk.LabelFrame(advanced, text="Baseline correction", padding=12, style="Card.TLabelframe")
         baseline.grid(row=2, column=0, sticky="ew", pady=(10, 0))
         ttk.Label(baseline, text="Mode").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
         ttk.Combobox(
@@ -271,7 +449,7 @@ class SIGeneratorApp:
         ttk.Label(baseline, text="Whittaker asymmetry").grid(row=2, column=2, sticky="e", padx=(12, 8), pady=4)
         ttk.Entry(baseline, textvariable=self.whittaker_asymmetry, width=10).grid(row=2, column=3, sticky="w", pady=4)
 
-        loadings = ttk.LabelFrame(advanced, text="Reagent Loadings", padding=12)
+        loadings = ttk.LabelFrame(advanced, text="Reagent Loadings", padding=12, style="Card.TLabelframe")
         loadings.grid(row=3, column=0, sticky="ew", pady=(10, 0))
         loadings.columnconfigure(1, weight=1)
         ttk.Checkbutton(
@@ -296,12 +474,16 @@ class SIGeneratorApp:
             optional=True,
         )
 
-        check_scroll = _ScrollableFrame(notebook, padding=12)
+    def _build_check_page(self, parent: ttk.Frame) -> None:
+        page = self._make_page(parent, "check")
+        page.rowconfigure(0, weight=1)
+        check_scroll = _ScrollableFrame(page, padding=2)
+        self._scrollable_frames.append(check_scroll)
+        check_scroll.grid(row=0, column=0, sticky="nsew")
         check_tab = check_scroll.content
         check_tab.columnconfigure(0, weight=1)
-        notebook.add(check_scroll, text="Check support")
 
-        check_box = ttk.LabelFrame(check_tab, text="Check existing support", padding=12)
+        check_box = ttk.LabelFrame(check_tab, text="Check existing support", padding=12, style="Card.TLabelframe")
         check_box.grid(row=0, column=0, sticky="ew")
         check_box.columnconfigure(1, weight=1)
         self._file_row(
@@ -322,12 +504,16 @@ class SIGeneratorApp:
             optional=True,
         )
 
-        patch_scroll = _ScrollableFrame(notebook, padding=12)
+    def _build_patch_page(self, parent: ttk.Frame) -> None:
+        page = self._make_page(parent, "patch")
+        page.rowconfigure(0, weight=1)
+        patch_scroll = _ScrollableFrame(page, padding=2)
+        self._scrollable_frames.append(patch_scroll)
+        patch_scroll.grid(row=0, column=0, sticky="nsew")
         patch_tab = patch_scroll.content
         patch_tab.columnconfigure(0, weight=1)
-        notebook.add(patch_scroll, text="Patch SI")
 
-        patch_box = ttk.LabelFrame(patch_tab, text="Patch existing support", padding=12)
+        patch_box = ttk.LabelFrame(patch_tab, text="Patch existing support", padding=12, style="Card.TLabelframe")
         patch_box.grid(row=0, column=0, sticky="ew")
         patch_box.columnconfigure(1, weight=1)
         self._file_row(
@@ -356,12 +542,16 @@ class SIGeneratorApp:
         ttk.Entry(patch_box, textvariable=self.patch_reorder).grid(row=5, column=1, sticky="ew", pady=4)
         ttk.Button(patch_box, text="Apply patch", command=self._start_patch).grid(row=5, column=2, sticky="e", padx=(8, 0), pady=4)
 
-        add_scroll = _ScrollableFrame(notebook, padding=12)
+    def _build_add_page(self, parent: ttk.Frame) -> None:
+        page = self._make_page(parent, "add")
+        page.rowconfigure(0, weight=1)
+        add_scroll = _ScrollableFrame(page, padding=2)
+        self._scrollable_frames.append(add_scroll)
+        add_scroll.grid(row=0, column=0, sticky="nsew")
         add_tab = add_scroll.content
         add_tab.columnconfigure(0, weight=1)
-        notebook.add(add_scroll, text="Add compounds")
 
-        add_box = ttk.LabelFrame(add_tab, text="Add compounds", padding=12)
+        add_box = ttk.LabelFrame(add_tab, text="Add compounds", padding=12, style="Card.TLabelframe")
         add_box.grid(row=0, column=0, sticky="ew")
         add_box.columnconfigure(1, weight=1)
         self._file_row(add_box, 0, "Existing manifest", self.add_manifest, lambda: self._browse_file(self.add_manifest, [("Manifest JSON", "*.json"), ("All files", "*.*")]), optional=True)
@@ -384,16 +574,44 @@ class SIGeneratorApp:
         self._file_row(add_box, 5, "Output .docx", self.add_output_docx, self._browse_add_output, optional=True)
         ttk.Button(add_box, text="Add compounds", command=self._start_add_compounds).grid(row=6, column=2, sticky="e", padx=(8, 0), pady=(8, 0))
 
-        actions = ttk.Frame(self.root, padding=(18, 8, 18, 18))
-        actions.grid(row=1, column=0, sticky="ew")
-        actions.columnconfigure(0, weight=1)
-        ttk.Label(actions, textvariable=self.status_text, style="Status.TLabel").pack(side="left")
-        self.progress = ttk.Progressbar(actions, mode="indeterminate", length=150)
-        self.progress.pack(side="left", padx=(12, 0))
-        self.run_button = ttk.Button(actions, text="Generate SI", command=self._start_generation, style="Accent.TButton")
-        self.run_button.pack(side="right")
-        ttk.Button(actions, text="Open last output", command=self._open_output_folder).pack(side="right", padx=(0, 8))
-        ttk.Button(actions, text="Clear log", command=lambda: self.log.clear()).pack(side="right", padx=(0, 8))
+    def _show_page(self, page: str) -> None:
+        page_text = {
+            "generate": ("Generate SI", "Create formatted Supporting Information from a compound table and spectra."),
+            "advanced": ("Processing", "Template, spectra rendering, peak picking, baseline correction, and loadings."),
+            "check": ("Check support", "Run validation from an existing manifest and optional support document."),
+            "patch": ("Patch SI", "Create a new support document with renumbered, removed, or reordered compounds."),
+            "add": ("Add compounds", "Append new compound blocks and spectra to an existing support document."),
+        }
+        for key, frame in self._page_frames.items():
+            if key == page:
+                frame.grid()
+            else:
+                frame.grid_remove()
+        for key, button in self._nav_buttons.items():
+            button.configure(style="ActiveSidebar.TButton" if key == page else "Sidebar.TButton")
+        title, subtitle = page_text.get(page, page_text["generate"])
+        self.page_title.set(title)
+        self.page_subtitle.set(subtitle)
+
+    def _toggle_theme(self) -> None:
+        self.theme_mode.set("dark" if self.dark_theme.get() else "light")
+        self._configure_style()
+        for key, button in self._nav_buttons.items():
+            if str(button.cget("style")) == "ActiveSidebar.TButton":
+                button.configure(style="ActiveSidebar.TButton")
+            else:
+                button.configure(style="Sidebar.TButton")
+        self._save_settings()
+
+    def _apply_theme_to_non_ttk_widgets(self) -> None:
+        theme = getattr(self, "_theme", THEME_PALETTES["light"])
+        if hasattr(self, "log"):
+            self.log.configure(background=theme["log_bg"], foreground=theme["log_fg"], insertbackground=theme["log_fg"])
+        for scrollable in getattr(self, "_scrollable_frames", []):
+            try:
+                scrollable.canvas.configure(background=theme["app_bg"])
+            except tk.TclError:
+                pass
 
     def _source_row(self, parent, row: int, label: str, variable: StringVar, file_command, folder_command, optional: bool = False) -> None:
         ttk.Label(parent, text=f"{label}{' (optional)' if optional else ''}").grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
@@ -939,6 +1157,7 @@ class SIGeneratorApp:
             "mnova_graphics_profile": self.mnova_graphics_profile,
             "output_docx": self.output_docx,
             "output_folder": self.output_folder,
+            "theme_mode": self.theme_mode,
             "peak_threshold_1h_percent": self.peak_threshold_1h_percent,
             "peak_threshold_13c_percent": self.peak_threshold_13c_percent,
             "target_signal_height_percent": self.target_signal_height_percent,

@@ -22,6 +22,7 @@ STRING_FIELDS = (
     "mnova_graphics_profile",
     "output_docx",
     "output_folder",
+    "theme_mode",
     "peak_threshold_percent",
     "peak_threshold_1h_percent",
     "peak_threshold_13c_percent",
@@ -51,6 +52,7 @@ CHOICE_FIELDS = {
     "add_input_kind": {"word", "csv"},
     "insert_spectra_as": {"png", "mnova", "none"},
     "baseline_mode": {"auto", "off", "bernstein", "whittaker"},
+    "theme_mode": {"light", "dark"},
 }
 
 
