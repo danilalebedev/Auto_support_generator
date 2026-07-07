@@ -63,6 +63,8 @@ New-Item -ItemType Directory -Path $payloadExamplesDir | Out-Null
 
 Copy-Item -LiteralPath $appExe -Destination (Join-Path $payloadDir "AutoSupportGenerator.exe")
 Copy-Item -LiteralPath (Join-Path $root "README.md") -Destination (Join-Path $payloadDir "README.md")
+Copy-Item -LiteralPath (Join-Path $root "README_RU.md") -Destination (Join-Path $payloadDir "README_RU.md")
+Copy-Item -LiteralPath (Join-Path $root "README_EN.md") -Destination (Join-Path $payloadDir "README_EN.md")
 Copy-Item -LiteralPath (Join-Path $root "INSTALL_RU.md") -Destination (Join-Path $payloadDir "INSTALL_RU.md")
 Copy-Item -LiteralPath (Join-Path $root "examples\test_input.docx") -Destination (Join-Path $payloadExamplesDir "test_input.docx")
 Copy-Item -LiteralPath (Join-Path $root "examples\test_input.zip") -Destination (Join-Path $payloadExamplesDir "test_input.zip")
