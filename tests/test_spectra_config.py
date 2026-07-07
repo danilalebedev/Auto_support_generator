@@ -29,6 +29,7 @@ class SpectraConfigTests(unittest.TestCase):
         self.assertEqual(config["baseline_poly_order"], 3)
         self.assertEqual(config["whittaker_lambda"], 100000.0)
         self.assertEqual(config["whittaker_asymmetry"], 0.001)
+        self.assertEqual(config["x_ranges_ppm"], DEFAULT_X_RANGES)
         self.assertTrue(config["solvent_suppression"])
         self.assertEqual(config["ignore_regions_ppm"], {})
         self.assertEqual(config["peak_picking"], DEFAULT_PEAK_PICKING)
@@ -50,6 +51,8 @@ class SpectraConfigTests(unittest.TestCase):
             baseline_poly_order=5,
             whittaker_lambda=250000,
             whittaker_asymmetry=0.002,
+            x_range_ppm_1h=(-0.5, 11.5),
+            x_range_ppm_13c=(205, -5),
         )
 
         self.assertFalse(config["extract_nmr"])
@@ -65,6 +68,8 @@ class SpectraConfigTests(unittest.TestCase):
         self.assertEqual(config["baseline_poly_order"], 5)
         self.assertEqual(config["whittaker_lambda"], 250000.0)
         self.assertEqual(config["whittaker_asymmetry"], 0.002)
+        self.assertEqual(config["x_ranges_ppm"]["1H"], (-0.5, 11.5))
+        self.assertEqual(config["x_ranges_ppm"]["13C"], (-5.0, 205.0))
 
     def test_builds_spectrum_render_spec_from_spectra_config(self) -> None:
         spec = build_spectrum_render_spec(
@@ -73,13 +78,14 @@ class SpectraConfigTests(unittest.TestCase):
                 "target_signal_height_fraction": 0.7,
                 "peak_threshold_fraction_13c": 0.045,
                 "peak_picking": "minimal",
+                "x_ranges_ppm": {"13C": (-5.0, 205.0)},
                 "ignore_regions_ppm": {"13C": [(76.0, 78.2)]},
                 "baseline_mode": "whittaker",
                 "baseline_apply_13c": True,
             },
         )
 
-        self.assertEqual(spec["x_range_ppm"], DEFAULT_X_RANGES["13C"])
+        self.assertEqual(spec["x_range_ppm"], (-5.0, 205.0))
         self.assertEqual(spec["target_signal_height_fraction"], 0.7)
         self.assertEqual(spec["peak_threshold_fraction"], 0.045)
         self.assertEqual(spec["peak_picking"], "minimal")

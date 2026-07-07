@@ -30,6 +30,8 @@ class GenerateSIRequest:
     peak_threshold_fraction: float | None = None
     peak_threshold_fraction_1h: float | None = None
     peak_threshold_fraction_13c: float | None = None
+    x_range_ppm_1h: tuple[float, float] = (-1.0, 12.0)
+    x_range_ppm_13c: tuple[float, float] = (-10.0, 210.0)
     baseline_mode: BaselineMode = "auto"
     baseline_apply_1h: bool = False
     baseline_apply_13c: bool = True
@@ -94,6 +96,8 @@ class AddCompoundsRequest:
     peak_threshold_fraction: float | None = None
     peak_threshold_fraction_1h: float | None = None
     peak_threshold_fraction_13c: float | None = None
+    x_range_ppm_1h: tuple[float, float] = (-1.0, 12.0)
+    x_range_ppm_13c: tuple[float, float] = (-10.0, 210.0)
     baseline_mode: BaselineMode = "auto"
     baseline_apply_1h: bool = False
     baseline_apply_13c: bool = True

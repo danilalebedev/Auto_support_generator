@@ -132,6 +132,8 @@ def generate_new_support_node(state: AddCompoundsState) -> dict:
         peak_threshold_fraction=request.peak_threshold_fraction,
         peak_threshold_fraction_1h=request.peak_threshold_fraction_1h,
         peak_threshold_fraction_13c=request.peak_threshold_fraction_13c,
+        x_range_ppm_1h=request.x_range_ppm_1h,
+        x_range_ppm_13c=request.x_range_ppm_13c,
         baseline_mode=request.baseline_mode,
         baseline_apply_1h=request.baseline_apply_1h,
         baseline_apply_13c=request.baseline_apply_13c,

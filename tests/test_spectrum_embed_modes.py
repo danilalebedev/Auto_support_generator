@@ -151,6 +151,8 @@ class SpectrumEmbedModeTests(unittest.TestCase):
             peak_threshold=None,
             peak_threshold_1h=6,
             peak_threshold_13c=4,
+            h1_ppm_range=[-0.5, 11.5],
+            c13_ppm_range=[205, -5],
             extract_structure_metadata=False,
             only="",
             insert_chemdraw=False,
@@ -163,6 +165,8 @@ class SpectrumEmbedModeTests(unittest.TestCase):
         self.assertEqual(request.insert_spectra_as, "mnova")
         self.assertEqual(request.peak_threshold_fraction_1h, 0.06)
         self.assertEqual(request.peak_threshold_fraction_13c, 0.04)
+        self.assertEqual(request.x_range_ppm_1h, (-0.5, 11.5))
+        self.assertEqual(request.x_range_ppm_13c, (-5.0, 205.0))
 
 
 def _tiny_png() -> bytes:

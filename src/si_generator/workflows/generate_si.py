@@ -4,6 +4,7 @@ from argparse import Namespace
 from pathlib import Path
 
 from ..domain.requests import GenerateSIRequest
+from ..domain.spectra_config import DEFAULT_X_RANGES
 from ..domain.types import SpectrumEmbedMode
 from ..graph.graphs import build_generate_si_graph
 from ..graph.state import GenerateSIState, make_run_id
@@ -48,6 +49,8 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
         peak_threshold_fraction=_peak_threshold_arg(getattr(args, "peak_threshold", None)),
         peak_threshold_fraction_1h=_peak_threshold_arg(getattr(args, "peak_threshold_1h", None)),
         peak_threshold_fraction_13c=_peak_threshold_arg(getattr(args, "peak_threshold_13c", None)),
+        x_range_ppm_1h=_range_arg(getattr(args, "h1_ppm_range", None), DEFAULT_X_RANGES["1H"]),
+        x_range_ppm_13c=_range_arg(getattr(args, "c13_ppm_range", None), DEFAULT_X_RANGES["13C"]),
         baseline_mode=getattr(args, "baseline_mode", "auto"),
         baseline_apply_1h=bool(getattr(args, "baseline_apply_1h", False)),
         baseline_apply_13c=not bool(getattr(args, "no_baseline_13c", False)),
@@ -79,3 +82,12 @@ def _fraction_arg(value: float | None, *, default: float) -> float:
     if value is None:
         return default
     return value / 100 if value > 1 else value
+
+
+def _range_arg(value, default: tuple[float, float]) -> tuple[float, float]:
+    if not value:
+        return default
+    first, second = float(value[0]), float(value[1])
+    if first == second:
+        return default
+    return (min(first, second), max(first, second))

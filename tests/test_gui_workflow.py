@@ -20,7 +20,9 @@ from si_generator.gui import (
     _next_available_docx_path,
     _output_docx_from_folder,
     _format_peak_threshold_percent,
+    _validated_ppm_range,
     _report_overview,
+    copy_starter_files_to,
     _validated_peak_threshold_fraction,
     _validated_target_signal_height_fraction,
 )
@@ -55,6 +57,10 @@ class GuiWorkflowTests(unittest.TestCase):
                 peak_threshold_1h_percent_text="8",
                 peak_threshold_13c_percent_text="3,5",
                 target_signal_height_percent_text="72",
+                h1_ppm_min_text="-0,5",
+                h1_ppm_max_text="11.5",
+                c13_ppm_min_text="205",
+                c13_ppm_max_text="-5",
                 baseline_mode_text="whittaker",
                 baseline_apply_1h=True,
                 baseline_apply_13c=False,
@@ -77,6 +83,8 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(request.peak_threshold_fraction_1h, 0.08)
         self.assertEqual(request.peak_threshold_fraction_13c, 0.035)
         self.assertEqual(request.target_signal_height_fraction, 0.72)
+        self.assertEqual(request.x_range_ppm_1h, (-0.5, 11.5))
+        self.assertEqual(request.x_range_ppm_13c, (-5.0, 205.0))
         self.assertEqual(request.baseline_mode, "whittaker")
         self.assertTrue(request.baseline_apply_1h)
         self.assertFalse(request.baseline_apply_13c)
@@ -148,6 +156,16 @@ class GuiWorkflowTests(unittest.TestCase):
             _validated_target_signal_height_fraction("abc")
         with self.assertRaisesRegex(ValueError, "between 20 and 95"):
             _validated_target_signal_height_fraction("10")
+
+    def test_ppm_range_validation_accepts_comma_and_reversed_order(self) -> None:
+        self.assertEqual(_validated_ppm_range("-1", "12", "1H ppm range"), (-1.0, 12.0))
+        self.assertEqual(_validated_ppm_range("210", "-10,5", "13C ppm range"), (-10.5, 210.0))
+
+    def test_ppm_range_validation_rejects_invalid_values(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must contain two numeric"):
+            _validated_ppm_range("abc", "12", "1H ppm range")
+        with self.assertRaisesRegex(ValueError, "must be different"):
+            _validated_ppm_range("12", "12", "1H ppm range")
 
     def test_rejects_missing_input_file(self) -> None:
         with self.assertRaisesRegex(ValueError, "compound table"):
@@ -520,9 +538,40 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(updates["loadings_schema_docx"], "")
         self.assertEqual(updates["loadings_scope_docx"], "")
         self.assertEqual(updates["mnova_graphics_profile"], "")
+        self.assertEqual(updates["h1_ppm_min"], "-1")
+        self.assertEqual(updates["h1_ppm_max"], "12")
+        self.assertEqual(updates["c13_ppm_min"], "-10")
+        self.assertEqual(updates["c13_ppm_max"], "210")
         self.assertEqual(updates["existing_manifest"], "")
         self.assertEqual(updates["patch_renumber"], "")
         self.assertNotIn("mnova_exe", updates)
+
+    def test_copy_starter_files_copies_expected_files_to_unique_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            examples_root = root / "examples"
+            starter = examples_root / "starter"
+            templates = examples_root / "templates"
+            starter.mkdir(parents=True)
+            templates.mkdir()
+            for path in [
+                starter / "compound_table_starter.docx",
+                starter / "compound_table_starter.csv",
+                starter / "spectra_source_layout.txt",
+                starter / "README_starter_files.md",
+                templates / "SI_template_visual_current.docx",
+            ]:
+                path.write_text("placeholder", encoding="utf-8")
+
+            first = copy_starter_files_to(root, examples_root=examples_root)
+            second = copy_starter_files_to(root, examples_root=examples_root)
+
+            self.assertTrue((first / "compound_table_starter.docx").exists())
+            self.assertTrue((first / "compound_table_starter.csv").exists())
+            self.assertTrue((first / "spectra_source_layout.txt").exists())
+            self.assertTrue((first / "README_starter_files.md").exists())
+            self.assertTrue((first / "SI_template.docx").exists())
+            self.assertEqual(second.name, "AutoSupportGenerator_starter_files_2")
 
     def test_mousewheel_units_scroll_in_platform_direction(self) -> None:
         self.assertEqual(_mousewheel_units(120), -1)

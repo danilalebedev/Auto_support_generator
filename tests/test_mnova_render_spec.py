@@ -72,6 +72,7 @@ class MnovaRenderSpecTests(unittest.TestCase):
                 "peak_threshold_fraction_1h": 0.075,
                 "peak_threshold_fraction_13c": 0.04,
                 "peak_picking": "dense",
+                "x_ranges_ppm": {"1H": (-0.5, 11.5), "13C": (-5.0, 205.0)},
                 "ignore_regions_ppm": {"1H": [(7.2, 7.4)], "13C": [(76.0, 78.2)]},
             },
         }
@@ -81,10 +82,12 @@ class MnovaRenderSpecTests(unittest.TestCase):
         h1 = result["spectra_plan"]["cmp_001"]["1H"]
         c13 = result["spectra_plan"]["cmp_001"]["13C"]
         self.assertEqual(h1["target_signal_height_fraction"], 0.7)
+        self.assertEqual(h1["x_range_ppm"], (-0.5, 11.5))
         self.assertEqual(h1["peak_threshold_fraction"], 0.075)
         self.assertEqual(h1["peak_picking"], "dense")
         self.assertEqual(h1["ignore_regions_ppm"], [(7.2, 7.4)])
         self.assertEqual(c13["peak_threshold_fraction"], 0.04)
+        self.assertEqual(c13["x_range_ppm"], (-5.0, 205.0))
         self.assertEqual(c13["ignore_regions_ppm"], [(76.0, 78.2)])
 
     def test_baseline_render_spec_defaults_and_whittaker_settings(self) -> None:

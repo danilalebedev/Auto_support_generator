@@ -184,6 +184,7 @@ class SpectraConfig(TypedDict, total=False):
     peak_threshold_fraction: float
     peak_threshold_fraction_1h: float
     peak_threshold_fraction_13c: float
+    x_ranges_ppm: dict[str, tuple[float, float]]
     baseline_mode: BaselineMode
     baseline_apply_1h: bool
     baseline_apply_13c: bool

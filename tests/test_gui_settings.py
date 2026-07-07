@@ -18,6 +18,10 @@ class GuiSettingsTests(unittest.TestCase):
                     "input_kind": "WORD",
                     "insert_spectra_as": "invalid",
                     "target_signal_height_percent": "72",
+                    "h1_ppm_min": "-0.5",
+                    "h1_ppm_max": "11.5",
+                    "c13_ppm_min": "-5",
+                    "c13_ppm_max": "205",
                     "peak_threshold_1h_percent": "8",
                     "peak_threshold_13c_percent": "4",
                     "loadings_schema_docx": Path("Reaction_schema.docx"),
@@ -34,6 +38,10 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(settings["output_folder"], str(Path("output/runs/demo")))
         self.assertEqual(settings["input_kind"], "word")
         self.assertEqual(settings["target_signal_height_percent"], "72")
+        self.assertEqual(settings["h1_ppm_min"], "-0.5")
+        self.assertEqual(settings["h1_ppm_max"], "11.5")
+        self.assertEqual(settings["c13_ppm_min"], "-5")
+        self.assertEqual(settings["c13_ppm_max"], "205")
         self.assertEqual(settings["peak_threshold_1h_percent"], "8")
         self.assertEqual(settings["peak_threshold_13c_percent"], "4")
         self.assertEqual(settings["loadings_schema_docx"], "Reaction_schema.docx")
@@ -57,6 +65,10 @@ class GuiSettingsTests(unittest.TestCase):
                     "input_kind": "csv",
                     "insert_spectra_as": "mnova",
                     "target_signal_height_percent": "85",
+                    "h1_ppm_min": "-1",
+                    "h1_ppm_max": "12",
+                    "c13_ppm_min": "-10",
+                    "c13_ppm_max": "210",
                     "peak_threshold_1h_percent": "6",
                     "peak_threshold_13c_percent": "4",
                     "loadings_schema_docx": "C:/data/loadings/Reaction_schema.docx",
@@ -77,6 +89,10 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(loaded["input_kind"], "csv")
         self.assertEqual(loaded["insert_spectra_as"], "mnova")
         self.assertEqual(loaded["target_signal_height_percent"], "85")
+        self.assertEqual(loaded["h1_ppm_min"], "-1")
+        self.assertEqual(loaded["h1_ppm_max"], "12")
+        self.assertEqual(loaded["c13_ppm_min"], "-10")
+        self.assertEqual(loaded["c13_ppm_max"], "210")
         self.assertEqual(loaded["peak_threshold_1h_percent"], "6")
         self.assertEqual(loaded["peak_threshold_13c_percent"], "4")
         self.assertEqual(loaded["loadings_schema_docx"], "C:/data/loadings/Reaction_schema.docx")

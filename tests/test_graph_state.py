@@ -70,6 +70,8 @@ class GraphStateTests(unittest.TestCase):
             target_signal_height_fraction=0.72,
             peak_threshold_fraction_1h=0.08,
             peak_threshold_fraction_13c=0.04,
+            x_range_ppm_1h=(-0.5, 11.5),
+            x_range_ppm_13c=(-5.0, 205.0),
             baseline_mode="whittaker",
             baseline_apply_1h=True,
             baseline_apply_13c=False,
@@ -86,6 +88,8 @@ class GraphStateTests(unittest.TestCase):
         self.assertEqual(result["spectra_config"]["target_signal_height_fraction"], 0.72)
         self.assertEqual(result["spectra_config"]["peak_threshold_fraction_1h"], 0.08)
         self.assertEqual(result["spectra_config"]["peak_threshold_fraction_13c"], 0.04)
+        self.assertEqual(result["spectra_config"]["x_ranges_ppm"]["1H"], (-0.5, 11.5))
+        self.assertEqual(result["spectra_config"]["x_ranges_ppm"]["13C"], (-5.0, 205.0))
         self.assertEqual(result["spectra_config"]["baseline_mode"], "whittaker")
         self.assertTrue(result["spectra_config"]["baseline_apply_1h"])
         self.assertFalse(result["spectra_config"]["baseline_apply_13c"])

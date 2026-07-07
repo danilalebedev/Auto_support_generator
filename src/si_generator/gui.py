@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import shutil
 import tkinter as tk
 import threading
 from contextlib import redirect_stderr, redirect_stdout
@@ -24,6 +25,7 @@ from .domain.spectra_config import (
     DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION,
     DEFAULT_WHITTAKER_ASYMMETRY,
     DEFAULT_WHITTAKER_LAMBDA,
+    DEFAULT_X_RANGES,
 )
 from .domain.types import SpectrumEmbedMode
 from .external_tools import find_mnova_executable
@@ -33,6 +35,15 @@ from .runtime_paths import default_output_path, examples_dir
 from .workflows.check_si import run_check_si
 from .workflows.generate_si import output_path_from_state, run_generate_si
 from .workflows.patch_si import run_patch_si
+
+
+STARTER_FILE_RELATIVE_PATHS = (
+    Path("starter") / "compound_table_starter.docx",
+    Path("starter") / "compound_table_starter.csv",
+    Path("starter") / "spectra_source_layout.txt",
+    Path("starter") / "README_starter_files.md",
+    Path("templates") / "SI_template_visual_current.docx",
+)
 
 
 class SIGeneratorApp:
@@ -58,6 +69,10 @@ class SIGeneratorApp:
         self.input_kind = StringVar(value="word")
         self.insert_spectra_as = StringVar(value="png")
         self.target_signal_height_percent = StringVar(value=_format_fraction_percent(DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION))
+        self.h1_ppm_min = StringVar(value=f"{DEFAULT_X_RANGES['1H'][0]:g}")
+        self.h1_ppm_max = StringVar(value=f"{DEFAULT_X_RANGES['1H'][1]:g}")
+        self.c13_ppm_min = StringVar(value=f"{DEFAULT_X_RANGES['13C'][0]:g}")
+        self.c13_ppm_max = StringVar(value=f"{DEFAULT_X_RANGES['13C'][1]:g}")
         self.peak_threshold_1h_percent = StringVar(value=_format_peak_threshold_percent(DEFAULT_H1_PEAK_THRESHOLD_FRACTION))
         self.peak_threshold_13c_percent = StringVar(value=_format_peak_threshold_percent(DEFAULT_C13_PEAK_THRESHOLD_FRACTION))
         self.baseline_mode = StringVar(value=DEFAULT_BASELINE_MODE)
@@ -126,7 +141,8 @@ class SIGeneratorApp:
             row=1, column=0, sticky="w", pady=(2, 0)
         )
         ttk.Button(header, text="Load example", command=self._load_examples).grid(row=0, column=1, rowspan=2, sticky="e", padx=(12, 0))
-        ttk.Button(header, text="Open examples", command=self._open_examples_folder).grid(row=0, column=2, rowspan=2, sticky="e", padx=(8, 0))
+        ttk.Button(header, text="Copy starter files", command=self._copy_starter_files).grid(row=0, column=2, rowspan=2, sticky="e", padx=(8, 0))
+        ttk.Button(header, text="Open examples", command=self._open_examples_folder).grid(row=0, column=3, rowspan=2, sticky="e", padx=(8, 0))
 
         notebook = ttk.Notebook(outer)
         notebook.grid(row=1, column=0, sticky="nsew")
@@ -171,10 +187,9 @@ class SIGeneratorApp:
         files.grid(row=0, column=0, sticky="ew")
         files.columnconfigure(1, weight=1)
         self._file_row(files, 0, "SI template .docx", self.template_docx, lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
-        self._file_row(files, 1, "References .yml", self.references_file, lambda: self._browse_file(self.references_file, [("YAML files", "*.yml *.yaml"), ("All files", "*.*")]), optional=True)
         self._file_row(
             files,
-            2,
+            1,
             "MestReNova .exe",
             self.mnova_exe,
             lambda: self._browse_file(self.mnova_exe, [("MestReNova", "*.exe"), ("All files", "*.*")]),
@@ -183,7 +198,7 @@ class SIGeneratorApp:
         )
         self._file_row(
             files,
-            3,
+            2,
             "Mnova graphics .mngp",
             self.mnova_graphics_profile,
             lambda: self._browse_file(
@@ -224,6 +239,18 @@ class SIGeneratorApp:
         ttk.Entry(options, textvariable=self.peak_threshold_13c_percent, width=8).grid(row=3, column=3, sticky="w", pady=4)
         ttk.Label(options, text="Signal height (%)").grid(row=4, column=0, sticky="w", padx=(0, 8), pady=4)
         ttk.Entry(options, textvariable=self.target_signal_height_percent, width=8).grid(row=4, column=1, sticky="w", pady=4)
+        ttk.Label(options, text="1H ppm range").grid(row=5, column=0, sticky="w", padx=(0, 8), pady=4)
+        h1_range = ttk.Frame(options)
+        h1_range.grid(row=5, column=1, sticky="w", pady=4)
+        ttk.Entry(h1_range, textvariable=self.h1_ppm_min, width=8).pack(side="left")
+        ttk.Label(h1_range, text=" to ").pack(side="left")
+        ttk.Entry(h1_range, textvariable=self.h1_ppm_max, width=8).pack(side="left")
+        ttk.Label(options, text="13C ppm range").grid(row=5, column=2, sticky="e", padx=(12, 8), pady=4)
+        c13_range = ttk.Frame(options)
+        c13_range.grid(row=5, column=3, sticky="w", pady=4)
+        ttk.Entry(c13_range, textvariable=self.c13_ppm_min, width=8).pack(side="left")
+        ttk.Label(c13_range, text=" to ").pack(side="left")
+        ttk.Entry(c13_range, textvariable=self.c13_ppm_max, width=8).pack(side="left")
 
         baseline = ttk.LabelFrame(advanced, text="Baseline correction", padding=12)
         baseline.grid(row=2, column=0, sticky="ew", pady=(10, 0))
@@ -511,6 +538,22 @@ class SIGeneratorApp:
         examples.mkdir(parents=True, exist_ok=True)
         os.startfile(str(examples))
 
+    def _copy_starter_files(self) -> None:
+        kwargs: dict[str, object] = {"title": "Choose a folder for starter files"}
+        initialdir = _dialog_initialdir(self.output_folder.get(), self.input_path.get(), self._last_output_folder)
+        if initialdir:
+            kwargs["initialdir"] = initialdir
+        parent = filedialog.askdirectory(**kwargs)
+        if not parent:
+            return
+        try:
+            copied_to = copy_starter_files_to(parent)
+        except Exception as exc:
+            messagebox.showerror("Auto Support Generator", f"Could not copy starter files:\n{exc}")
+            return
+        self.status_text.set(f"Starter files copied: {copied_to}")
+        os.startfile(str(copied_to))
+
     def _detect_mnova(self) -> None:
         try:
             path = find_mnova_executable()
@@ -624,6 +667,10 @@ class SIGeneratorApp:
                 mnova_graphics_profile_text=self.mnova_graphics_profile.get(),
                 insert_spectra_as=self.insert_spectra_as.get(),
                 target_signal_height_percent_text=self.target_signal_height_percent.get(),
+                h1_ppm_min_text=self.h1_ppm_min.get(),
+                h1_ppm_max_text=self.h1_ppm_max.get(),
+                c13_ppm_min_text=self.c13_ppm_min.get(),
+                c13_ppm_max_text=self.c13_ppm_max.get(),
                 peak_threshold_1h_percent_text=self.peak_threshold_1h_percent.get(),
                 peak_threshold_13c_percent_text=self.peak_threshold_13c_percent.get(),
                 baseline_mode_text=self.baseline_mode.get(),
@@ -679,6 +726,10 @@ class SIGeneratorApp:
             mnova_graphics_profile_text=self.mnova_graphics_profile.get(),
             insert_spectra_as=self.insert_spectra_as.get(),
             target_signal_height_percent_text=self.target_signal_height_percent.get(),
+            h1_ppm_min_text=self.h1_ppm_min.get(),
+            h1_ppm_max_text=self.h1_ppm_max.get(),
+            c13_ppm_min_text=self.c13_ppm_min.get(),
+            c13_ppm_max_text=self.c13_ppm_max.get(),
             peak_threshold_1h_percent_text=self.peak_threshold_1h_percent.get(),
             peak_threshold_13c_percent_text=self.peak_threshold_13c_percent.get(),
             baseline_mode_text=self.baseline_mode.get(),
@@ -891,6 +942,10 @@ class SIGeneratorApp:
             "peak_threshold_1h_percent": self.peak_threshold_1h_percent,
             "peak_threshold_13c_percent": self.peak_threshold_13c_percent,
             "target_signal_height_percent": self.target_signal_height_percent,
+            "h1_ppm_min": self.h1_ppm_min,
+            "h1_ppm_max": self.h1_ppm_max,
+            "c13_ppm_min": self.c13_ppm_min,
+            "c13_ppm_max": self.c13_ppm_max,
             "baseline_mode": self.baseline_mode,
             "baseline_poly_order": self.baseline_poly_order,
             "whittaker_lambda": self.whittaker_lambda,
@@ -1040,6 +1095,10 @@ def _build_generate_request(
     peak_threshold_1h_percent_text: str = "",
     peak_threshold_13c_percent_text: str = "",
     target_signal_height_percent_text: str = f"{DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION * 100:g}",
+    h1_ppm_min_text: str = f"{DEFAULT_X_RANGES['1H'][0]:g}",
+    h1_ppm_max_text: str = f"{DEFAULT_X_RANGES['1H'][1]:g}",
+    c13_ppm_min_text: str = f"{DEFAULT_X_RANGES['13C'][0]:g}",
+    c13_ppm_max_text: str = f"{DEFAULT_X_RANGES['13C'][1]:g}",
     baseline_mode_text: str = DEFAULT_BASELINE_MODE,
     baseline_apply_1h: bool = DEFAULT_BASELINE_APPLY_1H,
     baseline_apply_13c: bool = DEFAULT_BASELINE_APPLY_13C,
@@ -1089,6 +1148,8 @@ def _build_generate_request(
             shared_peak_threshold if shared_peak_threshold is not None else DEFAULT_C13_PEAK_THRESHOLD_FRACTION,
         ),
         target_signal_height_fraction=_validated_target_signal_height_fraction(target_signal_height_percent_text),
+        x_range_ppm_1h=_validated_ppm_range(h1_ppm_min_text, h1_ppm_max_text, "1H ppm range"),
+        x_range_ppm_13c=_validated_ppm_range(c13_ppm_min_text, c13_ppm_max_text, "13C ppm range"),
         baseline_mode=_validated_baseline_mode(baseline_mode_text),
         baseline_apply_1h=bool(baseline_apply_1h),
         baseline_apply_13c=bool(baseline_apply_13c),
@@ -1126,6 +1187,10 @@ def _build_add_compounds_request(
     peak_threshold_1h_percent_text: str = "",
     peak_threshold_13c_percent_text: str = "",
     target_signal_height_percent_text: str = f"{DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION * 100:g}",
+    h1_ppm_min_text: str = f"{DEFAULT_X_RANGES['1H'][0]:g}",
+    h1_ppm_max_text: str = f"{DEFAULT_X_RANGES['1H'][1]:g}",
+    c13_ppm_min_text: str = f"{DEFAULT_X_RANGES['13C'][0]:g}",
+    c13_ppm_max_text: str = f"{DEFAULT_X_RANGES['13C'][1]:g}",
     baseline_mode_text: str = DEFAULT_BASELINE_MODE,
     baseline_apply_1h: bool = DEFAULT_BASELINE_APPLY_1H,
     baseline_apply_13c: bool = DEFAULT_BASELINE_APPLY_13C,
@@ -1168,6 +1233,8 @@ def _build_add_compounds_request(
             shared_peak_threshold if shared_peak_threshold is not None else DEFAULT_C13_PEAK_THRESHOLD_FRACTION,
         ),
         target_signal_height_fraction=_validated_target_signal_height_fraction(target_signal_height_percent_text),
+        x_range_ppm_1h=_validated_ppm_range(h1_ppm_min_text, h1_ppm_max_text, "1H ppm range"),
+        x_range_ppm_13c=_validated_ppm_range(c13_ppm_min_text, c13_ppm_max_text, "13C ppm range"),
         baseline_mode=_validated_baseline_mode(baseline_mode_text),
         baseline_apply_1h=bool(baseline_apply_1h),
         baseline_apply_13c=bool(baseline_apply_13c),
@@ -1402,6 +1469,10 @@ def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) ->
         "loadings_schema_docx": "",
         "loadings_scope_docx": "",
         "mnova_graphics_profile": "",
+        "h1_ppm_min": f"{DEFAULT_X_RANGES['1H'][0]:g}",
+        "h1_ppm_max": f"{DEFAULT_X_RANGES['1H'][1]:g}",
+        "c13_ppm_min": f"{DEFAULT_X_RANGES['13C'][0]:g}",
+        "c13_ppm_max": f"{DEFAULT_X_RANGES['13C'][1]:g}",
         "existing_manifest": "",
         "check_support_docx": "",
         "patch_output_docx": "",
@@ -1515,6 +1586,17 @@ def _validated_target_signal_height_fraction(raw_value: str) -> float:
     return fraction
 
 
+def _validated_ppm_range(min_value: str, max_value: str, label: str) -> tuple[float, float]:
+    try:
+        first = float(str(min_value).strip().replace(",", "."))
+        second = float(str(max_value).strip().replace(",", "."))
+    except ValueError as exc:
+        raise ValueError(f"{label} must contain two numeric ppm values.") from exc
+    if first == second:
+        raise ValueError(f"{label} min and max values must be different.")
+    return (min(first, second), max(first, second))
+
+
 def _validated_positive_int(raw_value: str, label: str) -> int:
     raw_value = str(raw_value).strip()
     try:
@@ -1550,6 +1632,31 @@ def _format_peak_threshold_percent(fraction: float) -> str:
 
 def _format_fraction_percent(fraction: float) -> str:
     return f"{fraction * 100:g}"
+
+
+def copy_starter_files_to(destination_parent: str | Path, *, examples_root: Path | None = None) -> Path:
+    examples = Path(examples_root) if examples_root is not None else examples_dir()
+    sources = [(relative_path, examples / relative_path) for relative_path in STARTER_FILE_RELATIVE_PATHS]
+    missing = [str(path) for _, path in sources if not path.exists()]
+    if missing:
+        raise FileNotFoundError("Missing starter files: " + "; ".join(missing))
+
+    destination = _next_available_folder(Path(destination_parent).expanduser() / "AutoSupportGenerator_starter_files")
+    destination.mkdir(parents=True, exist_ok=False)
+    for relative_path, source in sources:
+        target_name = "SI_template.docx" if relative_path.name == "SI_template_visual_current.docx" else relative_path.name
+        shutil.copy2(source, destination / target_name)
+    return destination
+
+
+def _next_available_folder(path: Path) -> Path:
+    if not path.exists():
+        return path
+    for index in range(2, 1000):
+        candidate = path.with_name(f"{path.name}_{index}")
+        if not candidate.exists():
+            return candidate
+    raise FileExistsError(f"Could not choose a free starter-files folder near {path}.")
 
 
 def main() -> None:

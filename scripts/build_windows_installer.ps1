@@ -67,6 +67,9 @@ Copy-Item -LiteralPath (Join-Path $root "INSTALL_RU.md") -Destination (Join-Path
 Copy-Item -LiteralPath (Join-Path $root "examples\test_input.docx") -Destination (Join-Path $payloadExamplesDir "test_input.docx")
 Copy-Item -LiteralPath (Join-Path $root "examples\test_input.zip") -Destination (Join-Path $payloadExamplesDir "test_input.zip")
 Copy-Item -LiteralPath (Join-Path $root "examples\example_output") -Destination (Join-Path $payloadExamplesDir "example_output") -Recurse
+Copy-Item -LiteralPath (Join-Path $root "examples\starter") -Destination (Join-Path $payloadExamplesDir "starter") -Recurse
+Copy-Item -LiteralPath (Join-Path $root "examples\templates") -Destination (Join-Path $payloadExamplesDir "templates") -Recurse
+Copy-Item -LiteralPath (Join-Path $root "examples\loadings") -Destination (Join-Path $payloadExamplesDir "loadings") -Recurse
 
 Write-Host "Building AutoSupportGeneratorSetup.exe..."
 & $venvPython -m PyInstaller `

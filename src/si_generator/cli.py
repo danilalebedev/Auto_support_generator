@@ -118,6 +118,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Visible spectrum signal height. Use 80 or 0.8 for 80%% of the exported spectrum page height.",
     )
     parser.add_argument(
+        "--h1-ppm-range",
+        nargs=2,
+        type=float,
+        metavar=("MIN", "MAX"),
+        default=None,
+        help="1H exported spectrum ppm range, e.g. --h1-ppm-range -1 12.",
+    )
+    parser.add_argument(
+        "--c13-ppm-range",
+        nargs=2,
+        type=float,
+        metavar=("MIN", "MAX"),
+        default=None,
+        help="13C exported spectrum ppm range, e.g. --c13-ppm-range -10 210.",
+    )
+    parser.add_argument(
         "--peak-threshold",
         type=float,
         default=None,

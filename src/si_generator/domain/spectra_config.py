@@ -36,6 +36,8 @@ def build_spectra_config(
     baseline_poly_order: int = DEFAULT_BASELINE_POLY_ORDER,
     whittaker_lambda: float = DEFAULT_WHITTAKER_LAMBDA,
     whittaker_asymmetry: float = DEFAULT_WHITTAKER_ASYMMETRY,
+    x_range_ppm_1h: tuple[float, float] | None = None,
+    x_range_ppm_13c: tuple[float, float] | None = None,
 ) -> SpectraConfig:
     config: SpectraConfig = {
         "extract_nmr": extract_nmr,
@@ -55,6 +57,10 @@ def build_spectra_config(
         "baseline_poly_order": _positive_int(baseline_poly_order, DEFAULT_BASELINE_POLY_ORDER),
         "whittaker_lambda": _positive_float(whittaker_lambda, DEFAULT_WHITTAKER_LAMBDA),
         "whittaker_asymmetry": _normalized_fraction(whittaker_asymmetry, DEFAULT_WHITTAKER_ASYMMETRY),
+        "x_ranges_ppm": {
+            "1H": _x_range_ppm("1H", x_range_ppm_1h),
+            "13C": _x_range_ppm("13C", x_range_ppm_13c),
+        },
         "solvent_suppression": True,
         "ignore_regions_ppm": {},
         "peak_picking": DEFAULT_PEAK_PICKING,
@@ -76,7 +82,7 @@ def build_spectrum_render_spec(
     threshold_key = "peak_threshold_fraction_1h" if nucleus == "1H" else "peak_threshold_fraction_13c"
     spec: SpectrumRenderSpec = {
         "nucleus": nucleus,
-        "x_range_ppm": DEFAULT_X_RANGES[nucleus],
+        "x_range_ppm": _render_x_range_ppm(nucleus, config),
         "target_signal_height_fraction": float(config.get("target_signal_height_fraction", DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION)),
         "peak_threshold_fraction": _normalized_fraction(
             config.get(threshold_key, config.get("peak_threshold_fraction")),
@@ -97,6 +103,28 @@ def build_spectrum_render_spec(
 
 def _default_peak_threshold(nucleus: str) -> float:
     return DEFAULT_C13_PEAK_THRESHOLD_FRACTION if nucleus == "13C" else DEFAULT_H1_PEAK_THRESHOLD_FRACTION
+
+
+def _render_x_range_ppm(nucleus: str, config: SpectraConfig | dict) -> tuple[float, float]:
+    ranges = config.get("x_ranges_ppm", {})
+    if isinstance(ranges, dict):
+        return _x_range_ppm(nucleus, ranges.get(nucleus))
+    return DEFAULT_X_RANGES[nucleus]
+
+
+def _x_range_ppm(nucleus: str, value) -> tuple[float, float]:
+    fallback = DEFAULT_X_RANGES[nucleus]
+    if value is None:
+        return fallback
+    try:
+        lower, upper = value
+        first = float(lower)
+        second = float(upper)
+    except (TypeError, ValueError):
+        return fallback
+    if first == second:
+        return fallback
+    return (min(first, second), max(first, second))
 
 
 def _normalized_fraction(value, fallback: float) -> float:

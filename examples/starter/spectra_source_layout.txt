@@ -1,0 +1,30 @@
+Recommended spectra source layout
+=================================
+
+You can select either a folder or a .zip archive in the GUI field "Spectra source".
+
+The top-level folders must match compound numbers from the compound table:
+
+spectra/
+  2a/
+    da9534_1H/
+      fid
+      acqus
+      pdata/
+    da9534_13C/
+      fid
+      acqus
+      pdata/
+  2b/
+    any_name_1H/
+      fid
+      acqus
+    any_name_13C/
+      fid
+      acqus
+
+Notes:
+- Folder names inside each compound can be arbitrary.
+- The program looks for Bruker "fid" files and reads acqus/acqu to detect 1H vs 13C.
+- If you use a zip archive, zip the folder that contains the compound-number folders.
+- Keep compound numbers in the table and spectra source identical: 2a, 2b, 3c, etc.
