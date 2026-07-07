@@ -149,10 +149,13 @@ class SIGeneratorApp:
         self._is_running = False
         self._last_output_folder: Path | None = None
         self._log_queue: queue.Queue[Any] = queue.Queue()
+        self._poll_after_id: str | None = None
         self._theme = THEME_PALETTES["light"]
-        self._nav_buttons: dict[str, ttk.Button] = {}
+        self._nav_buttons: dict[str, _PillButton] = {}
+        self._sidebar_buttons: list[_PillButton] = []
         self._page_frames: dict[str, ttk.Frame] = {}
         self._scrollable_frames: list[_ScrollableFrame] = []
+        self._theme_switch: _ThemeSwitch | None = None
         self._logo_mark_source: tk.PhotoImage | None = None
         self._logo_mark_image: tk.PhotoImage | None = None
 
@@ -227,7 +230,7 @@ class SIGeneratorApp:
             return
         try:
             self._logo_mark_source = tk.PhotoImage(file=str(logo_path))
-            self._logo_mark_image = self._logo_mark_source.subsample(2, 2)
+            self._logo_mark_image = self._logo_mark_source
             self.root.iconphoto(True, self._logo_mark_source)
         except tk.TclError:
             self._logo_mark_source = None
@@ -246,39 +249,54 @@ class SIGeneratorApp:
         self._apply_theme_to_non_ttk_widgets()
 
     def _build_sidebar(self, parent: ttk.Frame) -> None:
-        sidebar = ttk.Frame(parent, style="Sidebar.TFrame", padding=(18, 18, 16, 18))
+        sidebar = ttk.Frame(parent, style="Sidebar.TFrame", padding=(18, 16, 16, 18))
         sidebar.grid(row=0, column=0, sticky="nsew")
         sidebar.columnconfigure(0, weight=1)
-        sidebar.rowconfigure(7, weight=1)
+        sidebar.rowconfigure(8, weight=1)
 
         brand = ttk.Frame(sidebar, style="Sidebar.TFrame")
-        brand.grid(row=0, column=0, sticky="ew", pady=(0, 18))
-        brand.columnconfigure(1, weight=1)
+        brand.grid(row=0, column=0, sticky="ew", pady=(0, 14))
+        brand.columnconfigure(0, weight=1)
         if self._logo_mark_image is not None:
-            ttk.Label(brand, image=self._logo_mark_image, style="Sidebar.TLabel").grid(row=0, column=0, rowspan=2, sticky="w", padx=(0, 10))
-        ttk.Label(brand, text="Auto Support", style="Sidebar.TLabel", font=("Segoe UI", 15, "bold")).grid(row=0, column=1, sticky="sw")
-        ttk.Label(brand, text="Generator", style="SidebarMuted.TLabel", font=("Segoe UI", 12, "bold")).grid(row=1, column=1, sticky="nw")
+            ttk.Label(brand, image=self._logo_mark_image, style="Sidebar.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 4))
+        ttk.Label(brand, text="Auto Support", style="Sidebar.TLabel", font=("Segoe UI", 15, "bold")).grid(row=1, column=0, sticky="w")
+        ttk.Label(brand, text="Generator", style="SidebarMuted.TLabel", font=("Segoe UI", 12, "bold")).grid(row=2, column=0, sticky="w")
+
+        self._theme_switch = _ThemeSwitch(
+            sidebar,
+            mode=self.theme_mode.get(),
+            command=self._set_theme_mode,
+            theme=self._theme,
+        )
+        self._theme_switch.grid(row=1, column=0, sticky="w", pady=(0, 16))
 
         nav_items = (
-            ("generate", "Generate SI", "Main workflow"),
-            ("advanced", "Processing", "NMR and templates"),
-            ("check", "Check support", "Validate existing SI"),
-            ("patch", "Patch SI", "Renumber or remove"),
-            ("add", "Add compounds", "Append new entries"),
+            ("generate", "Generate"),
+            ("advanced", "Processing"),
+            ("check", "Check"),
+            ("patch", "Patch"),
+            ("add", "Add"),
+            ("instructions", "Instructions"),
         )
-        for index, (page, title, subtitle) in enumerate(nav_items, start=1):
-            text = f"{title}\n{subtitle}"
-            button = ttk.Button(sidebar, text=text, style="Sidebar.TButton", command=lambda page=page: self._show_page(page))
-            button.grid(row=index, column=0, sticky="ew", pady=3)
+        for index, (page, text) in enumerate(nav_items, start=2):
+            button = _PillButton(sidebar, text=text, command=lambda page=page: self._show_page(page), theme=self._theme)
+            button.grid(row=index, column=0, sticky="ew", pady=4)
             self._nav_buttons[page] = button
+            self._sidebar_buttons.append(button)
 
         quick = ttk.Frame(sidebar, style="Sidebar.TFrame")
-        quick.grid(row=8, column=0, sticky="ew", pady=(14, 0))
+        quick.grid(row=9, column=0, sticky="ew", pady=(14, 0))
         quick.columnconfigure(0, weight=1)
-        ttk.Button(quick, text="Load example", command=self._load_examples, style="SidebarAction.TButton").grid(row=0, column=0, sticky="ew", pady=(0, 6))
-        ttk.Button(quick, text="Copy starter files", command=self._copy_starter_files, style="SidebarAction.TButton").grid(row=1, column=0, sticky="ew", pady=(0, 6))
-        ttk.Button(quick, text="Open examples", command=self._open_examples_folder, style="SidebarAction.TButton").grid(row=2, column=0, sticky="ew")
-        ttk.Checkbutton(quick, text="Dark theme", variable=self.dark_theme, command=self._toggle_theme).grid(row=3, column=0, sticky="w", pady=(14, 0))
+        for row, (text, command) in enumerate(
+            (
+                ("Example", self._load_examples),
+                ("Starter files", self._copy_starter_files),
+                ("Examples", self._open_examples_folder),
+            )
+        ):
+            button = _PillButton(quick, text=text, command=command, theme=self._theme, subtle=True, height=34)
+            button.grid(row=row, column=0, sticky="ew", pady=(0, 7))
+            self._sidebar_buttons.append(button)
 
     def _build_content_shell(self, parent: ttk.Frame) -> None:
         main = ttk.Frame(parent, style="App.TFrame", padding=(18, 18, 18, 14))
@@ -291,7 +309,6 @@ class SIGeneratorApp:
         header.columnconfigure(0, weight=1)
         ttk.Label(header, textvariable=self.page_title, style="Title.TLabel").grid(row=0, column=0, sticky="w")
         ttk.Label(header, textvariable=self.page_subtitle, style="Muted.TLabel").grid(row=1, column=0, sticky="w", pady=(2, 0))
-        ttk.Button(header, text="Generate SI", command=self._start_generation, style="Accent.TButton").grid(row=0, column=1, rowspan=2, sticky="e", padx=(12, 0))
 
         page_host = ttk.Frame(main, style="App.TFrame")
         page_host.grid(row=1, column=0, sticky="nsew")
@@ -302,6 +319,7 @@ class SIGeneratorApp:
         self._build_check_page(page_host)
         self._build_patch_page(page_host)
         self._build_add_page(page_host)
+        self._build_instructions_page(page_host)
 
         footer = ttk.Frame(main, style="App.TFrame")
         footer.grid(row=2, column=0, sticky="ew", pady=(12, 0))
@@ -574,6 +592,50 @@ class SIGeneratorApp:
         self._file_row(add_box, 5, "Output .docx", self.add_output_docx, self._browse_add_output, optional=True)
         ttk.Button(add_box, text="Add compounds", command=self._start_add_compounds).grid(row=6, column=2, sticky="e", padx=(8, 0), pady=(8, 0))
 
+    def _build_instructions_page(self, parent: ttk.Frame) -> None:
+        page = self._make_page(parent, "instructions")
+        page.rowconfigure(0, weight=1)
+        instructions_scroll = _ScrollableFrame(page, padding=2)
+        self._scrollable_frames.append(instructions_scroll)
+        instructions_scroll.grid(row=0, column=0, sticky="nsew")
+        content = instructions_scroll.content
+        content.columnconfigure(0, weight=1)
+
+        sections = (
+            (
+                "Generate a new SI",
+                "1. Select a compound table on Generate.\n"
+                "2. Select spectra source as a zip archive or a folder.\n"
+                "3. Select an output folder.\n"
+                "4. Click Generate SI in the bottom-right corner.",
+            ),
+            (
+                "Use examples",
+                "Example loads the built-in test input. Starter files copies editable blank files for a new project. "
+                "Examples folder opens all bundled input and output examples.",
+            ),
+            (
+                "Processing settings",
+                "Open Processing to set the SI template, MestReNova path, Mnova graphics profile, spectra appendix mode, "
+                "peak thresholds, ppm ranges, baseline correction and reagent-loading options.",
+            ),
+            (
+                "Review outputs",
+                "After generation, use Open support, Open output folder, Open logs and Open report. "
+                "Each run is saved into its own output folder with docx, input, spectra, mnova, logs and reports.",
+            ),
+            (
+                "Existing documents",
+                "Check validates an existing support from a manifest. Patch creates a modified copy of an SI. "
+                "Add appends new compounds without rewriting old compound blocks.",
+            ),
+        )
+        for row, (title, body) in enumerate(sections):
+            box = ttk.LabelFrame(content, text=title, padding=12, style="Card.TLabelframe")
+            box.grid(row=row, column=0, sticky="ew", pady=(0, 10))
+            box.columnconfigure(0, weight=1)
+            ttk.Label(box, text=body, wraplength=760, justify="left").grid(row=0, column=0, sticky="ew")
+
     def _show_page(self, page: str) -> None:
         page_text = {
             "generate": ("Generate SI", "Create formatted Supporting Information from a compound table and spectra."),
@@ -581,6 +643,7 @@ class SIGeneratorApp:
             "check": ("Check support", "Run validation from an existing manifest and optional support document."),
             "patch": ("Patch SI", "Create a new support document with renumbered, removed, or reordered compounds."),
             "add": ("Add compounds", "Append new compound blocks and spectra to an existing support document."),
+            "instructions": ("Instructions", "Short guide for everyday use of Auto Support Generator."),
         }
         for key, frame in self._page_frames.items():
             if key == page:
@@ -588,20 +651,21 @@ class SIGeneratorApp:
             else:
                 frame.grid_remove()
         for key, button in self._nav_buttons.items():
-            button.configure(style="ActiveSidebar.TButton" if key == page else "Sidebar.TButton")
+            button.set_selected(key == page)
         title, subtitle = page_text.get(page, page_text["generate"])
         self.page_title.set(title)
         self.page_subtitle.set(subtitle)
 
-    def _toggle_theme(self) -> None:
-        self.theme_mode.set("dark" if self.dark_theme.get() else "light")
+    def _set_theme_mode(self, mode: str) -> None:
+        if mode not in THEME_PALETTES:
+            mode = "light"
+        self.theme_mode.set(mode)
+        self.dark_theme.set(mode == "dark")
         self._configure_style()
-        for key, button in self._nav_buttons.items():
-            if str(button.cget("style")) == "ActiveSidebar.TButton":
-                button.configure(style="ActiveSidebar.TButton")
-            else:
-                button.configure(style="Sidebar.TButton")
         self._save_settings()
+
+    def _toggle_theme(self) -> None:
+        self._set_theme_mode("dark" if self.dark_theme.get() else "light")
 
     def _apply_theme_to_non_ttk_widgets(self) -> None:
         theme = getattr(self, "_theme", THEME_PALETTES["light"])
@@ -612,6 +676,11 @@ class SIGeneratorApp:
                 scrollable.canvas.configure(background=theme["app_bg"])
             except tk.TclError:
                 pass
+        for button in getattr(self, "_sidebar_buttons", []):
+            button.set_theme(theme)
+        if self._theme_switch is not None:
+            self._theme_switch.set_theme(theme)
+            self._theme_switch.set_mode(self.theme_mode.get())
 
     def _source_row(self, parent, row: int, label: str, variable: StringVar, file_command, folder_command, optional: bool = False) -> None:
         ttk.Label(parent, text=f"{label}{' (optional)' if optional else ''}").grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
@@ -1069,7 +1138,7 @@ class SIGeneratorApp:
                     self.log.write(item)
         except queue.Empty:
             pass
-        self.root.after(100, self._poll_log_queue)
+        self._poll_after_id = self.root.after(100, self._poll_log_queue)
 
     def _open_output_folder(self) -> None:
         path = self._last_output_folder or Path(self.output_folder.get() or self.output_docx.get() or ".").expanduser()
@@ -1212,7 +1281,177 @@ class SIGeneratorApp:
 
     def _on_close(self) -> None:
         self._save_settings()
+        if self._poll_after_id is not None:
+            try:
+                self.root.after_cancel(self._poll_after_id)
+            except tk.TclError:
+                pass
+            self._poll_after_id = None
         self.root.destroy()
+
+
+def _rounded_rectangle(canvas: tk.Canvas, x1: int, y1: int, x2: int, y2: int, radius: int, **kwargs) -> int:
+    radius = max(1, min(radius, int((x2 - x1) / 2), int((y2 - y1) / 2)))
+    points = (
+        x1 + radius,
+        y1,
+        x2 - radius,
+        y1,
+        x2,
+        y1,
+        x2,
+        y1 + radius,
+        x2,
+        y2 - radius,
+        x2,
+        y2,
+        x2 - radius,
+        y2,
+        x1 + radius,
+        y2,
+        x1,
+        y2,
+        x1,
+        y2 - radius,
+        x1,
+        y1 + radius,
+        x1,
+        y1,
+    )
+    return canvas.create_polygon(points, smooth=True, **kwargs)
+
+
+class _PillButton(tk.Canvas):
+    def __init__(
+        self,
+        parent,
+        *,
+        text: str,
+        command,
+        theme: dict[str, str],
+        subtle: bool = False,
+        height: int = 38,
+    ) -> None:
+        super().__init__(
+            parent,
+            width=224,
+            height=height,
+            highlightthickness=0,
+            borderwidth=0,
+            cursor="hand2",
+            background=theme["sidebar_bg"],
+        )
+        self.text = text
+        self.command = command
+        self.theme = theme
+        self.subtle = subtle
+        self._height = height
+        self._hovered = False
+        self._selected = False
+        self.bind("<Configure>", lambda _event: self._draw())
+        self.bind("<Enter>", self._on_enter)
+        self.bind("<Leave>", self._on_leave)
+        self.bind("<Button-1>", self._on_click)
+        self._draw()
+
+    def set_theme(self, theme: dict[str, str]) -> None:
+        self.theme = theme
+        self.configure(background=theme["sidebar_bg"])
+        self._draw()
+
+    def set_selected(self, selected: bool) -> None:
+        self._selected = selected
+        self._draw()
+
+    def _on_enter(self, _event=None) -> None:
+        self._hovered = True
+        self._draw()
+
+    def _on_leave(self, _event=None) -> None:
+        self._hovered = False
+        self._draw()
+
+    def _on_click(self, _event=None) -> None:
+        self.command()
+
+    def _draw(self) -> None:
+        self.delete("all")
+        width = max(self.winfo_width(), int(self.cget("width")))
+        height = max(self.winfo_height(), self._height)
+        theme = self.theme
+        if self._selected:
+            fill = theme["sidebar_selected"]
+            outline = ""
+        elif self._hovered:
+            fill = theme["sidebar_hover"]
+            outline = ""
+        elif self.subtle:
+            fill = theme["sidebar_hover"]
+            outline = ""
+        else:
+            fill = theme["sidebar_bg"]
+            outline = theme["sidebar_hover"]
+        _rounded_rectangle(self, 2, 2, width - 2, height - 2, int((height - 4) / 2), fill=fill, outline=outline)
+        anchor = "center" if self.subtle else "w"
+        x = int(width / 2) if self.subtle else 18
+        font_weight = "bold" if self._selected else "normal"
+        self.create_text(
+            x,
+            int(height / 2),
+            text=self.text,
+            anchor=anchor,
+            fill=theme["text"],
+            font=("Segoe UI", 10, font_weight),
+        )
+
+
+class _ThemeSwitch(tk.Canvas):
+    def __init__(self, parent, *, mode: str, command, theme: dict[str, str]) -> None:
+        super().__init__(
+            parent,
+            width=96,
+            height=36,
+            highlightthickness=0,
+            borderwidth=0,
+            cursor="hand2",
+            background=theme["sidebar_bg"],
+        )
+        self.mode = mode if mode in THEME_PALETTES else "light"
+        self.command = command
+        self.theme = theme
+        self.bind("<Configure>", lambda _event: self._draw())
+        self.bind("<Button-1>", self._on_click)
+        self._draw()
+
+    def set_theme(self, theme: dict[str, str]) -> None:
+        self.theme = theme
+        self.configure(background=theme["sidebar_bg"])
+        self._draw()
+
+    def set_mode(self, mode: str) -> None:
+        self.mode = mode if mode in THEME_PALETTES else "light"
+        self._draw()
+
+    def _on_click(self, event) -> None:
+        width = max(self.winfo_width(), int(self.cget("width")))
+        self.command("light" if event.x < width / 2 else "dark")
+
+    def _draw(self) -> None:
+        self.delete("all")
+        width = max(self.winfo_width(), int(self.cget("width")))
+        height = max(self.winfo_height(), int(self.cget("height")))
+        theme = self.theme
+        _rounded_rectangle(self, 2, 2, width - 2, height - 2, int((height - 4) / 2), fill=theme["sidebar_hover"], outline="")
+        half = int(width / 2)
+        if self.mode == "dark":
+            x1, x2 = half, width - 3
+        else:
+            x1, x2 = 3, half
+        _rounded_rectangle(self, x1, 3, x2, height - 3, int((height - 6) / 2), fill=theme["accent"], outline="")
+        light_color = "#ffffff" if self.mode == "light" else theme["muted"]
+        dark_color = "#ffffff" if self.mode == "dark" else theme["muted"]
+        self.create_text(int(width * 0.25), int(height / 2), text="☀", fill=light_color, font=("Segoe UI Symbol", 13, "bold"))
+        self.create_text(int(width * 0.75), int(height / 2), text="☾", fill=dark_color, font=("Segoe UI Symbol", 14, "bold"))
 
 
 class _ScrollableFrame(ttk.Frame):

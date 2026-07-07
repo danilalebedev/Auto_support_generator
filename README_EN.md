@@ -39,7 +39,8 @@ For a normal project, the `Generate SI` page usually needs only three fields:
 
 Most other settings can be left at their defaults.
 
-The GUI uses a Fluent-style left sidebar. Use the navigation items on the left to switch between generation, processing settings, checking, patching and adding compounds. Use the `Dark theme` switch at the bottom of the sidebar to toggle light/dark mode; the choice is saved locally.
+The GUI uses a Fluent-style left sidebar. Use the navigation items on the left to switch between generation, processing settings, checking, patching and adding compounds. Use the sun/moon switch near the top of the sidebar to toggle light/dark mode; the choice is saved locally.
+The `Instructions` page contains a short in-app workflow guide for everyday use.
 
 ## Main Features
 
