@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import locale
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -35,6 +36,21 @@ class MnovaTask:
     graphics_profile_path: Path | None = None
 
 
+class MnovaBatchError(RuntimeError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        no_status: bool = False,
+        returncode: int | None = None,
+        launch_log: Path | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.no_status = no_status
+        self.returncode = returncode
+        self.launch_log = launch_log
+
+
 def extract_report(input_path: Path, output_path: Path, nucleus: str, timeout: int = 120) -> Path:
     output_path = output_path.resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -58,11 +74,45 @@ def extract_reports_batch(
     timeout: int = 600,
     mnova_exe: str | Path | None = None,
 ) -> dict[tuple[str, str], dict[str, str]]:
+    try:
+        return _extract_reports_batch_once(tasks, output_dir, timeout=timeout, mnova_exe=mnova_exe)
+    except MnovaBatchError as exc:
+        grouped_tasks = _group_tasks_by_compound(tasks)
+        if not exc.no_status or len(grouped_tasks) <= 1:
+            raise RuntimeError(str(exc)) from exc
+
+        launch_log = f" See {exc.launch_log}." if exc.launch_log else ""
+        print(
+            "[Mnova warning] batch did not create a status file; retrying compound-by-compound."
+            + launch_log,
+            flush=True,
+        )
+        retry_root = Path(output_dir).resolve() / "retry_by_compound"
+        if retry_root.exists():
+            shutil.rmtree(retry_root)
+        reports: dict[tuple[str, str], dict[str, str]] = {}
+        for compound, compound_tasks in grouped_tasks:
+            group_dir = retry_root / _safe_token(compound)
+            try:
+                reports.update(_extract_reports_batch_once(compound_tasks, group_dir, timeout=timeout, mnova_exe=mnova_exe))
+            except MnovaBatchError as group_exc:
+                group_log = f" See {group_exc.launch_log}." if group_exc.launch_log else ""
+                raise RuntimeError(f"Mnova failed before status file for compound {compound}.{group_log}") from group_exc
+        return reports
+
+
+def _extract_reports_batch_once(
+    tasks: list[MnovaTask],
+    output_dir: Path,
+    timeout: int = 600,
+    mnova_exe: str | Path | None = None,
+) -> dict[tuple[str, str], dict[str, str]]:
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     tasks_path = output_dir / "mnova_batch_tasks.tsv"
     output_json_path = output_dir / "mnova_batch_reports.json"
     status_path = output_dir / "mnova_batch.status.txt"
+    launch_log_path = output_dir / "mnova_launch.txt"
     run_dir = make_ascii_work_dir("mnova")
     run_tasks_path = run_dir / "mnova_batch_tasks.tsv"
     run_output_json_path = run_dir / "mnova_batch_reports.json"
@@ -70,7 +120,7 @@ def extract_reports_batch(
     output_map: dict[tuple[str, str], dict[str, Path]] = {}
     graphics_profile_map: dict[Path, Path] = {}
 
-    for path in [tasks_path, output_json_path, status_path]:
+    for path in [tasks_path, output_json_path, status_path, launch_log_path]:
         if path.exists():
             path.unlink()
 
@@ -132,16 +182,61 @@ def extract_reports_batch(
         )
         executable = find_mnova_executable(mnova_exe)
         print(f"[Mnova] executable: {executable}", flush=True)
+        stale_pids = _cleanup_stale_mnova_automation_processes()
+        if stale_pids:
+            print(f"[Mnova warning] closed stale automation process(es): {', '.join(map(str, stale_pids))}", flush=True)
         command = [str(executable), "-w", str(SCRIPT_PATH), "-sf", sf_arg]
-        subprocess.run(command, cwd=run_dir, check=False, timeout=timeout)
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=run_dir,
+                check=False,
+                timeout=timeout,
+                capture_output=True,
+                text=True,
+                errors="replace",
+            )
+            _write_launch_log(
+                launch_log_path,
+                command=command,
+                cwd=run_dir,
+                returncode=completed.returncode,
+                stdout=completed.stdout,
+                stderr=completed.stderr,
+                stale_pids=stale_pids,
+                timeout=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            _copy_batch_artifacts(run_tasks_path, run_output_json_path, run_status_path, tasks_path, output_json_path, status_path)
+            _write_launch_log(
+                launch_log_path,
+                command=command,
+                cwd=run_dir,
+                returncode=None,
+                stdout=_timeout_text(exc.stdout),
+                stderr=_timeout_text(exc.stderr),
+                stale_pids=stale_pids,
+                timeout=True,
+            )
+            no_status = not run_status_path.exists()
+            raise MnovaBatchError(
+                f"ERROR: MestReNova batch timed out after {timeout} seconds. See {launch_log_path}.",
+                no_status=no_status,
+                launch_log=launch_log_path,
+            ) from exc
 
-        _copy_if_exists(run_tasks_path, tasks_path)
-        _copy_if_exists(run_output_json_path, output_json_path)
-        _copy_if_exists(run_status_path, status_path)
+        _copy_batch_artifacts(run_tasks_path, run_output_json_path, run_status_path, tasks_path, output_json_path, status_path)
 
-        status = _read_mnova_text(run_status_path) if run_status_path.exists() else "ERROR: no status file"
+        status = _read_mnova_text(run_status_path) if run_status_path.exists() else ""
+        if not status:
+            raise MnovaBatchError(
+                f"ERROR: no status file. MestReNova return code: {completed.returncode}. See {launch_log_path}.",
+                no_status=True,
+                returncode=completed.returncode,
+                launch_log=launch_log_path,
+            )
         if "DONE" not in status:
-            raise RuntimeError(status.strip())
+            raise MnovaBatchError(status.strip(), returncode=completed.returncode, launch_log=launch_log_path)
         if not run_output_json_path.exists():
             raise RuntimeError(f"Mnova did not create batch report file: {output_json_path}")
 
@@ -172,6 +267,121 @@ def extract_reports_batch(
         return reports
     finally:
         shutil.rmtree(run_dir, ignore_errors=True)
+
+
+def _group_tasks_by_compound(tasks: list[MnovaTask]) -> list[tuple[str, list[MnovaTask]]]:
+    grouped: dict[str, list[MnovaTask]] = {}
+    order: list[str] = []
+    for task in tasks:
+        if task.compound not in grouped:
+            grouped[task.compound] = []
+            order.append(task.compound)
+        grouped[task.compound].append(task)
+    return [(compound, grouped[compound]) for compound in order]
+
+
+def _copy_batch_artifacts(
+    run_tasks_path: Path,
+    run_output_json_path: Path,
+    run_status_path: Path,
+    tasks_path: Path,
+    output_json_path: Path,
+    status_path: Path,
+) -> None:
+    _copy_if_exists(run_tasks_path, tasks_path)
+    _copy_if_exists(run_output_json_path, output_json_path)
+    _copy_if_exists(run_status_path, status_path)
+
+
+def _write_launch_log(
+    path: Path,
+    *,
+    command: list[str],
+    cwd: Path,
+    returncode: int | None,
+    stdout: str | None,
+    stderr: str | None,
+    stale_pids: list[int],
+    timeout: bool,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "command": command,
+        "cwd": str(cwd),
+        "returncode": returncode,
+        "timeout": timeout,
+        "closed_stale_automation_pids": stale_pids,
+        "stdout": stdout or "",
+        "stderr": stderr or "",
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _timeout_text(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
+def _cleanup_stale_mnova_automation_processes() -> list[int]:
+    if os.name != "nt":
+        return []
+    killed: list[int] = []
+    for process in _active_mnova_processes():
+        command_line = str(process.get("CommandLine") or "")
+        if "extract_nmr_report.qs" not in command_line and "extractSpectrumReportsBatch" not in command_line:
+            continue
+        try:
+            pid = int(process.get("ProcessId") or 0)
+        except (TypeError, ValueError):
+            continue
+        if pid <= 0:
+            continue
+        try:
+            result = subprocess.run(
+                ["powershell.exe", "-NoProfile", "-Command", f"Stop-Process -Id {pid} -Force"],
+                check=False,
+                capture_output=True,
+                text=True,
+                errors="replace",
+            )
+        except OSError:
+            continue
+        if result.returncode == 0:
+            killed.append(pid)
+    return killed
+
+
+def _active_mnova_processes() -> list[dict[str, object]]:
+    if os.name != "nt":
+        return []
+    command = (
+        "Get-CimInstance Win32_Process -Filter \"name='MestReNova.exe'\" | "
+        "Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-Command", command],
+            check=False,
+            capture_output=True,
+            text=True,
+            errors="replace",
+        )
+    except OSError:
+        return []
+    if result.returncode != 0 or not result.stdout.strip():
+        return []
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return []
+    if isinstance(data, dict):
+        return [data]
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    return []
 
 
 def _resolve_spectrum_input(path: Path) -> Path:
