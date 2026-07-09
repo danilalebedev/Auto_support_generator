@@ -820,19 +820,74 @@ function _graphicsProfileName(profilePath)
     return name.toLowerCase();
 }
 
+function _readGraphicsProfileBytes(graphicsProfilePath, count)
+{
+    var file = new File(graphicsProfilePath);
+    var stream, bytes, i;
+    file.open(File.ReadOnly);
+    stream = new BinaryStream(file);
+    bytes = [];
+    for (i = 0; i < count; i++) {
+        bytes.push(stream.readInt8());
+    }
+    file.close();
+    return bytes;
+}
+
+function _hasGraphicsProfileHeader(bytes)
+{
+    var header = "MestReNova Graphic Properties";
+    var start = 4;
+    var i;
+    if (!bytes) {
+        return false;
+    }
+    for (i = 0; i < header.length; i++) {
+        if (bytes[start + i * 2] !== 0 || bytes[start + i * 2 + 1] !== header.charCodeAt(i)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function _gridSettingFromGraphicsProfile(graphicsProfilePath, statusPath)
+{
+    var bytes, flag;
+    try {
+        bytes = _readGraphicsProfileBytes(graphicsProfilePath, 208);
+        if (!_hasGraphicsProfileHeader(bytes)) {
+            return undefined;
+        }
+        flag = bytes[196];
+        if (flag === 0) {
+            _appendText(statusPath, "GRAPHICS_PROFILE parsed=mngp grid=false byte196=0\n");
+            return false;
+        }
+        if (flag === 1 || flag === 3 || flag === 15) {
+            _appendText(statusPath, "GRAPHICS_PROFILE parsed=mngp grid=true byte196=" + flag + "\n");
+            return true;
+        }
+    } catch (e) {
+        _appendText(statusPath, "WARNING graphics profile binary parse failed: " + e + "\n");
+    }
+    return undefined;
+}
+
 function _applyGraphicsProfileFallback(spectrum, graphicsProfilePath, statusPath)
 {
     var name = _graphicsProfileName(graphicsProfilePath);
-    var gridEnabled;
+    var gridEnabled = _gridSettingFromGraphicsProfile(graphicsProfilePath, statusPath);
     if (!name) {
         return false;
     }
-    if (name.indexOf("grid") >= 0) {
-        gridEnabled = true;
-    } else if (name.indexOf("classic") >= 0 || name.indexOf("default") >= 0) {
-        gridEnabled = false;
-    } else {
-        return false;
+    if (gridEnabled === undefined) {
+        if (name.indexOf("grid") >= 0) {
+            gridEnabled = true;
+        } else if (name.indexOf("classic") >= 0 || name.indexOf("default") >= 0) {
+            gridEnabled = false;
+        } else {
+            return false;
+        }
     }
 
     try {

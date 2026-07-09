@@ -13,6 +13,7 @@ from si_generator.domain.compound import Compound
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 QS_SCRIPT = REPO_ROOT / "src" / "si_generator" / "resources" / "scripts" / "extract_nmr_report.qs"
+MNGP_STYLES = REPO_ROOT / "examples" / "mngp_styles"
 
 
 class MnovaRenderSpecTests(unittest.TestCase):
@@ -62,6 +63,16 @@ class MnovaRenderSpecTests(unittest.TestCase):
     def test_empty_render_spec_is_empty_json_object(self) -> None:
         self.assertEqual(_render_spec_arg(None), "{}")
         self.assertEqual(_render_spec_arg({}), "{}")
+
+    def test_example_mngp_profiles_encode_grid_difference(self) -> None:
+        grid = (MNGP_STYLES / "grid.mngp").read_bytes()
+        classic = (MNGP_STYLES / "classic.mngp").read_bytes()
+        header = "MestReNova Graphic Properties".encode("utf-16-be")
+
+        self.assertIn(header, grid[:80])
+        self.assertIn(header, classic[:80])
+        self.assertEqual(grid[196], 3)
+        self.assertEqual(classic[196], 0)
 
     def test_plan_nmr_processing_carries_custom_render_policy(self) -> None:
         compound = Compound(id="cmp_001", number="2a", name="Example", h1_spectrum_path="1/fid", c13_spectrum_path="2/fid")
@@ -138,6 +149,11 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertIn("function _highlightSolventPeaks(renderSpec)", script)
         self.assertIn("function _hideSolventPeakAnnotations(spectrum)", script)
         self.assertIn("peaks.showAnnotations", script)
+        self.assertIn("function _gridSettingFromGraphicsProfile(graphicsProfilePath, statusPath)", script)
+        self.assertIn("new BinaryStream(file)", script)
+        self.assertIn("stream.readInt8()", script)
+        self.assertIn("MestReNova Graphic Properties", script)
+        self.assertIn("byte196=0", script)
         self.assertIn("GRAPHICS_PROFILE fallback=grid", script)
         self.assertIn("grid.showhorizontal", script)
         self.assertIn("function _isSolventPeak(spectrum, nucleus, peak, delta)", script)
