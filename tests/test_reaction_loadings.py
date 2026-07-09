@@ -250,7 +250,7 @@ class ReactionLoadingsTests(unittest.TestCase):
             template_path = Path(tmp) / "SI_template.docx"
             document = Document()
             document.add_paragraph(
-                "Alkene {Product.precursor_number} gave product {Product.number} with "
+                "Alkene {Product.precursor_number} from bromide {Reagent_1.number} gave product {Product.number} with "
                 "{Reagent_2.name} ({Reagent_2.mass.mg} mg, {Reagent_2.mmol} mmol). "
                 "Yield {Product.yield.mg} mg ({Product.yield.percent})."
             )
@@ -267,7 +267,7 @@ class ReactionLoadingsTests(unittest.TestCase):
                 structure_names_by_cell={(1, 2, 3): "benzene-1,2-diamine"},
             )
 
-        self.assertIn("Alkene 2a gave product 3a", compound.preparation)
+        self.assertIn("Alkene 2a from bromide 2a gave product 3a", compound.preparation)
         self.assertIn("benzene-1,2-diamine (509 mg, 4.7 mmol)", compound.preparation)
         self.assertIn("Yield 304 mg (69%)", compound.preparation)
         self.assertNotIn("{", compound.preparation)

@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from si_generator.gui import (
+    INSTRUCTION_TEMPLATE_FILES,
     _build_add_compounds_request,
     _build_add_compounds_summary,
     _build_check_summary,
@@ -550,17 +551,9 @@ class GuiWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             examples_root = root / "examples"
-            starter = examples_root / "starter"
-            templates = examples_root / "templates"
-            starter.mkdir(parents=True)
-            templates.mkdir()
-            for path in [
-                starter / "compound_table_starter.docx",
-                starter / "compound_table_starter.csv",
-                starter / "spectra_source_layout.txt",
-                starter / "README_starter_files.md",
-                templates / "SI_template_visual_current.docx",
-            ]:
+            for _label, relative_path, _description in INSTRUCTION_TEMPLATE_FILES:
+                path = examples_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("placeholder", encoding="utf-8")
 
             first = copy_starter_files_to(root, examples_root=examples_root)
@@ -571,6 +564,10 @@ class GuiWorkflowTests(unittest.TestCase):
             self.assertTrue((first / "spectra_source_layout.txt").exists())
             self.assertTrue((first / "README_starter_files.md").exists())
             self.assertTrue((first / "SI_template.docx").exists())
+            self.assertTrue((first / "Reaction_schema.docx").exists())
+            self.assertTrue((first / "Scope.docx").exists())
+            self.assertTrue((first / "grid.mngp").exists())
+            self.assertTrue((first / "classic.mngp").exists())
             self.assertEqual(second.name, "AutoSupportGenerator_starter_files_2")
 
     def test_mousewheel_units_scroll_in_platform_direction(self) -> None:

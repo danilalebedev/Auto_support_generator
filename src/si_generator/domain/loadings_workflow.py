@@ -224,6 +224,7 @@ def _apply_scope_row(
         mw=reagent_1_mw,
         mmol=target_mmol * (reagent_1_schema.equivalents or 1.0),
     )
+    reagent_amounts["Reagent_1"]["number"] = _infer_precursor_number(row.product_number)
     reagent_amounts["Reagent_2"] = _amount_from_equivalents(reagent_2_schema, target_mmol, row.reagent_2, reagent_2_mw)
 
     for key, entry in schema.items():
@@ -323,9 +324,11 @@ def _amount_template_values(name: str, amount: dict[str, Any]) -> dict[str, str]
         _token_key(f"{name}.mL"): _format_volume_ml(amount.get("volume_mL")),
         _token_key(f"{name}.equiv"): _format_equivalents(amount.get("equivalents")),
         _token_key(f"{name}.formula"): str(amount.get("formula") or ""),
+        _token_key(f"{name}.number"): str(amount.get("number") or ""),
     }
     if name == "Reagent_1":
         keys[_token_key("mg_Reagent 1")] = _format_mass(amount.get("mass_mg"))
+        keys[_token_key("Reagent_1.number")] = str(amount.get("number") or "")
     return keys
 
 

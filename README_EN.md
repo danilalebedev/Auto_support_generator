@@ -666,6 +666,8 @@ Visual template preview:
 | `examples/templates/SI_template_visual_current_preview.png` | Template preview |
 | `examples/loadings/Reaction_schema.docx` | Example reagent-loading reaction scheme |
 | `examples/loadings/Scope.docx` | Example reagent-loading scope table |
+| `examples/mngp_styles/grid.mngp` | Example MestReNova graphics profile with grid enabled |
+| `examples/mngp_styles/classic.mngp` | Example MestReNova graphics profile with grid disabled |
 | `examples/example_output/support_information.docx` | Example generated SI |
 | `examples/example_output/processed_spectra.zip` | Example processed spectra package |
 

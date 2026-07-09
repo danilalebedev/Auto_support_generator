@@ -66,6 +66,44 @@ class TemplateRendererTests(unittest.TestCase):
         self.assertNotIn("{compound.number.nmr.1h.picture}", text)
         self.assertEqual(len(media_files), 1)
 
+    def test_visual_template_uses_current_aliases(self) -> None:
+        template = Path(__file__).resolve().parents[1] / "examples" / "templates" / "SI_template_visual_current.docx"
+        document = Document(template)
+        text_parts = [paragraph.text for paragraph in document.paragraphs]
+        for table in document.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    text_parts.extend(paragraph.text for paragraph in cell.paragraphs)
+        text = "\n".join(text_parts)
+
+        legacy_aliases = (
+            "number.Product",
+            "number.Reagent",
+            "name.Reagent",
+            "mg.Reagent",
+            "mmol.Reagent",
+            "mmol.AcOH",
+            "yield.Product",
+            "spectrum.structure.marker",
+            "[[SPECTRUM",
+            "[[STRUCTURE",
+        )
+        current_aliases = (
+            "Product.number",
+            "Reagent_1.number",
+            "Reagent_2.name",
+            "AcOH.mmol",
+            "Product.yield.percent",
+            "compound.number.structure",
+            "compound.number.nmr.1h.picture",
+            "compound.number.nmr.13c.picture",
+        )
+
+        for alias in legacy_aliases:
+            self.assertNotIn(alias, text)
+        for alias in current_aliases:
+            self.assertIn(alias, text)
+
 
 def _tiny_png() -> bytes:
     return base64.b64decode(

@@ -291,13 +291,17 @@ function _referenceValue(spectrum, nucleus)
     return nucleus === "13C" ? 77.16 : 7.26;
 }
 
-function _referenceSpectrum(spectrum, nucleus)
+function _referenceSpectrum(spectrum, nucleus, renderSpec)
 {
     var reference = _referenceValue(spectrum, nucleus);
     var tolerance = nucleus === "13C" ? 2.0 : 0.20;
+    var label = _highlightSolventPeaks(renderSpec || {}) ? "CHCl3 reference" : "";
 
     try {
-        spectrum.reference(1, reference, reference, true, tolerance, "CHCl3 reference");
+        spectrum.reference(1, reference, reference, true, tolerance, label);
+        if (!_highlightSolventPeaks(renderSpec || {})) {
+            _hideSolventPeakAnnotations(spectrum);
+        }
         spectrum.update();
     } catch (e) {
         // Referencing is best-effort: if Mnova cannot find CHCl3/CDCl3, keep the
@@ -433,7 +437,7 @@ function _processForReport(spectrum, nucleus, sensitivity, doReference, peakOnly
     var p = new NMRProcessing(spectrum.proc);
 
     if (doReference) {
-        _referenceSpectrum(spectrum, nucleus);
+        _referenceSpectrum(spectrum, nucleus, renderSpec || {});
     }
 
     _configureBaselineProcessing(p, nucleus, renderSpec || {}, statusPath);
@@ -523,6 +527,15 @@ function _highlightSolventPeaks(renderSpec)
         return Boolean(renderSpec.highlight_solvent_peaks);
     }
     return false;
+}
+
+function _hideSolventPeakAnnotations(spectrum)
+{
+    try {
+        spectrum.setProperty("peaks.showAnnotations", false);
+        spectrum.setProperty("peaks.showAssignments", false);
+    } catch (e) {
+    }
 }
 
 function _peakText(peak)
@@ -647,6 +660,9 @@ function _filterPeaksForImage(spectrum, nucleus, renderSpec)
             }
         }
         spectrum.setPeaks(keptPeaks);
+        if (!_highlightSolventPeaks(renderSpec || {})) {
+            _hideSolventPeakAnnotations(spectrum);
+        }
     } catch (e) {
     }
 }
@@ -796,6 +812,48 @@ function _tryApplyGraphicsProfileProperties(target, profilePath, statusPath)
     return false;
 }
 
+function _graphicsProfileName(profilePath)
+{
+    var path = String(profilePath || "").replace(/\\/g, "/");
+    var slash = path.lastIndexOf("/");
+    var name = slash >= 0 ? path.substr(slash + 1) : path;
+    return name.toLowerCase();
+}
+
+function _applyGraphicsProfileFallback(spectrum, graphicsProfilePath, statusPath)
+{
+    var name = _graphicsProfileName(graphicsProfilePath);
+    var gridEnabled;
+    if (!name) {
+        return false;
+    }
+    if (name.indexOf("grid") >= 0) {
+        gridEnabled = true;
+    } else if (name.indexOf("classic") >= 0 || name.indexOf("default") >= 0) {
+        gridEnabled = false;
+    } else {
+        return false;
+    }
+
+    try {
+        spectrum.setProperty("grid.showhorizontal", gridEnabled);
+        spectrum.setProperty("grid.showvertical", gridEnabled);
+        spectrum.setProperty("grid.showframe", gridEnabled);
+        spectrum.setProperty("grid.showbaseline", gridEnabled);
+        spectrum.setProperty("grid.showover", gridEnabled);
+        if (gridEnabled) {
+            spectrum.setProperty("grid.color", "#D0D7E2");
+            spectrum.setProperty("grid.linewidth", 0.45);
+        }
+        spectrum.update();
+        _appendText(statusPath, "GRAPHICS_PROFILE fallback=grid name=" + name + " enabled=" + gridEnabled + "\n");
+        return true;
+    } catch (e) {
+        _appendText(statusPath, "WARNING graphics profile fallback failed: " + e + "\n");
+        return false;
+    }
+}
+
 function _applyGraphicsProfile(spectrum, graphicsProfilePath, statusPath)
 {
     if (!graphicsProfilePath) {
@@ -873,12 +931,18 @@ function _applyGraphicsProfile(spectrum, graphicsProfilePath, statusPath)
     for (i = 0; i < targets.length; i++) {
         for (j = 0; j < methods.length; j++) {
             if (_tryApplyGraphicsProfileMethod(targets[i], methods[j], graphicsProfilePath, statusPath)) {
+                _applyGraphicsProfileFallback(spectrum, graphicsProfilePath, statusPath);
                 return true;
             }
         }
         if (_tryApplyGraphicsProfileProperties(targets[i], graphicsProfilePath, statusPath)) {
+            _applyGraphicsProfileFallback(spectrum, graphicsProfilePath, statusPath);
             return true;
         }
+    }
+
+    if (_applyGraphicsProfileFallback(spectrum, graphicsProfilePath, statusPath)) {
+        return true;
     }
 
     _appendText(statusPath, "WARNING graphics profile not applied; this MestReNova scripting API may not expose .mngp loading: " + graphicsProfilePath + "\n");
@@ -907,7 +971,7 @@ function _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec, graphics
 function _prepareSpectrumForExport(spectrum, nucleus, renderSpec, graphicsProfilePath, statusPath)
 {
     var range = _xRange(nucleus, renderSpec || {});
-    _referenceSpectrum(spectrum, nucleus);
+    _referenceSpectrum(spectrum, nucleus, renderSpec || {});
     if (nucleus === "13C") {
         _clearNonPeakAnnotations(spectrum);
     } else {

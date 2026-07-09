@@ -37,13 +37,18 @@ from .workflows.generate_si import output_path_from_state, run_generate_si
 from .workflows.patch_si import run_patch_si
 
 
-STARTER_FILE_RELATIVE_PATHS = (
-    Path("starter") / "compound_table_starter.docx",
-    Path("starter") / "compound_table_starter.csv",
-    Path("starter") / "spectra_source_layout.txt",
-    Path("starter") / "README_starter_files.md",
-    Path("templates") / "SI_template_visual_current.docx",
+INSTRUCTION_TEMPLATE_FILES = (
+    ("Word table", Path("starter") / "compound_table_starter.docx", "Main compound table with ChemDraw OLE structures."),
+    ("CSV table", Path("starter") / "compound_table_starter.csv", "Text-table alternative when structures are provided by paths or generated later."),
+    ("Spectra layout", Path("starter") / "spectra_source_layout.txt", "Folder naming rules for raw 1H and 13C spectra."),
+    ("SI template", Path("templates") / "SI_template_visual_current.docx", "Visual Word template for compound blocks and spectra appendix."),
+    ("Reaction schema", Path("loadings") / "Reaction_schema.docx", "Reagent equivalents, MW, density and concentration settings."),
+    ("Scope table", Path("loadings") / "Scope.docx", "Reaction scope table used for reagent-loading calculations."),
+    ("Mnova grid style", Path("mngp_styles") / "grid.mngp", "Example MestReNova graphic profile with grid enabled."),
+    ("Mnova classic style", Path("mngp_styles") / "classic.mngp", "Example MestReNova graphic profile with grid disabled."),
+    ("Starter notes", Path("starter") / "README_starter_files.md", "Short description of bundled starter files."),
 )
+STARTER_FILE_RELATIVE_PATHS = tuple(relative_path for _, relative_path, _ in INSTRUCTION_TEMPLATE_FILES)
 
 
 THEME_PALETTES = {
@@ -154,6 +159,7 @@ class SIGeneratorApp:
         self._theme = THEME_PALETTES["light"]
         self._nav_buttons: dict[str, _PillButton] = {}
         self._sidebar_buttons: list[_PillButton] = []
+        self._instruction_blocks: list[_CollapsibleInstructionBlock] = []
         self._page_frames: dict[str, ttk.Frame] = {}
         self._scrollable_frames: list[_ScrollableFrame] = []
         self._theme_switch: _ThemeSwitch | None = None
@@ -607,40 +613,84 @@ class SIGeneratorApp:
         content = instructions_scroll.content
         content.columnconfigure(0, weight=1)
 
-        sections = (
-            (
-                "Generate a new SI",
-                "1. Select a compound table on Generate.\n"
-                "2. Select spectra source as a zip archive or a folder.\n"
-                "3. Select an output folder.\n"
-                "4. Click Generate SI in the bottom-right corner.",
+        quick = self._instruction_block(content, 0, "Quick start", "Minimal path for a normal SI run.", expanded=True)
+        ttk.Label(
+            quick,
+            text=(
+                "1. Open Generate and select Compound table, Spectra source and Output folder.\n"
+                "2. Open Processing only when you need a custom template, Mnova style, thresholds or loadings.\n"
+                "3. Click Generate SI. Results are saved into a separate run folder with docx, spectra, mnova, logs and reports."
             ),
-            (
-                "Use examples",
-                "Example loads the built-in test input. Starter files copies editable blank files for a new project. "
-                "Examples folder opens all bundled input and output examples.",
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+
+        templates = self._instruction_block(content, 1, "Templates", "Open or copy editable starter files.", expanded=True)
+        templates.columnconfigure(1, weight=1)
+        ttk.Button(templates, text="Copy all", command=self._copy_starter_files).grid(row=0, column=2, sticky="e", padx=(8, 0), pady=(0, 8))
+        for row, (label, relative_path, description) in enumerate(INSTRUCTION_TEMPLATE_FILES, start=1):
+            ttk.Label(templates, text=label, font=("Segoe UI", 10, "bold")).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=3)
+            ttk.Label(templates, text=description, wraplength=560, justify="left").grid(row=row, column=1, sticky="ew", pady=3)
+            ttk.Button(
+                templates,
+                text="Open",
+                command=lambda relative_path=relative_path: self._open_example_file(relative_path),
+            ).grid(row=row, column=2, sticky="e", padx=(8, 0), pady=3)
+
+        spectra = self._instruction_block(content, 2, "Spectra processing", "Controls that affect generated NMR descriptions and images.")
+        ttk.Label(
+            spectra,
+            text=(
+                "Spectra source can be a .zip archive or a folder with compound-number subfolders. "
+                "Peak thresholds are independent for 1H and 13C and define the minimum relative height for picked peaks. "
+                "PPM ranges control image export windows. Highlight solvent peaks should stay off for normal reports; then CDCl3 is used for referencing but not labeled on images."
             ),
-            (
-                "Processing settings",
-                "Open Processing to set the SI template, MestReNova path, Mnova graphics profile, spectra appendix mode, "
-                "peak thresholds, ppm ranges, baseline correction and reagent-loading options.",
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+
+        aliases = self._instruction_block(content, 3, "Template aliases", "Main placeholders used inside the Word SI template.")
+        ttk.Label(
+            aliases,
+            text=(
+                "Use entity-first aliases: {Product.number}, {Product.yield.percent}, {Reagent_1.number}, "
+                "{Reagent_2.name}, {AcOH.mmol}, {Solvent_MeCN.mL}. "
+                "Structure placeholder: {compound.number.structure}. "
+                "Spectrum placeholders: {compound.number.nmr.1h.picture} and {compound.number.nmr.13c.picture}. "
+                "Bold or italic formatting applied to a placeholder in Word is preserved in the rendered value."
             ),
-            (
-                "Review outputs",
-                "After generation, use Open support, Open output folder, Open logs and Open report. "
-                "Each run is saved into its own output folder with docx, input, spectra, mnova, logs and reports.",
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+
+        loadings = self._instruction_block(content, 4, "Loadings and checks", "Optional chemistry validation and reagent calculations.")
+        ttk.Label(
+            loadings,
+            text=(
+                "Check support validates NMR, HRMS and elemental analysis against the structural formula when enough data are available. "
+                "Calculate reagent loadings uses Reaction_schema.docx and Scope.docx to fill preparation text and product yield fields."
             ),
-            (
-                "Existing documents",
-                "Check validates an existing support from a manifest. Patch creates a modified copy of an SI. "
-                "Add appends new compounds without rewriting old compound blocks.",
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+
+        existing = self._instruction_block(content, 5, "Existing SI tools", "Workflows for already generated documents.")
+        ttk.Label(
+            existing,
+            text=(
+                "Check validates an existing support from a manifest. Patch creates a modified copy with renumbered, removed or reordered compounds. "
+                "Add appends new compounds to the end without rewriting old compound blocks."
             ),
-        )
-        for row, (title, body) in enumerate(sections):
-            box = ttk.LabelFrame(content, text=title, padding=12, style="Card.TLabelframe")
-            box.grid(row=row, column=0, sticky="ew", pady=(0, 10))
-            box.columnconfigure(0, weight=1)
-            ttk.Label(box, text=body, wraplength=760, justify="left").grid(row=0, column=0, sticky="ew")
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+
+    def _instruction_block(self, parent: ttk.Frame, row: int, title: str, summary: str, *, expanded: bool = False) -> ttk.Frame:
+        block = _CollapsibleInstructionBlock(parent, title=title, summary=summary, theme=self._theme, expanded=expanded)
+        block.grid(row=row, column=0, sticky="ew", pady=(0, 10))
+        block.columnconfigure(0, weight=1)
+        self._instruction_blocks.append(block)
+        return block.body
 
     def _show_page(self, page: str) -> None:
         page_text = {
@@ -684,6 +734,8 @@ class SIGeneratorApp:
                 pass
         for button in getattr(self, "_sidebar_buttons", []):
             button.set_theme(theme)
+        for block in getattr(self, "_instruction_blocks", []):
+            block.set_theme(theme)
         if self._theme_switch is not None:
             self._theme_switch.set_theme(theme)
             self._theme_switch.set_mode(self.theme_mode.get())
@@ -830,6 +882,13 @@ class SIGeneratorApp:
         examples = examples_dir()
         examples.mkdir(parents=True, exist_ok=True)
         os.startfile(str(examples))
+
+    def _open_example_file(self, relative_path: Path) -> None:
+        path = examples_dir() / relative_path
+        if not path.exists():
+            messagebox.showerror("Auto Support Generator", f"Example file was not found:\n{path}")
+            return
+        os.startfile(str(path))
 
     def _copy_starter_files(self) -> None:
         kwargs: dict[str, object] = {"title": "Choose a folder for starter files"}
@@ -1461,6 +1520,59 @@ class _ThemeSwitch(tk.Canvas):
         dark_color = "#ffffff" if self.mode == "dark" else theme["muted"]
         self.create_text(int(width * 0.25), int(height / 2), text="☀", fill=light_color, font=("Segoe UI Symbol", 13, "bold"))
         self.create_text(int(width * 0.75), int(height / 2), text="☾", fill=dark_color, font=("Segoe UI Symbol", 14, "bold"))
+
+
+class _CollapsibleInstructionBlock(ttk.Frame):
+    def __init__(
+        self,
+        parent,
+        *,
+        title: str,
+        summary: str,
+        theme: dict[str, str],
+        expanded: bool = False,
+    ) -> None:
+        super().__init__(parent)
+        self.columnconfigure(0, weight=1)
+        self.title = title
+        self.summary = summary
+        self.theme = theme
+        self.expanded = expanded
+        self.header = tk.Canvas(self, height=44, highlightthickness=0, borderwidth=0, cursor="hand2", background=theme["app_bg"])
+        self.header.grid(row=0, column=0, sticky="ew")
+        self.header.bind("<Configure>", lambda _event: self._draw_header())
+        self.header.bind("<Button-1>", lambda _event: self.toggle())
+        self.body = ttk.Frame(self, style="Card.TFrame", padding=(14, 8, 14, 12))
+        self.body.columnconfigure(0, weight=1)
+        if self.expanded:
+            self.body.grid(row=1, column=0, sticky="ew")
+        self._draw_header()
+
+    def set_theme(self, theme: dict[str, str]) -> None:
+        self.theme = theme
+        self.header.configure(background=theme["app_bg"])
+        self._draw_header()
+
+    def toggle(self) -> None:
+        self.expanded = not self.expanded
+        if self.expanded:
+            self.body.grid(row=1, column=0, sticky="ew")
+        else:
+            self.body.grid_remove()
+        self._draw_header()
+
+    def _draw_header(self) -> None:
+        self.header.delete("all")
+        width = max(self.header.winfo_width(), 360)
+        height = max(self.header.winfo_height(), 44)
+        theme = self.theme
+        fill = theme["card_bg"]
+        outline = theme["border"]
+        _rounded_rectangle(self.header, 2, 2, width - 2, height - 2, int((height - 4) / 2), fill=fill, outline=outline)
+        marker = "▾" if self.expanded else "▸"
+        self.header.create_text(18, int(height / 2), text=marker, anchor="w", fill=theme["accent"], font=("Segoe UI Symbol", 13, "bold"))
+        self.header.create_text(42, int(height / 2), text=self.title, anchor="w", fill=theme["text"], font=("Segoe UI", 11, "bold"))
+        self.header.create_text(width - 18, int(height / 2), text=self.summary, anchor="e", fill=theme["muted"], font=("Segoe UI", 9))
 
 
 class _ScrollableFrame(ttk.Frame):
