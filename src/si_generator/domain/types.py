@@ -54,6 +54,7 @@ class SpectrumRenderSpec(TypedDict, total=False):
     baseline_poly_order: int
     whittaker_lambda: float
     whittaker_asymmetry: float
+    highlight_solvent_peaks: bool
 
 
 class SpectrumAsset(TypedDict, total=False):
@@ -192,6 +193,7 @@ class SpectraConfig(TypedDict, total=False):
     whittaker_lambda: float
     whittaker_asymmetry: float
     solvent_suppression: bool
+    highlight_solvent_peaks: bool
     ignore_regions_ppm: dict[str, list[tuple[float, float]]]
     peak_picking: PeakPickingPolicy
     mnova_executable_path: str

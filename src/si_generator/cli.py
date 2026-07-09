@@ -186,6 +186,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Whittaker baseline asymmetry parameter.",
     )
     parser.add_argument(
+        "--highlight-solvent-peaks",
+        action="store_true",
+        help="Keep solvent peaks highlighted/picked in exported spectrum images. Disabled by default.",
+    )
+    parser.add_argument(
         "--generate-loadings",
         action="store_true",
         help="Calculate reagent loadings from table columns or the loadings workflow files.",

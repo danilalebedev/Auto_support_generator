@@ -28,6 +28,7 @@ def load_settings_node(state: GenerateSIState) -> dict:
             baseline_poly_order=request.baseline_poly_order,
             whittaker_lambda=request.whittaker_lambda,
             whittaker_asymmetry=request.whittaker_asymmetry,
+            highlight_solvent_peaks=request.highlight_solvent_peaks,
         ),
         "generation_config": build_generation_config(
             generate_loadings=request.generate_loadings,

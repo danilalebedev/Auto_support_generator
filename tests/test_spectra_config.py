@@ -31,6 +31,7 @@ class SpectraConfigTests(unittest.TestCase):
         self.assertEqual(config["whittaker_asymmetry"], 0.001)
         self.assertEqual(config["x_ranges_ppm"], DEFAULT_X_RANGES)
         self.assertTrue(config["solvent_suppression"])
+        self.assertFalse(config["highlight_solvent_peaks"])
         self.assertEqual(config["ignore_regions_ppm"], {})
         self.assertEqual(config["peak_picking"], DEFAULT_PEAK_PICKING)
         self.assertTrue(config["keep_intermediate_reports"])
@@ -53,6 +54,7 @@ class SpectraConfigTests(unittest.TestCase):
             whittaker_asymmetry=0.002,
             x_range_ppm_1h=(-0.5, 11.5),
             x_range_ppm_13c=(205, -5),
+            highlight_solvent_peaks=True,
         )
 
         self.assertFalse(config["extract_nmr"])
@@ -70,6 +72,7 @@ class SpectraConfigTests(unittest.TestCase):
         self.assertEqual(config["whittaker_asymmetry"], 0.002)
         self.assertEqual(config["x_ranges_ppm"]["1H"], (-0.5, 11.5))
         self.assertEqual(config["x_ranges_ppm"]["13C"], (-5.0, 205.0))
+        self.assertTrue(config["highlight_solvent_peaks"])
 
     def test_builds_spectrum_render_spec_from_spectra_config(self) -> None:
         spec = build_spectrum_render_spec(
@@ -82,6 +85,7 @@ class SpectraConfigTests(unittest.TestCase):
                 "ignore_regions_ppm": {"13C": [(76.0, 78.2)]},
                 "baseline_mode": "whittaker",
                 "baseline_apply_13c": True,
+                "highlight_solvent_peaks": True,
             },
         )
 
@@ -92,6 +96,7 @@ class SpectraConfigTests(unittest.TestCase):
         self.assertEqual(spec["ignore_regions_ppm"], [(76.0, 78.2)])
         self.assertEqual(spec["baseline_mode"], "whittaker")
         self.assertTrue(spec["baseline_apply"])
+        self.assertTrue(spec["highlight_solvent_peaks"])
 
     def test_shared_peak_threshold_populates_both_nuclei(self) -> None:
         config = build_spectra_config(peak_threshold_fraction=0.09)

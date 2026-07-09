@@ -57,6 +57,7 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
         baseline_poly_order=int(getattr(args, "baseline_poly_order", 3) or 3),
         whittaker_lambda=float(getattr(args, "whittaker_lambda", 100000.0) or 100000.0),
         whittaker_asymmetry=float(getattr(args, "whittaker_asymmetry", 0.001) or 0.001),
+        highlight_solvent_peaks=bool(getattr(args, "highlight_solvent_peaks", False)),
         generate_loadings=bool(getattr(args, "generate_loadings", False)),
         calculate_elemental_analysis=bool(getattr(args, "calculate_elemental_analysis", False)),
         extract_structure_metadata=bool(args.extract_structure_metadata),

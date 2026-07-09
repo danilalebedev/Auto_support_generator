@@ -280,6 +280,15 @@ def _base_template_values(
         _token_key("number_Reagent_1"): _infer_precursor_number(row.product_number),
         _token_key("mg_yield_Product"): _format_mass(row.product_mass_mg),
         _token_key("percent_yield_Product"): _format_percent(percent_yield),
+        _token_key("Product.number"): row.product_number,
+        _token_key("Product.precursor_number"): _infer_precursor_number(row.product_number),
+        _token_key("Product.mass.mg"): _format_mass(row.product_mass_mg),
+        _token_key("Product.yield.mg"): _format_mass(row.product_mass_mg),
+        _token_key("Product.yield.percent"): _format_percent(percent_yield),
+        _token_key("Product.appearance"): _compound_appearance(compound),
+        _token_key("Product.mp"): _strip_temperature_unit(compound.melting_point),
+        _token_key("Product.rf.value"): rf_value,
+        _token_key("Product.rf.system"): rf_system,
         _token_key("yield.Product.mg"): _format_mass(row.product_mass_mg),
         _token_key("yield.Product.percent"): _format_percent(percent_yield),
         _token_key("color"): _compound_appearance(compound),
@@ -290,6 +299,7 @@ def _base_template_values(
         _token_key("rf.value"): rf_value,
         _token_key("rf.system"): rf_system,
         _token_key("target_mmol"): _format_mmol(target_mmol),
+        _token_key("Reaction.target.mmol"): _format_mmol(target_mmol),
     }
 
 
@@ -302,6 +312,17 @@ def _amount_template_values(name: str, amount: dict[str, Any]) -> dict[str, str]
         _token_key(f"uL_{name}"): _format_volume_ul(amount.get("volume_uL")),
         _token_key(f"\u03bcL_{name}"): _format_volume_ul(amount.get("volume_uL")),
         _token_key(f"ml_{name}"): _format_volume_ml(amount.get("volume_mL")),
+        _token_key(f"{name}.name"): str(amount.get("name") or ""),
+        _token_key(f"{name}.mass.mg"): _format_mass(amount.get("mass_mg")),
+        _token_key(f"{name}.mg"): _format_mass(amount.get("mass_mg")),
+        _token_key(f"{name}.mmol"): _format_mmol(amount.get("mmol")),
+        _token_key(f"{name}.volume.uL"): _format_volume_ul(amount.get("volume_uL")),
+        _token_key(f"{name}.uL"): _format_volume_ul(amount.get("volume_uL")),
+        _token_key(f"{name}.\u03bcL"): _format_volume_ul(amount.get("volume_uL")),
+        _token_key(f"{name}.volume.mL"): _format_volume_ml(amount.get("volume_mL")),
+        _token_key(f"{name}.mL"): _format_volume_ml(amount.get("volume_mL")),
+        _token_key(f"{name}.equiv"): _format_equivalents(amount.get("equivalents")),
+        _token_key(f"{name}.formula"): str(amount.get("formula") or ""),
     }
     if name == "Reagent_1":
         keys[_token_key("mg_Reagent 1")] = _format_mass(amount.get("mass_mg"))
@@ -411,7 +432,8 @@ def _structure_names_for_template(scope_path: Path, template: str) -> tuple[dict
 
 def _template_requests_structure_names(template: str) -> bool:
     for match in re.finditer(r"\{([^{}]+)\}", template):
-        if _token_key(match.group(1)).startswith("name"):
+        key = _token_key(match.group(1))
+        if key.startswith("name") or key.endswith(".name"):
             return True
     return False
 
@@ -421,7 +443,16 @@ def _paragraph_has_loadings_placeholders(text: str) -> bool:
     return any(
         key.startswith(prefix)
         for key in keys
-        for prefix in ("name.reagent", "mg.reagent", "mmol.reagent", "number.product", "mg.yield.product")
+        for prefix in (
+            "name.reagent",
+            "mg.reagent",
+            "mmol.reagent",
+            "number.product",
+            "mg.yield.product",
+            "reagent.",
+            "product.",
+            "solvent.",
+        )
     )
 
 
@@ -595,6 +626,11 @@ def _format_mass(value: Any) -> str:
 
 
 def _format_mmol(value: Any) -> str:
+    parsed = _to_float(value)
+    return _format_decimal(parsed, 2) if parsed is not None else ""
+
+
+def _format_equivalents(value: Any) -> str:
     parsed = _to_float(value)
     return _format_decimal(parsed, 2) if parsed is not None else ""
 

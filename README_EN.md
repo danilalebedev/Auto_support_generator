@@ -539,26 +539,60 @@ If `SI template .docx` is empty, the built-in template is used. A custom templat
 - bold/italic formatting of labels and placeholders;
 - formatting of compound headers and spectra appendix headers.
 
-Template example:
+Write the template as a normal Word document that looks like the final SI. Use placeholders only where the program should insert data. If a placeholder is bold or italic in Word, the inserted value keeps that formatting.
+
+Use entity-first aliases for new templates:
+
+- `compound.*` for the current compound;
+- `nmr.1h.*` and `nmr.13c.*` for generated NMR text;
+- `hrms.*`, `anal.*`, `ir.*` for analytical lines;
+- `Reagent_1.*`, `Reagent_2.*`, `Solvent_MeCN.*`, `Product.*` for reagent loadings.
+
+Core placeholders:
 
 ```text
 {compound.name} ({compound.number})
-{compound.structure.marker}
-{compound.physical}
-{compound.nmr.1h}
-{compound.nmr.13c}
-{compound.hrms}
-{compound.elemental_analysis}
+{compound.number.structure}
+{compound.preparation}
+{nmr.1h.label} ({nmr.1h.conditions}) δ = {nmr.1h.peaks}.
+{nmr.13c.label} ({nmr.13c.conditions}) δ = {nmr.13c.peaks}.
+{hrms.label} m/z: {hrms.adduct} calcd for {hrms.formula} {hrms.calculated}. Found {hrms.found}.
+{anal.label} Calcd for {anal.formula}: {anal.calculated}. Found: {anal.found}.
+{ir.label} ({ir.method}, cm-1): {ir.peaks}.
 ```
 
 For spectra appendix formatting:
 
 ```text
-{spectrum.compound.name} ({spectrum.compound.number})
-{spectrum.title}
-{spectrum.structure.marker}
-{spectrum.image}
+{compound.name} ({compound.number})
+{spectrum.label} ({spectrum.conditions})
+{compound.number.structure}
+{compound.number.nmr.1h.picture}
 ```
+
+On the 13C appendix page use `{compound.number.nmr.13c.picture}` instead of `{compound.number.nmr.1h.picture}`.
+
+Reagent loading placeholders:
+
+```text
+{Product.precursor_number}
+{Product.number}
+{Product.yield.mg}
+{Product.yield.percent}
+{Product.appearance}
+{Product.mp}
+{Product.rf.value}
+{Product.rf.system}
+{Reagent_1.name}
+{Reagent_1.mass.mg}
+{Reagent_1.mmol}
+{Reagent_2.name}
+{Reagent_2.mass.mg}
+{Reagent_2.mmol}
+{Solvent_MeCN.mL}
+```
+
+Older aliases such as `{number.Product}` and `{yield.Product.percent}` are still accepted for compatibility, but new templates should use the entity-first form.
 
 ## Support Check
 

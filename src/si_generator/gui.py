@@ -121,6 +121,7 @@ class SIGeneratorApp:
         self.baseline_poly_order = StringVar(value=str(DEFAULT_BASELINE_POLY_ORDER))
         self.whittaker_lambda = StringVar(value=f"{DEFAULT_WHITTAKER_LAMBDA:g}")
         self.whittaker_asymmetry = StringVar(value=f"{DEFAULT_WHITTAKER_ASYMMETRY:g}")
+        self.highlight_solvent_peaks = BooleanVar(value=False)
         self.check_support = BooleanVar(value=True)
         self.generate_loadings = BooleanVar(value=False)
         self.calculate_elemental_analysis = BooleanVar(value=False)
@@ -447,6 +448,11 @@ class SIGeneratorApp:
         ttk.Entry(c13_range, textvariable=self.c13_ppm_min, width=8).pack(side="left")
         ttk.Label(c13_range, text=" to ").pack(side="left")
         ttk.Entry(c13_range, textvariable=self.c13_ppm_max, width=8).pack(side="left")
+        ttk.Checkbutton(
+            options,
+            text="Highlight solvent peaks",
+            variable=self.highlight_solvent_peaks,
+        ).grid(row=6, column=0, columnspan=2, sticky="w", pady=4)
 
         baseline = ttk.LabelFrame(advanced, text="Baseline correction", padding=12, style="Card.TLabelframe")
         baseline.grid(row=2, column=0, sticky="ew", pady=(10, 0))
@@ -966,6 +972,7 @@ class SIGeneratorApp:
                 baseline_poly_order_text=self.baseline_poly_order.get(),
                 whittaker_lambda_text=self.whittaker_lambda.get(),
                 whittaker_asymmetry_text=self.whittaker_asymmetry.get(),
+                highlight_solvent_peaks=self.highlight_solvent_peaks.get(),
                 generate_loadings=self.generate_loadings.get(),
                 calculate_elemental_analysis=self.calculate_elemental_analysis.get(),
                 check_support=self.check_support.get(),
@@ -1025,6 +1032,7 @@ class SIGeneratorApp:
             baseline_poly_order_text=self.baseline_poly_order.get(),
             whittaker_lambda_text=self.whittaker_lambda.get(),
             whittaker_asymmetry_text=self.whittaker_asymmetry.get(),
+            highlight_solvent_peaks=self.highlight_solvent_peaks.get(),
             generate_loadings=self.generate_loadings.get(),
             calculate_elemental_analysis=self.calculate_elemental_analysis.get(),
             check_support=self.check_support.get(),
@@ -1277,6 +1285,7 @@ class SIGeneratorApp:
             "calculate_elemental_analysis": self.calculate_elemental_analysis,
             "baseline_apply_1h": self.baseline_apply_1h,
             "baseline_apply_13c": self.baseline_apply_13c,
+            "highlight_solvent_peaks": self.highlight_solvent_peaks,
         }
 
     def _on_close(self) -> None:
@@ -1563,6 +1572,7 @@ def _build_generate_request(
     baseline_poly_order_text: str = str(DEFAULT_BASELINE_POLY_ORDER),
     whittaker_lambda_text: str = f"{DEFAULT_WHITTAKER_LAMBDA:g}",
     whittaker_asymmetry_text: str = f"{DEFAULT_WHITTAKER_ASYMMETRY:g}",
+    highlight_solvent_peaks: bool = False,
     generate_loadings: bool = False,
     calculate_elemental_analysis: bool = False,
     check_support: bool = True,
@@ -1614,6 +1624,7 @@ def _build_generate_request(
         baseline_poly_order=_validated_positive_int(baseline_poly_order_text, "Baseline polynomial order"),
         whittaker_lambda=_validated_positive_float(whittaker_lambda_text, "Whittaker lambda"),
         whittaker_asymmetry=_validated_fraction(whittaker_asymmetry_text, "Whittaker asymmetry"),
+        highlight_solvent_peaks=bool(highlight_solvent_peaks),
         generate_loadings=generate_loadings,
         calculate_elemental_analysis=calculate_elemental_analysis,
         no_check_support=not check_support,
@@ -1655,6 +1666,7 @@ def _build_add_compounds_request(
     baseline_poly_order_text: str = str(DEFAULT_BASELINE_POLY_ORDER),
     whittaker_lambda_text: str = f"{DEFAULT_WHITTAKER_LAMBDA:g}",
     whittaker_asymmetry_text: str = f"{DEFAULT_WHITTAKER_ASYMMETRY:g}",
+    highlight_solvent_peaks: bool = False,
     generate_loadings: bool = False,
     calculate_elemental_analysis: bool = False,
     check_support: bool = True,
@@ -1699,6 +1711,7 @@ def _build_add_compounds_request(
         baseline_poly_order=_validated_positive_int(baseline_poly_order_text, "Baseline polynomial order"),
         whittaker_lambda=_validated_positive_float(whittaker_lambda_text, "Whittaker lambda"),
         whittaker_asymmetry=_validated_fraction(whittaker_asymmetry_text, "Whittaker asymmetry"),
+        highlight_solvent_peaks=bool(highlight_solvent_peaks),
         generate_loadings=generate_loadings,
         calculate_elemental_analysis=calculate_elemental_analysis,
         no_check_support=not check_support,

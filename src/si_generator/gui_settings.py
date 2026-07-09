@@ -46,7 +46,14 @@ STRING_FIELDS = (
     "add_spectra_source",
     "add_output_docx",
 )
-BOOL_FIELDS = ("check_support", "generate_loadings", "calculate_elemental_analysis", "baseline_apply_1h", "baseline_apply_13c")
+BOOL_FIELDS = (
+    "check_support",
+    "generate_loadings",
+    "calculate_elemental_analysis",
+    "baseline_apply_1h",
+    "baseline_apply_13c",
+    "highlight_solvent_peaks",
+)
 CHOICE_FIELDS = {
     "input_kind": {"word", "csv"},
     "add_input_kind": {"word", "csv"},

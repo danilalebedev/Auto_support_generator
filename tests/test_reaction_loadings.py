@@ -245,6 +245,33 @@ class ReactionLoadingsTests(unittest.TestCase):
             "LOADINGS_COMPOUND_NOT_FOUND",
         ])
 
+    def test_loadings_workflow_supports_entity_first_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            template_path = Path(tmp) / "SI_template.docx"
+            document = Document()
+            document.add_paragraph(
+                "Alkene {Product.precursor_number} gave product {Product.number} with "
+                "{Reagent_2.name} ({Reagent_2.mass.mg} mg, {Reagent_2.mmol} mmol). "
+                "Yield {Product.yield.mg} mg ({Product.yield.percent})."
+            )
+            document.save(template_path)
+            compound = Compound(number="3a", name="Example", color="white", state="solid")
+            apply_loadings_workflow(
+                [compound],
+                EXAMPLES_DIR,
+                paths=LoadingsWorkflowPaths(
+                    LOADINGS_DIR / "Reaction_schema.docx",
+                    LOADINGS_DIR / "Scope.docx",
+                    template_path,
+                ),
+                structure_names_by_cell={(1, 2, 3): "benzene-1,2-diamine"},
+            )
+
+        self.assertIn("Alkene 2a gave product 3a", compound.preparation)
+        self.assertIn("benzene-1,2-diamine (509 mg, 4.7 mmol)", compound.preparation)
+        self.assertIn("Yield 304 mg (69%)", compound.preparation)
+        self.assertNotIn("{", compound.preparation)
+
     def test_loadings_node_uses_examples_dir_when_enabled(self) -> None:
         compounds, order = make_compound_store(
             [

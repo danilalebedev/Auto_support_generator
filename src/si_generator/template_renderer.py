@@ -163,11 +163,11 @@ def _render_template_paragraphs(
 ) -> None:
     for template_paragraph in template_paragraphs:
         text = template_paragraph.text
-        if text.startswith("[[STRUCTURE:") and not (compound.has_word_structure or compound.structure_path):
+        if spectrum_block is None and _is_structure_placeholder_paragraph(text) and not (compound.has_word_structure or compound.structure_path):
             continue
         if _should_skip_paragraph(text, values):
             continue
-        if "[[SPECTRUM:" in text:
+        if _is_spectrum_artifact_paragraph(text):
             _render_spectrum_artifact(document, spectrum_block, mnova_ole_targets)
             continue
 
@@ -190,15 +190,87 @@ def _clone_paragraph(document: DocumentObject, paragraph: Paragraph) -> Paragrap
 
 
 def _replace_placeholders(paragraph: Paragraph, values: dict[str, str]) -> None:
-    for run in paragraph.runs:
-        if not run.text:
+    runs = list(paragraph.runs)
+    if not runs:
+        return
+
+    run_texts = [run.text or "" for run in runs]
+    full_text = "".join(run_texts)
+    matches = list(PLACEHOLDER_RE.finditer(full_text))
+    if not matches:
+        return
+
+    spans: list[tuple[int, int, int]] = []
+    position = 0
+    for index, text in enumerate(run_texts):
+        end = position + len(text)
+        spans.append((position, end, index))
+        position = end
+
+    segments: list[tuple[str, Any]] = []
+    cursor = 0
+    for match in matches:
+        _append_original_run_segments(segments, runs, run_texts, spans, cursor, match.start())
+        key = match.group(1) or match.group(2) or ""
+        replacement = values.get(_key(key), "")
+        if replacement:
+            source_index = _run_index_at(spans, match.start())
+            segments.append((replacement, deepcopy(runs[source_index]._r.rPr)))
+        cursor = match.end()
+    _append_original_run_segments(segments, runs, run_texts, spans, cursor, len(full_text))
+    _replace_paragraph_runs(paragraph, segments)
+
+
+def _append_original_run_segments(
+    segments: list[tuple[str, Any]],
+    runs: list[Run],
+    run_texts: list[str],
+    spans: list[tuple[int, int, int]],
+    start: int,
+    end: int,
+) -> None:
+    if end <= start:
+        return
+    for run_start, run_end, run_index in spans:
+        overlap_start = max(start, run_start)
+        overlap_end = min(end, run_end)
+        if overlap_end <= overlap_start:
             continue
+        text = run_texts[run_index][overlap_start - run_start : overlap_end - run_start]
+        if text:
+            segments.append((text, deepcopy(runs[run_index]._r.rPr)))
 
-        def replace(match: re.Match[str]) -> str:
-            key = match.group(1) or match.group(2) or ""
-            return values.get(_key(key), "")
 
-        run.text = PLACEHOLDER_RE.sub(replace, run.text)
+def _run_index_at(spans: list[tuple[int, int, int]], position: int) -> int:
+    for start, end, index in spans:
+        if start <= position < end:
+            return index
+    return spans[-1][2] if spans else 0
+
+
+def _replace_paragraph_runs(paragraph: Paragraph, segments: list[tuple[str, Any]]) -> None:
+    parent = paragraph._p
+    insert_index = 0
+    for index, child in enumerate(list(parent)):
+        if child.tag == qn("w:pPr"):
+            insert_index = index + 1
+        if child.tag == qn("w:r"):
+            parent.remove(child)
+
+    offset = 0
+    for text, run_properties in segments:
+        if not text:
+            continue
+        new_r = OxmlElement("w:r")
+        if run_properties is not None:
+            new_r.append(deepcopy(run_properties))
+        text_element = OxmlElement("w:t")
+        if text[:1].isspace() or text[-1:].isspace():
+            text_element.set(qn("xml:space"), "preserve")
+        text_element.text = text
+        new_r.append(text_element)
+        parent.insert(insert_index + offset, new_r)
+        offset += 1
 
 
 def _apply_inline_formatting(paragraph: Paragraph) -> None:
@@ -399,8 +471,34 @@ def _render_spectrum_artifact(
         paragraph.add_run().add_picture(image_path, width=picture_width)
 
 
+def _placeholder_keys(text: str) -> set[str]:
+    return {_key(match.group(1) or match.group(2) or "") for match in PLACEHOLDER_RE.finditer(text)}
+
+
+def _is_structure_placeholder_paragraph(text: str) -> bool:
+    stripped = text.strip()
+    if stripped.startswith("[[STRUCTURE:") or stripped.startswith("[[SPECTRUM_STRUCTURE:"):
+        return True
+    keys = _placeholder_keys(stripped)
+    return bool(keys) and keys.issubset({"compound.number.structure", "spectrum.structure.marker"})
+
+
+def _is_spectrum_artifact_paragraph(text: str) -> bool:
+    if "[[SPECTRUM:" in text:
+        return True
+    keys = _placeholder_keys(text)
+    return bool(
+        keys
+        & {
+            "compound.number.nmr.1h.picture",
+            "compound.number.nmr.13c.picture",
+            "spectrum.picture",
+        }
+    )
+
+
 def _should_skip_paragraph(text: str, values: dict[str, str]) -> bool:
-    keys = {_key(match.group(1) or match.group(2) or "") for match in PLACEHOLDER_RE.finditer(text)}
+    keys = _placeholder_keys(text)
     if not keys:
         return False
     if any(key.startswith("nmr.1h.") for key in keys) and not values.get("nmr.1h.peaks"):
@@ -419,7 +517,7 @@ def _should_skip_paragraph(text: str, values: dict[str, str]) -> bool:
         return True
     if "reaction.loadings" in keys and not values.get("reaction.loadings"):
         return True
-    if _has_loadings_placeholders(keys) and not values.get("number.product"):
+    if _has_loadings_placeholders(keys) and not (values.get("number.product") or values.get("product.number")):
         return True
     if "compound.support_warning" in keys and not values.get("compound.support_warning"):
         return True
@@ -436,13 +534,14 @@ def _compound_values(compound: Compound) -> dict[str, str]:
         "compound.name": compound.name,
         "compound.number": compound.number,
         "compound.label": compound.label,
+        "compound.number.structure": f"[[STRUCTURE:{compound.number}]]",
         "compound.preparation": "" if loadings_values else _summary_text(compound),
         "compound.support_warning": f"(Support check: {compound.nmr_check_warning})" if compound.nmr_check_warning else "",
         "reaction.loadings": _reaction_loadings_text(compound),
-        "nmr.1h.label": "1H NMR",
+        "nmr.1h.label": _nmr_label_from_text(compound.h1_nmr, "1H NMR"),
         "nmr.1h.conditions": compound.h1_conditions,
         "nmr.1h.peaks": _nmr_peaks_text(compound.h1_nmr),
-        "nmr.13c.label": "13C{1H} NMR",
+        "nmr.13c.label": _nmr_label_from_text(compound.c13_nmr, "13C{1H} NMR"),
         "nmr.13c.conditions": compound.c13_conditions,
         "nmr.13c.peaks": _nmr_peaks_text(compound.c13_nmr),
         "nmr.extra": compound.extra_nmr.strip(),
@@ -458,15 +557,21 @@ def _spectrum_values(compound: Compound, nucleus: str) -> dict[str, str]:
     if nucleus == "1H":
         return {
             "spectrum.nucleus": "1H",
-            "spectrum.label": "1H NMR",
+            "spectrum.label": _nmr_label_from_text(compound.h1_nmr, "1H NMR"),
             "spectrum.conditions": compound.h1_conditions,
             "spectrum.structure.marker": f"[[SPECTRUM_STRUCTURE:{compound.number}:1H]]",
+            "spectrum.picture": f"[[SPECTRUM:{compound.number}:1H]]",
+            "compound.number.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:1H]]",
+            "compound.number.nmr.1h.picture": f"[[SPECTRUM:{compound.number}:1H]]",
         }
     return {
         "spectrum.nucleus": "13C",
-        "spectrum.label": "13C{1H} NMR",
+        "spectrum.label": _nmr_label_from_text(compound.c13_nmr, "13C{1H} NMR"),
         "spectrum.conditions": compound.c13_conditions,
         "spectrum.structure.marker": f"[[SPECTRUM_STRUCTURE:{compound.number}:13C]]",
+        "spectrum.picture": f"[[SPECTRUM:{compound.number}:13C]]",
+        "compound.number.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:13C]]",
+        "compound.number.nmr.13c.picture": f"[[SPECTRUM:{compound.number}:13C]]",
     }
 
 
@@ -512,6 +617,22 @@ def _nmr_peaks_text(value: str) -> str:
         text = re.sub(r"^\s*\u03b4\s*", "", text)
         text = re.sub(r"^\s*=\s*", "", text)
     return text.rstrip(" .")
+
+
+def _nmr_label_from_text(value: str, fallback: str) -> str:
+    text = " ".join(str(value or "").strip().split())
+    if not text:
+        return fallback
+    if not re.match(r"^(?:1H|13C\{1H\})\s*NMR\b", text, flags=re.IGNORECASE):
+        return fallback
+    if "(" in text:
+        label = text.split("(", 1)[0].strip()
+    elif "\u03b4" in text:
+        label = text.split("\u03b4", 1)[0].strip()
+    else:
+        label = ""
+    label = label.rstrip(":")
+    return label or fallback
 
 
 def _hrms_values(compound: Compound) -> dict[str, str]:
@@ -589,7 +710,16 @@ def _style_warning_paragraph(paragraph: Paragraph) -> None:
 
 
 def _has_loadings_placeholders(keys: set[str]) -> bool:
-    prefixes = ("name.reagent", "mg.reagent", "mmol.reagent", "number.product", "mg.yield.product")
+    prefixes = (
+        "name.reagent",
+        "mg.reagent",
+        "mmol.reagent",
+        "number.product",
+        "mg.yield.product",
+        "reagent.",
+        "product.",
+        "solvent.",
+    )
     return any(key.startswith(prefix) for key in keys for prefix in prefixes)
 
 

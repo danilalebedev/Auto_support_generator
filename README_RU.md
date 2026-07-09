@@ -672,57 +672,74 @@ IR (ATR, cm-1): 3038, 2957, 1711.
 - расположение блоков;
 - формат заголовков и спектрального приложения.
 
-Шаблон пишется как обычный Word-документ, похожий на будущий SI. Вместо данных
-используются placeholders.
+Пишите шаблон как обычный Word-документ, похожий на будущий SI. Placeholder нужен
+только там, где программа должна вставить значение. Если placeholder выделен
+жирным или курсивом в Word, вставленный текст сохранит это оформление.
+
+Для новых шаблонов используйте порядок `сущность.поле`:
+
+- `compound.*` — текущее соединение;
+- `nmr.1h.*` и `nmr.13c.*` — текст ЯМР;
+- `hrms.*`, `anal.*`, `ir.*` — аналитические строки;
+- `Reagent_1.*`, `Reagent_2.*`, `Solvent_MeCN.*`, `Product.*` — расчет загрузок.
 
 Основные placeholders:
 
 ```text
-{compound.name}
-{compound.number}
-{compound.label}
+{compound.name} ({compound.number})
+{compound.number.structure}
 {compound.preparation}
 {compound.support_warning}
 {reaction.loadings}
-{nmr.1h.label}
-{nmr.1h.conditions}
-{nmr.1h.peaks}
-{nmr.13c.label}
-{nmr.13c.conditions}
-{nmr.13c.peaks}
+{nmr.1h.label} ({nmr.1h.conditions}) δ = {nmr.1h.peaks}.
+{nmr.13c.label} ({nmr.13c.conditions}) δ = {nmr.13c.peaks}.
 {nmr.extra}
-{hrms.label}
-{hrms.adduct}
-{hrms.formula}
-{hrms.calculated}
-{hrms.found}
-{anal.label}
-{anal.formula}
-{anal.calculated}
-{anal.found}
-{ir.label}
-{ir.method}
-{ir.peaks}
+{hrms.label} m/z: {hrms.adduct} calcd for {hrms.formula} {hrms.calculated}. Found {hrms.found}.
+{anal.label} Calcd for {anal.formula}: {anal.calculated}. Found: {anal.found}.
+{ir.label} ({ir.method}, cm-1): {ir.peaks}.
+```
+
+Для приложения со спектрами:
+
+```text
+{compound.name} ({compound.number})
+{spectrum.label} ({spectrum.conditions})
+{compound.number.structure}
+{compound.number.nmr.1h.picture}
+```
+
+На странице 13C используйте `{compound.number.nmr.13c.picture}` вместо `{compound.number.nmr.1h.picture}`.
+
+Для reagent loadings используйте placeholders вида:
+
+```text
+{Product.precursor_number}
+{Product.number}
+{Product.yield.mg}
+{Product.yield.percent}
+{Product.appearance}
+{Product.mp}
+{Product.rf.value}
+{Product.rf.system}
+{Reagent_1.name}
+{Reagent_1.mass.mg}
+{Reagent_1.mmol}
+{Reagent_2.name}
+{Reagent_2.mass.mg}
+{Reagent_2.mmol}
+{Solvent_MeCN.mL}
+```
+
+Старые aliases вроде `{number.Product}` и `{yield.Product.percent}` пока
+поддерживаются для совместимости, но новые шаблоны лучше писать в формате
+`Product.yield.percent`.
+
+Дополнительные placeholders для appendix:
+
+```text
 {spectrum.label}
 {spectrum.conditions}
 {spectrum.structure.marker}
-```
-
-Для reagent loadings используются placeholders вида:
-
-```text
-{number.Product}
-{number.Reagent.1}
-{name.Reagent.1}
-{name.Reagent.2}
-{mg.Reagent.2}
-{mmol.Reagent.2}
-{mg.K2CO3}
-{mmol.K2CO3}
-{uL.AcOH}
-{mL.Solvent.MeCN}
-{yield.Product.mg}
-{yield.Product.percent}
 ```
 
 Если placeholder выделен жирным или курсивом в шаблоне, вставленный текст

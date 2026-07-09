@@ -39,7 +39,7 @@
 Пример:
 
 ```text
-Alkene {number.Product} was obtained from bromide {number.Reagent.1} ({mg.Reagent.1} mg, {mmol.Reagent.1} mmol), {name.Reagent.2} ({mg.Reagent.2} mg, {mmol.Reagent.2} mmol), K2CO3 ({mg.K2CO3} mg, {mmol.K2CO3} mmol), AcOH ({uL.AcOH} µL, {mmol.AcOH} mmol) and MeCN ({mL.Solvent.MeCN} mL) according to GP2. Yield {yield.Product.mg} mg ({yield.Product.percent}); {appearance}; mp {mp} °C. Rf = {rf.value} ({rf.system}).
+Alkene {Product.precursor_number} was obtained from bromide {Reagent_1.name} ({Reagent_1.mass.mg} mg, {Reagent_1.mmol} mmol), {Reagent_2.name} ({Reagent_2.mass.mg} mg, {Reagent_2.mmol} mmol), K2CO3 ({K2CO3.mass.mg} mg, {K2CO3.mmol} mmol), AcOH ({AcOH.uL} µL, {AcOH.mmol} mmol) and MeCN ({Solvent_MeCN.mL} mL) according to GP2. Yield {Product.yield.mg} mg ({Product.yield.percent}); {Product.appearance}; mp {Product.mp} °C. Rf = {Product.rf.value} ({Product.rf.system}).
 ```
 
 В самом Word-шаблоне формулы можно форматировать нормально: например, в `K2CO3`
@@ -47,17 +47,19 @@ Alkene {number.Product} was obtained from bromide {number.Reagent.1} ({mg.Reagen
 
 ## Важные placeholder-ы
 
-- `{compound.name}`, `{compound.number}`, `{compound.preparation}`;
+- `{compound.name}`, `{compound.number}`, `{compound.number.structure}`, `{compound.preparation}`;
 - `{reaction.loadings}`;
-- `{number.Product}`, `{number.Reagent.1}`;
-- `{name.Reagent.2}`, `{mg.Reagent.2}`, `{mmol.Reagent.2}`;
-- `{mg.K2CO3}`, `{mmol.K2CO3}`;
-- `{uL.AcOH}`, `{mmol.AcOH}`;
-- `{mL.Solvent.MeCN}`;
-- `{yield.Product.mg}`, `{yield.Product.percent}`;
-- `{appearance}`, `{mp}`, `{rf.value}`, `{rf.system}`;
+- `{Product.number}`, `{Product.precursor_number}`;
+- `{Reagent_1.name}`, `{Reagent_1.mass.mg}`, `{Reagent_1.mmol}`;
+- `{Reagent_2.name}`, `{Reagent_2.mass.mg}`, `{Reagent_2.mmol}`;
+- `{K2CO3.mass.mg}`, `{K2CO3.mmol}`;
+- `{AcOH.uL}`, `{AcOH.mmol}`;
+- `{Solvent_MeCN.mL}`;
+- `{Product.yield.mg}`, `{Product.yield.percent}`;
+- `{Product.appearance}`, `{Product.mp}`, `{Product.rf.value}`, `{Product.rf.system}`;
 - `{nmr.1h.label}`, `{nmr.1h.conditions}`, `{nmr.1h.peaks}`;
 - `{nmr.13c.label}`, `{nmr.13c.conditions}`, `{nmr.13c.peaks}`;
+- `{compound.number.nmr.1h.picture}`, `{compound.number.nmr.13c.picture}`;
 - `{hrms.label}`, `{hrms.adduct}`, `{hrms.formula}`, `{hrms.calculated}`, `{hrms.found}`;
 - `{anal.label}`, `{anal.formula}`, `{anal.calculated}`, `{anal.found}`;
 - `{ir.label}`, `{ir.method}`, `{ir.peaks}`.

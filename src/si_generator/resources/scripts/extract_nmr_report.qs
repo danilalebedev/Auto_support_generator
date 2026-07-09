@@ -210,7 +210,7 @@ function _thresholdPeakData(spectrum, nucleus, renderSpec)
         for (i = 0; i < peaks.count; i++) {
             peak = peaks.at(i);
             delta = peak.delta();
-            if (_isIgnoredImagePeak(spectrum, nucleus, delta, renderSpec || {})) {
+            if (_isIgnoredImagePeak(spectrum, nucleus, peak, renderSpec || {})) {
                 continue;
             }
             intensity = Math.abs(peak.intensity);
@@ -294,7 +294,7 @@ function _referenceValue(spectrum, nucleus)
 function _referenceSpectrum(spectrum, nucleus)
 {
     var reference = _referenceValue(spectrum, nucleus);
-    var tolerance = nucleus === "13C" ? 1.0 : 0.15;
+    var tolerance = nucleus === "13C" ? 2.0 : 0.20;
 
     try {
         spectrum.reference(1, reference, reference, true, tolerance, "CHCl3 reference");
@@ -517,12 +517,79 @@ function _isReferencePeak(spectrum, nucleus, delta)
     return nucleus === "1H" && Math.abs(delta) <= 0.05;
 }
 
-function _isIgnoredImagePeak(spectrum, nucleus, delta, renderSpec)
+function _highlightSolventPeaks(renderSpec)
 {
+    if (renderSpec && renderSpec.highlight_solvent_peaks !== undefined) {
+        return Boolean(renderSpec.highlight_solvent_peaks);
+    }
+    return false;
+}
+
+function _peakText(peak)
+{
+    var parts = [];
+    var names = ["annotation", "label", "name", "comment", "assignment", "solvent"];
+    var i, name, value;
+    if (peak === undefined || peak === null) {
+        return "";
+    }
+    for (i = 0; i < names.length; i++) {
+        name = names[i];
+        try {
+            value = peak[name];
+            if (value !== undefined && value !== null) {
+                parts.push(String(value));
+            }
+        } catch (e) {
+        }
+        try {
+            if (peak[name] !== undefined && typeof peak[name] === "function") {
+                value = peak[name]();
+                if (value !== undefined && value !== null) {
+                    parts.push(String(value));
+                }
+            }
+        } catch (e2) {
+        }
+    }
+    try {
+        parts.push(String(peak));
+    } catch (e3) {
+    }
+    return parts.join(" ").toLowerCase();
+}
+
+function _isSolventPeak(spectrum, nucleus, peak, delta)
+{
+    var text = _peakText(peak);
+    var solvent = String(spectrum.solvent || "").toLowerCase();
+    if (
+        text.indexOf("cdcl3") >= 0 ||
+        text.indexOf("chcl3") >= 0 ||
+        text.indexOf("chloroform") >= 0 ||
+        text.indexOf("dmso") >= 0 ||
+        text.indexOf("h2o") >= 0 ||
+        text.indexOf("water") >= 0 ||
+        text.indexOf("solvent") >= 0
+    ) {
+        return true;
+    }
+    if (nucleus === "13C" && solvent.indexOf("cdcl") >= 0 && delta >= 76.0 && delta <= 78.2) {
+        return true;
+    }
+    if (nucleus === "13C" && solvent.indexOf("dmso") >= 0 && delta >= 38.8 && delta <= 40.2) {
+        return true;
+    }
+    return _isReferencePeak(spectrum, nucleus, delta);
+}
+
+function _isIgnoredImagePeak(spectrum, nucleus, peak, renderSpec)
+{
+    var delta = peak.delta();
     if (_isIgnoredByRenderSpec(delta, renderSpec || {})) {
         return true;
     }
-    if (_isReferencePeak(spectrum, nucleus, delta)) {
+    if (!_highlightSolventPeaks(renderSpec || {}) && _isSolventPeak(spectrum, nucleus, peak, delta)) {
         return true;
     }
     if (nucleus !== "1H") {
@@ -548,7 +615,7 @@ function _filterPeaksForImage(spectrum, nucleus, renderSpec)
         maxIntensity = 0;
         for (i = 0; i < allPeaks.count; i++) {
             peak = allPeaks.at(i);
-            if (_isIgnoredImagePeak(spectrum, nucleus, peak.delta(), renderSpec)) {
+            if (_isIgnoredImagePeak(spectrum, nucleus, peak, renderSpec)) {
                 continue;
             }
             intensity = Math.abs(peak.intensity);
@@ -559,7 +626,7 @@ function _filterPeaksForImage(spectrum, nucleus, renderSpec)
         if (maxIntensity <= 0) {
             for (i = 0; i < allPeaks.count; i++) {
                 peak = allPeaks.at(i);
-                if (_isIgnoredImagePeak(spectrum, nucleus, peak.delta(), renderSpec)) {
+                if (_isIgnoredImagePeak(spectrum, nucleus, peak, renderSpec)) {
                     continue;
                 }
                 intensity = Math.abs(peak.intensity);
@@ -572,7 +639,7 @@ function _filterPeaksForImage(spectrum, nucleus, renderSpec)
         keptPeaks = new Peaks();
         for (i = 0; i < allPeaks.count; i++) {
             peak = allPeaks.at(i);
-            if (!_isIgnoredImagePeak(spectrum, nucleus, peak.delta(), renderSpec) && Math.abs(peak.intensity) >= threshold) {
+            if (!_isIgnoredImagePeak(spectrum, nucleus, peak, renderSpec) && Math.abs(peak.intensity) >= threshold) {
                 if (nucleus === "1H") {
                     peak.annotation = "";
                 }
@@ -636,7 +703,7 @@ function _plainPeakReport(spectrum, nucleus, renderSpec)
     for (i = 0; i < peaks.count; i++) {
         peak = peaks.at(i);
         delta = peak.delta();
-        if (nucleus === "13C" && (Math.abs(delta - solventReference) <= solventTolerance || (delta >= 76.0 && delta <= 78.2))) {
+        if (nucleus === "13C" && _isSolventPeak(spectrum, nucleus, peak, delta)) {
             continue;
         }
         if (delta < minDelta || delta > maxDelta || _isIgnoredByRenderSpec(delta, renderSpec || {})) {
@@ -651,7 +718,7 @@ function _plainPeakReport(spectrum, nucleus, renderSpec)
     for (i = 0; i < peaks.count; i++) {
         peak = peaks.at(i);
         delta = peak.delta();
-        if (nucleus === "13C" && (Math.abs(delta - solventReference) <= solventTolerance || (delta >= 76.0 && delta <= 78.2))) {
+        if (nucleus === "13C" && _isSolventPeak(spectrum, nucleus, peak, delta)) {
             continue;
         }
         if (delta < minDelta || delta > maxDelta || _isIgnoredByRenderSpec(delta, renderSpec || {})) {
@@ -738,21 +805,69 @@ function _applyGraphicsProfile(spectrum, graphicsProfilePath, statusPath)
     var methods = [
         "loadProperties",
         "loadGraphicProperties",
+        "loadGraphicPropertiesFromFile",
         "loadGraphicsProfile",
+        "loadNMRGraphicProperties",
+        "loadNMRGraphicsProfile",
+        "importProperties",
+        "importGraphicProperties",
         "applyProperties",
         "applyGraphicProperties",
+        "applyGraphicPropertiesFromFile",
+        "readProperties",
         "applyGraphicsProfile"
     ];
     var targets = [spectrum];
-    var activeItem;
+    var activeDocument, activePage, activeItem, activeWindow;
     var i, j;
+
+    try {
+        activeDocument = mainWindow.activeDocument;
+        if (activeDocument !== undefined && activeDocument !== null) {
+            targets.push(activeDocument);
+            try {
+                activePage = activeDocument.curPage();
+                if (activePage !== undefined && activePage !== null) {
+                    targets.push(activePage);
+                }
+            } catch (pageError) {
+            }
+            activeItem = activeDocument.getActiveItem("NMR Spectrum");
+            if (activeItem !== undefined && activeItem !== null) {
+                targets.push(activeItem);
+            }
+        }
+    } catch (e) {
+    }
+
+    try {
+        activeWindow = mainWindow.activeWindow();
+        if (activeWindow !== undefined && activeWindow !== null) {
+            targets.push(activeWindow);
+        }
+    } catch (windowError) {
+    }
+
+    try {
+        if (typeof nmr !== "undefined" && nmr !== null) {
+            targets.push(nmr);
+        }
+    } catch (nmrError) {
+    }
+
+    try {
+        if (typeof draw !== "undefined" && draw !== null) {
+            targets.push(draw);
+        }
+    } catch (drawError) {
+    }
 
     try {
         activeItem = mainWindow.activeDocument.getActiveItem("NMR Spectrum");
         if (activeItem !== undefined && activeItem !== null) {
             targets.push(activeItem);
         }
-    } catch (e) {
+    } catch (fallbackError) {
     }
 
     for (i = 0; i < targets.length; i++) {
@@ -792,13 +907,14 @@ function _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec, graphics
 function _prepareSpectrumForExport(spectrum, nucleus, renderSpec, graphicsProfilePath, statusPath)
 {
     var range = _xRange(nucleus, renderSpec || {});
-    _applyGraphicsProfile(spectrum, graphicsProfilePath || "", statusPath);
+    _referenceSpectrum(spectrum, nucleus);
     if (nucleus === "13C") {
         _clearNonPeakAnnotations(spectrum);
     } else {
         _hideProtonImageClutter(spectrum);
     }
     _filterPeaksForImage(spectrum, nucleus, renderSpec || {});
+    _applyGraphicsProfile(spectrum, graphicsProfilePath || "", statusPath);
     spectrum.horzZoom(range[0], range[1]);
     _fitVerticalScaleForImage(spectrum, nucleus, renderSpec || {});
     spectrum.update();

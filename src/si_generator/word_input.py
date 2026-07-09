@@ -684,10 +684,41 @@ def _apply_object_layout(object_xml, width: str, height: str, in_front: bool = F
 
 
 def _run_with_text(document, text: str):
-    for run in document.findall(".//w:r", NS):
+    runs = list(document.findall(".//w:r", NS))
+    for run in runs:
         if text in "".join(run.itertext()):
             return run
+    parents = {child: parent for parent in document.iter() for child in list(parent)}
+    for start, run in enumerate(runs):
+        collected = ""
+        group = []
+        parent = parents.get(run)
+        if parent is None:
+            continue
+        for candidate in runs[start:]:
+            if parents.get(candidate) is not parent:
+                break
+            group.append(candidate)
+            collected += "".join(candidate.itertext())
+            if len(collected) > len(text) + 80:
+                break
+            if text in collected:
+                return _collapse_marker_runs(group, text, parents)
     return None
+
+
+def _collapse_marker_runs(runs, text: str, parents):
+    first = runs[0]
+    for child in list(first):
+        if child.tag != f"{{{NS['w']}}}rPr":
+            first.remove(child)
+    text_element = ET.SubElement(first, f"{{{NS['w']}}}t")
+    text_element.text = text
+    for run in runs[1:]:
+        parent = parents.get(run)
+        if parent is not None:
+            parent.remove(run)
+    return first
 
 
 def _replace_run_text_with_object(run, object_xml) -> None:

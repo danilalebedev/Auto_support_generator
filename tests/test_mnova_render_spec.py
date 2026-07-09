@@ -29,6 +29,7 @@ class MnovaRenderSpecTests(unittest.TestCase):
             "baseline_poly_order": 5,
             "whittaker_lambda": 200000,
             "whittaker_asymmetry": 0.002,
+            "highlight_solvent_peaks": True,
         }
 
         line = _format_task_line(
@@ -54,6 +55,7 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertEqual(parsed["baseline_poly_order"], 5)
         self.assertEqual(parsed["whittaker_lambda"], 200000)
         self.assertEqual(parsed["whittaker_asymmetry"], 0.002)
+        self.assertTrue(parsed["highlight_solvent_peaks"])
         self.assertEqual(parts[6], "C:/ascii/out/2a_1H.mnova")
         self.assertEqual(parts[7], "C:/ascii/profile/default.mngp")
 
@@ -129,7 +131,12 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertIn("var graphicsProfilePath = parts.length >= 8 ? parts[7] : \"\";", script)
         self.assertIn("_saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath", script)
         self.assertIn("function _applyGraphicsProfile(spectrum, graphicsProfilePath, statusPath)", script)
+        self.assertIn("loadGraphicPropertiesFromFile", script)
+        self.assertIn("loadNMRGraphicsProfile", script)
         self.assertIn("WARNING graphics profile not applied", script)
+        self.assertIn("_referenceSpectrum(spectrum, nucleus);", script)
+        self.assertIn("function _highlightSolventPeaks(renderSpec)", script)
+        self.assertIn("function _isSolventPeak(spectrum, nucleus, peak, delta)", script)
         self.assertIn("x_range_ppm", script)
         self.assertIn("_targetSignalHeightFraction(renderSpec", script)
         self.assertIn("_peakThresholdFraction(nucleus, renderSpec", script)

@@ -14,6 +14,7 @@ DEFAULT_WHITTAKER_LAMBDA = 100000.0
 DEFAULT_WHITTAKER_ASYMMETRY = 0.001
 DEFAULT_PEAK_THRESHOLD_FRACTION = DEFAULT_H1_PEAK_THRESHOLD_FRACTION
 DEFAULT_PEAK_PICKING: PeakPickingPolicy = "normal"
+DEFAULT_HIGHLIGHT_SOLVENT_PEAKS = False
 DEFAULT_X_RANGES = {
     "1H": (-1.0, 12.0),
     "13C": (-10.0, 210.0),
@@ -36,6 +37,7 @@ def build_spectra_config(
     baseline_poly_order: int = DEFAULT_BASELINE_POLY_ORDER,
     whittaker_lambda: float = DEFAULT_WHITTAKER_LAMBDA,
     whittaker_asymmetry: float = DEFAULT_WHITTAKER_ASYMMETRY,
+    highlight_solvent_peaks: bool = DEFAULT_HIGHLIGHT_SOLVENT_PEAKS,
     x_range_ppm_1h: tuple[float, float] | None = None,
     x_range_ppm_13c: tuple[float, float] | None = None,
 ) -> SpectraConfig:
@@ -62,6 +64,7 @@ def build_spectra_config(
             "13C": _x_range_ppm("13C", x_range_ppm_13c),
         },
         "solvent_suppression": True,
+        "highlight_solvent_peaks": bool(highlight_solvent_peaks),
         "ignore_regions_ppm": {},
         "peak_picking": DEFAULT_PEAK_PICKING,
         "keep_intermediate_reports": True,
@@ -94,6 +97,7 @@ def build_spectrum_render_spec(
         "baseline_poly_order": _positive_int(config.get("baseline_poly_order"), DEFAULT_BASELINE_POLY_ORDER),
         "whittaker_lambda": _positive_float(config.get("whittaker_lambda"), DEFAULT_WHITTAKER_LAMBDA),
         "whittaker_asymmetry": _normalized_fraction(config.get("whittaker_asymmetry"), DEFAULT_WHITTAKER_ASYMMETRY),
+        "highlight_solvent_peaks": bool(config.get("highlight_solvent_peaks", DEFAULT_HIGHLIGHT_SOLVENT_PEAKS)),
     }
     ignore_regions = config.get("ignore_regions_ppm", {})
     if isinstance(ignore_regions, dict) and nucleus in ignore_regions:
