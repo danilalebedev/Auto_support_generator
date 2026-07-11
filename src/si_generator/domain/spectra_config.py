@@ -27,6 +27,8 @@ def build_spectra_config(
     insert_spectra_as: SpectrumEmbedMode = "png",
     mnova_executable_path: str | None = None,
     mnova_graphics_profile_path: str | None = None,
+    mnova_graphics_profile_1h_path: str | None = None,
+    mnova_graphics_profile_13c_path: str | None = None,
     target_signal_height_fraction: float = DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION,
     peak_threshold_fraction: float | None = None,
     peak_threshold_fraction_1h: float | None = None,
@@ -73,6 +75,10 @@ def build_spectra_config(
         config["mnova_executable_path"] = mnova_executable_path
     if mnova_graphics_profile_path:
         config["mnova_graphics_profile_path"] = mnova_graphics_profile_path
+    if mnova_graphics_profile_1h_path:
+        config["mnova_graphics_profile_1h_path"] = mnova_graphics_profile_1h_path
+    if mnova_graphics_profile_13c_path:
+        config["mnova_graphics_profile_13c_path"] = mnova_graphics_profile_13c_path
     return config
 
 

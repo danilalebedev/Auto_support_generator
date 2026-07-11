@@ -28,7 +28,7 @@ def write_manifest_node(state: GenerateSIState) -> dict:
     run_summary = build_run_summary(state_with_manifest, manifest)
     run_summary_path.write_text(json.dumps(run_summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    return {"manifest": manifest, "artifacts": manifest["artifacts"]}
+    return {"manifest": manifest, "artifacts": manifest["artifacts"], "status": run_summary["status"]}
 
 
 def build_manifest(state: GenerateSIState) -> dict:
@@ -48,7 +48,11 @@ def build_manifest(state: GenerateSIState) -> dict:
                 "spectra_source": request.resolved_spectra_source,
                 "template_docx": request.template_docx,
                 "references": request.references_path,
+                "loadings_schema_docx": request.loadings_schema_docx,
+                "loadings_scope_docx": request.loadings_scope_docx,
                 "mnova_graphics_profile": request.mnova_graphics_profile,
+                "mnova_graphics_profile_1h": request.mnova_graphics_profile_1h,
+                "mnova_graphics_profile_13c": request.mnova_graphics_profile_13c,
             }
         ),
         "output_paths": output_paths,
@@ -58,6 +62,7 @@ def build_manifest(state: GenerateSIState) -> dict:
             "generation": state.get("generation_config", {}),
             "runtime": state.get("runtime_config", {}),
         },
+        "run_config": _run_config(request, artifacts, output_root),
         "artifacts": artifacts,
         "order": order,
         "compounds": {},
@@ -111,6 +116,7 @@ def build_run_summary(state: GenerateSIState, manifest: dict | None = None) -> d
         "artifacts": manifest.get("artifacts", {}),
         "relative_paths": manifest.get("relative_paths", {}),
         "configs": manifest.get("configs", {}),
+        "run_config": manifest.get("run_config", {}),
         "compounds": [
             {
                 "id": compound_id,
@@ -224,6 +230,45 @@ def _compound_artifacts(compound) -> dict[str, str]:
     if compound.mnova_path:
         artifacts["mnova"] = compound.mnova_path
     return artifacts
+
+
+def _run_config(request, artifacts: dict[str, str], output_root: Path) -> dict:
+    return {
+        "version": 1,
+        "input_kind": request.input_kind,
+        "template_docx": _artifact_or_request_path("template_docx_copy", request.template_docx, artifacts, output_root),
+        "references_path": _artifact_or_request_path("references_copy", request.references_path, artifacts, output_root),
+        "loadings_schema_docx": _artifact_or_request_path("loadings_schema_copy", request.loadings_schema_docx, artifacts, output_root),
+        "loadings_scope_docx": _artifact_or_request_path("loadings_scope_copy", request.loadings_scope_docx, artifacts, output_root),
+        "mnova_graphics_profile": _artifact_or_request_path("mnova_graphics_profile_copy", request.mnova_graphics_profile, artifacts, output_root),
+        "mnova_graphics_profile_1h": _artifact_or_request_path("mnova_graphics_profile_1h_copy", request.mnova_graphics_profile_1h, artifacts, output_root),
+        "mnova_graphics_profile_13c": _artifact_or_request_path("mnova_graphics_profile_13c_copy", request.mnova_graphics_profile_13c, artifacts, output_root),
+        "no_extract_nmr": bool(request.no_extract_nmr),
+        "insert_spectra_as": request.insert_spectra_as,
+        "target_signal_height_fraction": request.target_signal_height_fraction,
+        "peak_threshold_fraction": request.peak_threshold_fraction,
+        "peak_threshold_fraction_1h": request.peak_threshold_fraction_1h,
+        "peak_threshold_fraction_13c": request.peak_threshold_fraction_13c,
+        "x_range_ppm_1h": list(request.x_range_ppm_1h),
+        "x_range_ppm_13c": list(request.x_range_ppm_13c),
+        "baseline_mode": request.baseline_mode,
+        "baseline_apply_1h": bool(request.baseline_apply_1h),
+        "baseline_apply_13c": bool(request.baseline_apply_13c),
+        "baseline_poly_order": request.baseline_poly_order,
+        "whittaker_lambda": request.whittaker_lambda,
+        "whittaker_asymmetry": request.whittaker_asymmetry,
+        "highlight_solvent_peaks": bool(request.highlight_solvent_peaks),
+        "generate_loadings": bool(request.generate_loadings),
+        "calculate_elemental_analysis": bool(request.calculate_elemental_analysis),
+        "no_check_support": bool(request.no_check_support),
+    }
+
+
+def _artifact_or_request_path(artifact_key: str, request_path: Path | None, artifacts: dict[str, str], output_root: Path) -> str:
+    value = artifacts.get(artifact_key) or (str(request_path) if request_path else "")
+    if not value:
+        return ""
+    return _relative_path(output_root, value)
 
 
 def _analytical_blocks(compound) -> dict[str, bool]:

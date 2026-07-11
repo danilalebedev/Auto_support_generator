@@ -144,16 +144,21 @@ def _check_loadings_files(request: GenerateSIRequest) -> list[Issue]:
 
 
 def _check_mnova_graphics_profile(request: GenerateSIRequest) -> list[Issue]:
-    path = request.mnova_graphics_profile
-    if not path:
-        return []
-    if not path.exists():
-        return [_issue("PREFLIGHT_MNOVA_GRAPHICS_PROFILE_MISSING", "error", "Mnova graphics profile does not exist.", path)]
-    if not path.is_file():
-        return [_issue("PREFLIGHT_MNOVA_GRAPHICS_PROFILE_NOT_FILE", "error", "Mnova graphics profile must be a file.", path)]
-    if path.suffix.lower() != ".mngp":
-        return [_issue("PREFLIGHT_MNOVA_GRAPHICS_PROFILE_EXTENSION", "error", "Mnova graphics profile must be a .mngp file.", path)]
-    return []
+    issues: list[Issue] = []
+    for label, path in {
+        "Mnova graphics profile": request.mnova_graphics_profile,
+        "1H Mnova graphics profile": request.mnova_graphics_profile_1h,
+        "13C Mnova graphics profile": request.mnova_graphics_profile_13c,
+    }.items():
+        if not path:
+            continue
+        if not path.exists():
+            issues.append(_issue("PREFLIGHT_MNOVA_GRAPHICS_PROFILE_MISSING", "error", f"{label} does not exist.", path))
+        elif not path.is_file():
+            issues.append(_issue("PREFLIGHT_MNOVA_GRAPHICS_PROFILE_NOT_FILE", "error", f"{label} must be a file.", path))
+        elif path.suffix.lower() != ".mngp":
+            issues.append(_issue("PREFLIGHT_MNOVA_GRAPHICS_PROFILE_EXTENSION", "error", f"{label} must be a .mngp file.", path))
+    return issues
 
 
 def _check_missing_spectra_source(request: GenerateSIRequest) -> list[Issue]:

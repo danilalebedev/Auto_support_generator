@@ -14,6 +14,7 @@ from si_generator.gui import (
     _build_patch_request,
     _build_patch_summary,
     _build_result_summary,
+    _previous_output_defaults,
     _dialog_initialdir,
     _example_field_updates,
     _existing_result_path,
@@ -21,6 +22,7 @@ from si_generator.gui import (
     _next_available_docx_path,
     _output_docx_from_folder,
     _format_peak_threshold_percent,
+    _failure_dialog_message,
     _validated_ppm_range,
     _report_overview,
     copy_starter_files_to,
@@ -39,12 +41,16 @@ class GuiWorkflowTests(unittest.TestCase):
             schema = root / "Reaction_schema.docx"
             scope = root / "Scope.docx"
             graphics_profile = root / "default.mngp"
+            h1_profile = root / "h1.mngp"
+            c13_profile = root / "c13.mngp"
             output = root / "support_information.docx"
             table.write_text("placeholder", encoding="utf-8")
             spectra.write_text("placeholder", encoding="utf-8")
             schema.write_text("placeholder", encoding="utf-8")
             scope.write_text("placeholder", encoding="utf-8")
             graphics_profile.write_text("placeholder", encoding="utf-8")
+            h1_profile.write_text("placeholder", encoding="utf-8")
+            c13_profile.write_text("placeholder", encoding="utf-8")
 
             request = _build_generate_request(
                 input_kind="word",
@@ -55,6 +61,8 @@ class GuiWorkflowTests(unittest.TestCase):
                 loadings_schema_text=str(schema),
                 loadings_scope_text=str(scope),
                 mnova_graphics_profile_text=str(graphics_profile),
+                mnova_graphics_profile_1h_text=str(h1_profile),
+                mnova_graphics_profile_13c_text=str(c13_profile),
                 peak_threshold_1h_percent_text="8",
                 peak_threshold_13c_percent_text="3,5",
                 target_signal_height_percent_text="72",
@@ -81,6 +89,8 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(request.loadings_schema_docx, schema)
         self.assertEqual(request.loadings_scope_docx, scope)
         self.assertEqual(request.mnova_graphics_profile, graphics_profile)
+        self.assertEqual(request.mnova_graphics_profile_1h, h1_profile)
+        self.assertEqual(request.mnova_graphics_profile_13c, c13_profile)
         self.assertEqual(request.peak_threshold_fraction_1h, 0.08)
         self.assertEqual(request.peak_threshold_fraction_13c, 0.035)
         self.assertEqual(request.target_signal_height_fraction, 0.72)
@@ -171,8 +181,8 @@ class GuiWorkflowTests(unittest.TestCase):
     def test_rejects_missing_input_file(self) -> None:
         with self.assertRaisesRegex(ValueError, "compound table"):
             _build_generate_request(
-                input_kind="csv",
-                input_path_text="missing.csv",
+                input_kind="word",
+                input_path_text="missing.docx",
                 output_docx_text="support_information.docx",
             )
 
@@ -419,31 +429,116 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(summary["run_summary"], str(report.resolve()))
         self.assertEqual(summary["overview"], "Status: pass | Issues: 0")
 
-    def test_builds_add_compounds_request_from_csv_table(self) -> None:
+    def test_builds_add_compounds_request_from_word_table(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             manifest = root / "support_information.manifest.json"
-            new_table = root / "new_compounds.csv"
-            output = root / "combined.docx"
+            new_table = root / "new_compounds.docx"
+            schema = root / "Reaction_schema.docx"
+            scope = root / "Scope.docx"
+            output_folder = root / "output"
             manifest.write_text("{}", encoding="utf-8")
-            new_table.write_text("number,name\n3a,Example\n", encoding="utf-8")
+            new_table.write_text("placeholder", encoding="utf-8")
+            schema.write_text("schema", encoding="utf-8")
+            scope.write_text("scope", encoding="utf-8")
 
             request = _build_add_compounds_request(
                 manifest_text=str(manifest),
                 support_docx_text="",
-                input_kind="csv",
+                input_kind="word",
+                method_mode_text="new_method",
                 input_path_text=str(new_table),
-                output_docx_text=str(output),
+                output_folder_text=str(output_folder),
+                loadings_schema_docx_text=str(schema),
+                loadings_scope_docx_text=str(scope),
                 target_signal_height_percent_text="85",
+                generate_loadings=True,
                 calculate_elemental_analysis=True,
             )
 
         self.assertEqual(request.manifest_path, manifest)
         self.assertEqual(request.input_path, new_table)
-        self.assertEqual(request.input_kind, "csv")
-        self.assertEqual(request.output_docx, output)
+        self.assertEqual(request.input_kind, "word")
+        self.assertIsNone(request.output_docx)
+        self.assertEqual(request.output_folder, output_folder)
+        self.assertEqual(request.method_mode, "new_method")
+        self.assertEqual(request.loadings_schema_docx, schema)
+        self.assertEqual(request.loadings_scope_docx, scope)
+        self.assertTrue(request.generate_loadings)
         self.assertEqual(request.target_signal_height_fraction, 0.85)
         self.assertTrue(request.calculate_elemental_analysis)
+
+    def test_builds_add_request_from_previous_output_folder_defaults(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            previous = root / "old_run"
+            docx_dir = previous / "docx"
+            docx_dir.mkdir(parents=True)
+            manifest = docx_dir / "support_information.manifest.json"
+            support = docx_dir / "support_information.docx"
+            new_table = root / "new_compounds.docx"
+            output_folder = root / "output"
+            manifest.write_text("{}", encoding="utf-8")
+            support.write_text("support", encoding="utf-8")
+            new_table.write_text("table", encoding="utf-8")
+
+            request = _build_add_compounds_request(
+                manifest_text="",
+                support_docx_text="",
+                previous_output_dir_text=str(previous),
+                input_kind="word",
+                method_mode_text="same_series",
+                input_path_text=str(new_table),
+                output_folder_text=str(output_folder),
+            )
+
+        self.assertEqual(request.previous_output_dir, previous)
+        self.assertEqual(request.manifest_path, manifest)
+        self.assertEqual(request.support_docx, support)
+
+    def test_previous_output_defaults_accepts_docx_subfolder_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            docx_dir = root / "docx"
+            docx_dir.mkdir()
+            manifest = docx_dir / "support_information.manifest.json"
+            support = docx_dir / "support_information.docx"
+            manifest.write_text("{}", encoding="utf-8")
+            support.write_text("support", encoding="utf-8")
+
+            resolved_manifest, resolved_support = _previous_output_defaults(root)
+
+        self.assertEqual(resolved_manifest, manifest)
+        self.assertEqual(resolved_support, support)
+
+    def test_add_schema_or_scope_enables_loadings_for_add_request(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = root / "support_information.manifest.json"
+            new_table = root / "new_compounds.docx"
+            schema = root / "Reaction_schema.docx"
+            scope = root / "Scope.docx"
+            output_folder = root / "output"
+            manifest.write_text("{}", encoding="utf-8")
+            new_table.write_text("table", encoding="utf-8")
+            schema.write_text("schema", encoding="utf-8")
+            scope.write_text("scope", encoding="utf-8")
+
+            request = _build_add_compounds_request(
+                manifest_text=str(manifest),
+                support_docx_text="",
+                input_kind="word",
+                method_mode_text="new_method",
+                input_path_text=str(new_table),
+                output_folder_text=str(output_folder),
+                loadings_schema_docx_text=str(schema),
+                loadings_scope_docx_text=str(scope),
+                generate_loadings=False,
+            )
+
+        self.assertTrue(request.generate_loadings)
+        self.assertEqual(request.loadings_schema_docx, schema)
+        self.assertEqual(request.loadings_scope_docx, scope)
 
     def test_report_overview_ignores_missing_or_invalid_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -455,6 +550,32 @@ class GuiWorkflowTests(unittest.TestCase):
 
         self.assertEqual(invalid_result, "")
         self.assertEqual(missing_result, "")
+
+    def test_failure_dialog_message_includes_issue_details_and_file_path(self) -> None:
+        message = _failure_dialog_message(
+            {
+                "error": "Generation failed",
+                "issues": [
+                    {
+                        "code": "LOADINGS_SCOPE_INPUT_MISMATCH",
+                        "severity": "error",
+                        "message": (
+                            "Reaction loadings cannot be calculated because compound numbers in Scope.docx and "
+                            "compound table do not match. Input compounds: 2e, 2f. Scope products: 2a, 2b."
+                        ),
+                        "path": "C:/data/Scope.docx",
+                    }
+                ],
+                "summary": {"run_summary": "C:/data/support_information.run_summary.json"},
+            }
+        )
+
+        self.assertIn("Generation failed", message)
+        self.assertIn("LOADINGS_SCOPE_INPUT_MISMATCH", message)
+        self.assertIn("Input compounds: 2e, 2f", message)
+        self.assertIn("Scope products: 2a, 2b", message)
+        self.assertIn("File: C:/data/Scope.docx", message)
+        self.assertIn("Report: C:/data/support_information.run_summary.json", message)
 
     def test_existing_result_path_returns_resolved_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -524,14 +645,14 @@ class GuiWorkflowTests(unittest.TestCase):
 
     def test_example_field_updates_clear_project_specific_paths(self) -> None:
         updates = _example_field_updates(
-            Path("examples/test_input.docx"),
-            Path("examples/test_input.zip"),
+            Path("examples/test_input_2.docx"),
+            Path("examples/spectra_2.zip"),
             Path("output/docx/support_information.docx"),
         )
 
         self.assertEqual(updates["input_kind"], "word")
-        self.assertEqual(updates["input_path"], str(Path("examples/test_input.docx")))
-        self.assertEqual(updates["spectra_zip"], str(Path("examples/test_input.zip")))
+        self.assertEqual(updates["input_path"], str(Path("examples/test_input_2.docx")))
+        self.assertEqual(updates["spectra_zip"], str(Path("examples/spectra_2.zip")))
         self.assertEqual(updates["output_docx"], str(Path("output/docx/support_information.docx")))
         self.assertEqual(updates["output_folder"], str(Path("output/docx")))
         self.assertEqual(updates["template_docx"], "")
@@ -539,12 +660,15 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(updates["loadings_schema_docx"], "")
         self.assertEqual(updates["loadings_scope_docx"], "")
         self.assertEqual(updates["mnova_graphics_profile"], "")
+        self.assertEqual(updates["mnova_graphics_profile_1h"], str(Path("examples/mngp_styles/classic_1H.mngp")))
+        self.assertEqual(updates["mnova_graphics_profile_13c"], str(Path("examples/mngp_styles/classic_13C.mngp")))
         self.assertEqual(updates["h1_ppm_min"], "-1")
         self.assertEqual(updates["h1_ppm_max"], "12")
         self.assertEqual(updates["c13_ppm_min"], "-10")
         self.assertEqual(updates["c13_ppm_max"], "210")
         self.assertEqual(updates["existing_manifest"], "")
         self.assertEqual(updates["patch_renumber"], "")
+        self.assertEqual(updates["add_output_folder"], str(Path("output/docx")))
         self.assertNotIn("mnova_exe", updates)
 
     def test_copy_starter_files_copies_expected_files_to_unique_folder(self) -> None:
@@ -560,14 +684,18 @@ class GuiWorkflowTests(unittest.TestCase):
             second = copy_starter_files_to(root, examples_root=examples_root)
 
             self.assertTrue((first / "compound_table_starter.docx").exists())
-            self.assertTrue((first / "compound_table_starter.csv").exists())
+            self.assertFalse((first / "compound_table_starter.csv").exists())
+            self.assertTrue((first / "spectra_2.zip").exists())
             self.assertTrue((first / "spectra_source_layout.txt").exists())
             self.assertTrue((first / "README_starter_files.md").exists())
             self.assertTrue((first / "SI_template.docx").exists())
             self.assertTrue((first / "Reaction_schema.docx").exists())
             self.assertTrue((first / "Scope.docx").exists())
-            self.assertTrue((first / "grid.mngp").exists())
-            self.assertTrue((first / "classic.mngp").exists())
+            self.assertTrue((first / "classic_1H.mngp").exists())
+            self.assertTrue((first / "classic_13C.mngp").exists())
+            self.assertTrue((first / "grid_1H.mngp").exists())
+            self.assertTrue((first / "grid_13C.mngp").exists())
+            self.assertTrue((first / "support_information.docx").exists())
             self.assertEqual(second.name, "AutoSupportGenerator_starter_files_2")
 
     def test_mousewheel_units_scroll_in_platform_direction(self) -> None:

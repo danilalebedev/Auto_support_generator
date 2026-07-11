@@ -6,7 +6,11 @@ import zipfile
 from pathlib import Path
 
 from si_generator.cli import _build_parser
-from si_generator.spectra_zip import prepare_spectra_source
+from si_generator.domain.compound import Compound
+from si_generator.domain.requests import GenerateSIRequest
+from si_generator.graph.compound_store import make_compound_store
+from si_generator.graph.nodes.spectra import prepare_spectra_source_node
+from si_generator.spectra_zip import prepare_spectra_source, spectra_source_compound_numbers
 from si_generator.workflows.generate_si import request_from_args
 
 
@@ -32,6 +36,50 @@ class SpectraSourceTests(unittest.TestCase):
             prepared = prepare_spectra_source(spectra_zip, root / "work")
             self.assertEqual(prepared.name, "test_input")
             self.assertTrue((prepared / "2a" / "1H" / "fid").exists())
+
+    def test_spectra_source_compound_numbers_reads_top_level_compound_folders(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            spectra_folder = root / "spectra"
+            (spectra_folder / "2a" / "1H").mkdir(parents=True)
+            (spectra_folder / "2b" / "13C").mkdir(parents=True)
+            (spectra_folder / "__MACOSX").mkdir()
+
+            numbers = spectra_source_compound_numbers(spectra_folder)
+
+        self.assertEqual(numbers, {"2a", "2b"})
+
+    def test_prepare_spectra_source_node_errors_when_numbers_do_not_match_input(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            spectra_folder = root / "spectra"
+            (spectra_folder / "2a" / "1H").mkdir(parents=True)
+            (spectra_folder / "2b" / "1H").mkdir(parents=True)
+            compounds, order = make_compound_store([Compound(number="2a", name="Example")])
+            request = GenerateSIRequest(
+                input_path=root / "input.docx",
+                input_kind="word",
+                output_path=root / "output" / "support_information.docx",
+                spectra_source=spectra_folder,
+            )
+
+            result = prepare_spectra_source_node(
+                {
+                    "request": request,
+                    "compounds": compounds,
+                    "order": order,
+                    "issues": [],
+                    "run_id": "run",
+                }
+            )
+
+        self.assertEqual(result["status"], "fail")
+        issue_codes = {issue["code"] for issue in result["issues"]}
+        self.assertIn("SPECTRA_SOURCE_INPUT_MISMATCH", issue_codes)
+        mismatch = next(issue for issue in result["issues"] if issue["code"] == "SPECTRA_SOURCE_INPUT_MISMATCH")
+        self.assertEqual(mismatch["severity"], "error")
+        self.assertIn("Input compounds: 2a", mismatch["message"])
+        self.assertIn("Spectra folders: 2a, 2b", mismatch["message"])
 
     def test_prepare_spectra_source_rejects_zip_slip_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

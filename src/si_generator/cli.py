@@ -32,10 +32,10 @@ def _main(argv: list[str] | None = None) -> int:
         _print_patch_result(result)
         return 1 if manifest_has_errors(result.get("issues", [])) else 0
     if args.add_compounds_manifest:
-        if not (args.add_input or args.add_word_input):
-            parser.error("--add-input or --add-word-input is required with --add-compounds-manifest.")
-        if not (args.add_output or args.output):
-            parser.error("--add-output or --output is required with --add-compounds-manifest.")
+        if not args.add_word_input:
+            parser.error("--add-word-input is required with --add-compounds-manifest.")
+        if not (args.add_output or args.add_output_folder or args.output):
+            parser.error("--add-output-folder, --add-output or --output is required with --add-compounds-manifest.")
         result = run_add_compounds(add_compounds_request_from_args(args))
         _print_add_compounds_result(result)
         return 1 if manifest_has_errors(result.get("issues", [])) else 0
@@ -49,13 +49,12 @@ def _main(argv: list[str] | None = None) -> int:
         return 1
     result = run_generate_si(request)
     _print_generate_result(result)
-    return 0
+    return 1 if manifest_has_errors(result.get("issues", [])) else 0
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate Supporting Information DOCX from compound CSV data.")
+    parser = argparse.ArgumentParser(description="Generate Supporting Information DOCX from a Word compound table.")
     input_group = parser.add_mutually_exclusive_group(required=True)
-    input_group.add_argument("--input", "-i", help="Path to compounds CSV.")
     input_group.add_argument("--word-input", help="Path to a Word table with ChemDraw/ChemSketch OLE structures.")
     input_group.add_argument("--check-manifest", help="Check an existing support_information.manifest.json file.")
     input_group.add_argument("--patch-manifest", help="Patch an existing support_information.manifest.json file.")
@@ -67,10 +66,22 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reorder", help="For --patch-manifest, comma-separated compound ids or numbers in the desired order.")
     parser.add_argument("--patched-output", help="For --patch-manifest, output path for the patched DOCX.")
     parser.add_argument("--patched-manifest-output", help="For --patch-manifest, output path for the patched manifest JSON.")
-    add_input_group = parser.add_mutually_exclusive_group()
-    add_input_group.add_argument("--add-input", help="For --add-compounds-manifest, path to new compounds CSV.")
-    add_input_group.add_argument("--add-word-input", help="For --add-compounds-manifest, path to new compounds Word table.")
+    parser.add_argument("--add-word-input", help="For --add-compounds-manifest, path to new compounds Word table.")
     parser.add_argument("--add-output", help="For --add-compounds-manifest, output path for the new combined DOCX.")
+    parser.add_argument("--add-output-folder", help="For --add-compounds-manifest, output folder where a new run folder will be created.")
+    parser.add_argument(
+        "--previous-output-folder",
+        help="For --add-compounds-manifest, path to the previous generated output run folder.",
+    )
+    parser.add_argument(
+        "--add-method-mode",
+        choices=["same-series", "new-method", "same_series", "new_method"],
+        default="same-series",
+        help=(
+            "For --add-compounds-manifest: same-series reuses formatting/processing settings from the existing manifest; "
+            "new-method uses the current CLI settings."
+        ),
+    )
     parser.add_argument(
         "--no-strict-artifacts",
         action="store_true",
@@ -99,6 +110,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mnova-graphics-profile",
         help="Optional .mngp MestReNova NMR graphic properties file used for spectrum display/export formatting.",
+    )
+    parser.add_argument(
+        "--mnova-graphics-profile-1h",
+        help="Optional .mngp MestReNova graphic profile for 1H spectrum display/export formatting.",
+    )
+    parser.add_argument(
+        "--mnova-graphics-profile-13c",
+        help="Optional .mngp MestReNova graphic profile for 13C spectrum display/export formatting.",
     )
     parser.add_argument(
         "--no-extract-nmr",
@@ -285,7 +304,15 @@ def _print_add_compounds_result(result: dict) -> None:
 
 
 def _print_generate_result(result: dict) -> None:
-    print(f"Generated {output_path_from_state(result).resolve()}")
+    for issue in result.get("issues", []):
+        severity = issue.get("severity", "warning").upper()
+        code = issue.get("code", "GENERATE")
+        message = issue.get("message", "")
+        print(f"[{severity}] {code}: {message}")
+    if manifest_has_errors(result.get("issues", [])):
+        print(f"Generation failed. Intended DOCX path: {output_path_from_state(result).resolve()}")
+    else:
+        print(f"Generated {output_path_from_state(result).resolve()}")
     artifacts = result.get("artifacts", {})
     for label, key in [
         ("Spectra package", "processed_spectra_zip"),

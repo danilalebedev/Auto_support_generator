@@ -16,6 +16,8 @@ def calculate_elemental_analysis_node(state: GenerateSIState) -> dict:
 
     issues: list[Issue] = list(state.get("issues", []))
     for compound in compounds:
+        if compound.elemental_analysis.get("skip"):
+            continue
         if not include_all and not compound.elemental_analysis:
             continue
         if not compound.formula:

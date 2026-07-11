@@ -20,6 +20,8 @@ STRING_FIELDS = (
     "loadings_scope_docx",
     "mnova_exe",
     "mnova_graphics_profile",
+    "mnova_graphics_profile_1h",
+    "mnova_graphics_profile_13c",
     "output_docx",
     "output_folder",
     "theme_mode",
@@ -40,11 +42,17 @@ STRING_FIELDS = (
     "patch_renumber",
     "patch_remove",
     "patch_reorder",
+    "add_previous_output_dir",
     "add_manifest",
     "add_support_docx",
+    "add_template_docx",
+    "add_loadings_schema_docx",
+    "add_loadings_scope_docx",
     "add_input_path",
     "add_spectra_source",
     "add_output_docx",
+    "add_output_folder",
+    "add_method_mode",
 )
 BOOL_FIELDS = (
     "check_support",
@@ -55,8 +63,9 @@ BOOL_FIELDS = (
     "highlight_solvent_peaks",
 )
 CHOICE_FIELDS = {
-    "input_kind": {"word", "csv"},
-    "add_input_kind": {"word", "csv"},
+    "input_kind": {"word"},
+    "add_input_kind": {"word"},
+    "add_method_mode": {"same_series", "new_method"},
     "insert_spectra_as": {"png", "mnova", "none"},
     "baseline_mode": {"auto", "off", "bernstein", "whittaker"},
     "theme_mode": {"light", "dark"},
@@ -105,6 +114,7 @@ def normalize_gui_settings(raw: Mapping[str, Any]) -> dict[str, str | bool]:
         value = str(source.get(field, "")).strip().lower()
         if value in allowed:
             settings[field] = value
+    _migrate_legacy_mngp_settings(settings)
     return settings
 
 
@@ -112,3 +122,21 @@ def _bool_value(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() not in {"", "0", "false", "no", "off"}
     return bool(value)
+
+
+def _migrate_legacy_mngp_settings(settings: dict[str, str | bool]) -> None:
+    raw_profile = str(settings.get("mnova_graphics_profile", "")).strip().strip('"')
+    if not raw_profile:
+        return
+
+    path = Path(raw_profile)
+    name = path.name.lower()
+    if name not in {"classic.mngp", "grid.mngp"}:
+        return
+
+    stem = "classic" if name == "classic.mngp" else "grid"
+    if not str(settings.get("mnova_graphics_profile_1h", "")).strip():
+        settings["mnova_graphics_profile_1h"] = str(path.with_name(f"{stem}_1H.mngp"))
+    if not str(settings.get("mnova_graphics_profile_13c", "")).strip():
+        settings["mnova_graphics_profile_13c"] = str(path.with_name(f"{stem}_13C.mngp"))
+    settings["mnova_graphics_profile"] = ""

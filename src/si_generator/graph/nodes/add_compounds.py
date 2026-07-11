@@ -15,7 +15,11 @@ from ...domain.issues import compound_issue_counts, count_issues
 from ...domain.manifest import load_manifest, manifest_has_errors
 from ...domain.patching import set_manifest_output_paths, support_docx_from_manifest
 from ...domain.requests import GenerateSIRequest
+from ...domain.loadings_workflow import read_scope
+from ...domain.spectra_config import DEFAULT_X_RANGES
+from ...domain.types import BaselineMode, SpectrumEmbedMode
 from ...input_table import read_compounds
+from ...output_layout import output_dirs, run_output_dirs
 from ...word_input import read_word_compounds
 from ..state import AddCompoundsState
 
@@ -24,6 +28,15 @@ WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 OFFICE_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 CONTENT_TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
+PATH_CONFIG_KEYS = (
+    "template_docx",
+    "references_path",
+    "loadings_schema_docx",
+    "loadings_scope_docx",
+    "mnova_graphics_profile",
+    "mnova_graphics_profile_1h",
+    "mnova_graphics_profile_13c",
+)
 REL_ATTRS = (
     f"{{{OFFICE_REL_NS}}}id",
     f"{{{OFFICE_REL_NS}}}embed",
@@ -36,9 +49,39 @@ ET.register_namespace("rel", REL_NS)
 ET.register_namespace("ct", CONTENT_TYPES_NS)
 
 
+def prepare_add_output_layout_node(state: AddCompoundsState) -> dict:
+    request = state["request"]
+    if request.output_docx:
+        output_path = Path(request.output_docx)
+        dirs = output_dirs(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        for key in ("input_dir", "logs_dir", "reports_dir", "mnova_dir", "spectra_dir"):
+            dirs[key].mkdir(parents=True, exist_ok=True)
+    else:
+        run_root = _create_add_run_output_root(request.input_path, request.output_folder or request.input_path.parent, state.get("run_id", ""))
+        dirs = run_output_dirs(run_root)
+        for key in ("docx_dir", "input_dir", "logs_dir", "reports_dir", "mnova_dir", "spectra_dir"):
+            dirs[key].mkdir(parents=True, exist_ok=True)
+        output_path = dirs["docx_dir"] / "support_information.docx"
+    artifacts = {
+        **state.get("artifacts", {}),
+        "output_root": str(dirs["output_root"]),
+        "docx_dir": str(dirs["docx_dir"]),
+        "input_dir": str(dirs["input_dir"]),
+        "logs_dir": str(dirs["logs_dir"]),
+        "reports_dir": str(dirs["reports_dir"]),
+        "spectra_dir": str(dirs["spectra_dir"]),
+        "support_docx": str(output_path),
+    }
+    _copy_add_input_artifacts(request, dirs["input_dir"], artifacts)
+    return {"output_path": output_path, "artifacts": artifacts}
+
+
 def load_add_manifest_node(state: AddCompoundsState) -> dict:
     request = state["request"]
     artifacts = {**state.get("artifacts", {}), "source_manifest": str(request.manifest_path)}
+    if request.previous_output_dir:
+        artifacts["previous_output_dir"] = str(request.previous_output_dir)
     try:
         manifest = load_manifest(request.manifest_path)
     except (OSError, json.JSONDecodeError, ValueError) as exc:
@@ -103,8 +146,64 @@ def check_duplicate_compound_numbers_node(state: AddCompoundsState) -> dict:
             "duplicate_numbers": duplicate_numbers,
             "added_ids": [],
             "generated_support_docx": "",
+            "method_mode": state["request"].method_mode,
         },
     }
+
+
+def resolve_add_method_config_node(state: AddCompoundsState) -> dict:
+    issues = list(state.get("issues", []))
+    if manifest_has_errors(issues):
+        return {"issues": issues, "status": "fail"}
+
+    request = state["request"]
+    if request.method_mode == "same_series":
+        run_config = state.get("manifest", {}).get("run_config")
+        if not isinstance(run_config, dict) or not run_config:
+            issues.append(
+                _issue(
+                    "ADD_RUN_CONFIG_MISSING",
+                    "error",
+                    "existing manifest does not contain run_config; use Add With New Method or regenerate the source SI with the current version.",
+                    path=str(request.manifest_path),
+                )
+            )
+            return {"issues": issues, "status": "fail"}
+        config = _method_config_from_manifest(
+            run_config,
+            state.get("manifest", {}),
+            request.manifest_path,
+            issues,
+            skip_path_keys={"loadings_scope_docx"},
+        )
+        config["loadings_scope_docx"] = request.loadings_scope_docx
+        if request.template_docx:
+            config["template_docx"] = request.template_docx
+        if request.references_path:
+            config["references_path"] = request.references_path
+        if request.loadings_schema_docx:
+            config["loadings_schema_docx"] = request.loadings_schema_docx
+        if request.mnova_exe:
+            config["mnova_exe"] = request.mnova_exe
+    else:
+        run_config = state.get("manifest", {}).get("run_config")
+        if isinstance(run_config, dict) and run_config:
+            config = _method_config_from_manifest(
+                run_config,
+                state.get("manifest", {}),
+                request.manifest_path,
+                issues,
+                skip_path_keys={"loadings_schema_docx", "loadings_scope_docx"},
+            )
+            _overlay_request_method_config(config, request)
+        else:
+            config = _method_config_from_request(request)
+
+    _validate_add_loadings_numbers(config, state.get("new_compounds", []), issues)
+    _validate_method_config(config, issues)
+    if manifest_has_errors(issues):
+        return {"add_method_config": config, "issues": issues, "status": "fail"}
+    return {"add_method_config": config, "issues": issues}
 
 
 def generate_new_support_node(state: AddCompoundsState) -> dict:
@@ -113,7 +212,9 @@ def generate_new_support_node(state: AddCompoundsState) -> dict:
         return {"issues": issues, "status": "fail"}
 
     request = state["request"]
-    temp_dir = request.output_docx.parent / "_add_compounds_work" / (state.get("run_id") or "run")
+    method_config = state.get("add_method_config") or _method_config_from_request(request)
+    output_docx = _add_output_docx(state)
+    temp_dir = output_docx.parent / "_add_compounds_work" / (state.get("run_id") or "run")
     temp_output = temp_dir / "new_compounds.docx"
     temp_dir.mkdir(parents=True, exist_ok=True)
 
@@ -121,28 +222,33 @@ def generate_new_support_node(state: AddCompoundsState) -> dict:
         input_path=request.input_path,
         input_kind=request.input_kind,
         output_path=temp_output,
-        template_docx=request.template_docx,
-        references_path=request.references_path,
+        template_docx=method_config.get("template_docx"),
+        references_path=method_config.get("references_path"),
+        loadings_schema_docx=method_config.get("loadings_schema_docx"),
+        loadings_scope_docx=method_config.get("loadings_scope_docx"),
         spectra_source=request.resolved_spectra_source,
-        mnova_exe=request.mnova_exe,
-        mnova_graphics_profile=request.mnova_graphics_profile,
-        no_extract_nmr=request.no_extract_nmr,
-        insert_spectra_as=request.insert_spectra_as,
-        target_signal_height_fraction=request.target_signal_height_fraction,
-        peak_threshold_fraction=request.peak_threshold_fraction,
-        peak_threshold_fraction_1h=request.peak_threshold_fraction_1h,
-        peak_threshold_fraction_13c=request.peak_threshold_fraction_13c,
-        x_range_ppm_1h=request.x_range_ppm_1h,
-        x_range_ppm_13c=request.x_range_ppm_13c,
-        baseline_mode=request.baseline_mode,
-        baseline_apply_1h=request.baseline_apply_1h,
-        baseline_apply_13c=request.baseline_apply_13c,
-        baseline_poly_order=request.baseline_poly_order,
-        whittaker_lambda=request.whittaker_lambda,
-        whittaker_asymmetry=request.whittaker_asymmetry,
-        generate_loadings=request.generate_loadings,
-        calculate_elemental_analysis=request.calculate_elemental_analysis,
-        no_check_support=request.no_check_support,
+        mnova_exe=method_config.get("mnova_exe"),
+        mnova_graphics_profile=method_config.get("mnova_graphics_profile"),
+        mnova_graphics_profile_1h=method_config.get("mnova_graphics_profile_1h"),
+        mnova_graphics_profile_13c=method_config.get("mnova_graphics_profile_13c"),
+        no_extract_nmr=bool(method_config.get("no_extract_nmr", False)),
+        insert_spectra_as=method_config.get("insert_spectra_as", "png"),
+        target_signal_height_fraction=float(method_config.get("target_signal_height_fraction", 0.80)),
+        peak_threshold_fraction=method_config.get("peak_threshold_fraction"),
+        peak_threshold_fraction_1h=method_config.get("peak_threshold_fraction_1h"),
+        peak_threshold_fraction_13c=method_config.get("peak_threshold_fraction_13c"),
+        x_range_ppm_1h=method_config.get("x_range_ppm_1h", DEFAULT_X_RANGES["1H"]),
+        x_range_ppm_13c=method_config.get("x_range_ppm_13c", DEFAULT_X_RANGES["13C"]),
+        baseline_mode=method_config.get("baseline_mode", "auto"),
+        baseline_apply_1h=bool(method_config.get("baseline_apply_1h", False)),
+        baseline_apply_13c=bool(method_config.get("baseline_apply_13c", True)),
+        baseline_poly_order=int(method_config.get("baseline_poly_order", 3)),
+        whittaker_lambda=float(method_config.get("whittaker_lambda", 100000.0)),
+        whittaker_asymmetry=float(method_config.get("whittaker_asymmetry", 0.001)),
+        highlight_solvent_peaks=bool(method_config.get("highlight_solvent_peaks", False)),
+        generate_loadings=bool(method_config.get("generate_loadings", False)),
+        calculate_elemental_analysis=bool(method_config.get("calculate_elemental_analysis", False)),
+        no_check_support=bool(method_config.get("no_check_support", False)),
     )
 
     from ...workflows.generate_si import output_path_from_state, run_generate_si
@@ -175,7 +281,7 @@ def append_new_blocks_node(state: AddCompoundsState) -> dict:
         return {"issues": issues, "status": "fail"}
 
     request = state["request"]
-    output_docx = Path(request.output_docx)
+    output_docx = _add_output_docx(state)
     output_docx.parent.mkdir(parents=True, exist_ok=True)
     try:
         source_docx = support_docx_from_manifest(state.get("manifest", {}), request.manifest_path, request.support_docx)
@@ -224,7 +330,7 @@ def write_add_manifest_node(state: AddCompoundsState) -> dict:
         return {"issues": issues, "status": "fail"}
 
     request = state["request"]
-    output_docx = Path(request.output_docx)
+    output_docx = _add_output_docx(state)
     output_manifest = output_docx.with_suffix(".manifest.json")
     generated_manifest = _generated_manifest(state)
     id_map = state.get("add_id_map") or _new_compound_id_map(state.get("manifest", {}), generated_manifest)
@@ -236,6 +342,8 @@ def write_add_manifest_node(state: AddCompoundsState) -> dict:
         source_manifest=request.manifest_path,
         output_docx=output_docx,
         output_manifest=output_manifest,
+        method_mode=request.method_mode,
+        method_config=state.get("add_method_config", {}),
     )
     output_manifest.parent.mkdir(parents=True, exist_ok=True)
     output_manifest.write_text(json.dumps(merged_manifest, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -248,18 +356,21 @@ def write_add_manifest_node(state: AddCompoundsState) -> dict:
 
 def write_add_compounds_report_node(state: AddCompoundsState) -> dict:
     request = state["request"]
-    output_docx = Path(request.output_docx)
+    output_docx = _add_output_docx(state)
     report_path = output_docx.with_suffix(".add_report.json")
     issues = list(state.get("issues", []))
     status = "fail" if manifest_has_errors(issues) or state.get("status") == "fail" else "pass"
     report = {
         "run_id": state.get("run_id", ""),
         "status": status,
+        "previous_output_dir": str(request.previous_output_dir) if request.previous_output_dir else "",
         "source_manifest": str(request.manifest_path),
         "source_support_docx": str(request.support_docx) if request.support_docx else "",
         "new_compound_table": str(request.input_path),
         "output_docx": str(output_docx),
         "strict_artifacts": request.strict_artifacts,
+        "method_mode": request.method_mode,
+        "method_config": _jsonable_method_config(state.get("add_method_config", {})),
         "add_result": state.get("add_result", _empty_add_result()),
         "issue_counts": count_issues(issues),
         "compound_issue_counts": compound_issue_counts(issues),
@@ -269,6 +380,65 @@ def write_add_compounds_report_node(state: AddCompoundsState) -> dict:
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return {"status": status, "issues": issues, "artifacts": report["artifacts"]}
+
+
+def _add_output_docx(state: AddCompoundsState) -> Path:
+    output_path = state.get("output_path")
+    if output_path:
+        return Path(output_path)
+    request = state["request"]
+    if request.output_docx:
+        return Path(request.output_docx)
+    run_root = _create_add_run_output_root(request.input_path, request.output_folder or request.input_path.parent, state.get("run_id", ""))
+    return run_root / "docx" / "support_information.docx"
+
+
+def _create_add_run_output_root(input_path: Path, requested_output: Path, run_id: str) -> Path:
+    base = Path(requested_output)
+    if base.suffix.lower() == ".docx":
+        base = base.parent
+    run_parent = base if base.name.lower() == "runs" else base / "runs"
+    run_parent.mkdir(parents=True, exist_ok=True)
+    stem = _safe_add_output_stem(Path(input_path).stem) or "support"
+    run_stamp = _safe_add_output_stem(str(run_id).replace("T", "_")) or "run"
+    candidate = run_parent / f"{run_stamp}_{stem}"
+    if not candidate.exists():
+        return candidate
+    for index in range(2, 1000):
+        indexed = run_parent / f"{candidate.name}_{index}"
+        if not indexed.exists():
+            return indexed
+    raise ValueError(f"Cannot create a unique add-compounds output folder under {run_parent}")
+
+
+def _safe_add_output_stem(value: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", value.strip())
+    return safe.strip("._-")
+
+
+def _copy_add_input_artifacts(request, input_dir: Path, artifacts: dict[str, str]) -> None:
+    for key, source in {
+        "source_manifest_copy": request.manifest_path,
+        "source_support_docx_copy": request.support_docx,
+        "new_compound_table_copy": request.input_path,
+        "template_docx_copy": request.template_docx,
+        "references_copy": request.references_path,
+        "loadings_schema_copy": request.loadings_schema_docx,
+        "loadings_scope_copy": request.loadings_scope_docx,
+        "mnova_graphics_profile_copy": request.mnova_graphics_profile,
+        "mnova_graphics_profile_1h_copy": request.mnova_graphics_profile_1h,
+        "mnova_graphics_profile_13c_copy": request.mnova_graphics_profile_13c,
+    }.items():
+        if not source:
+            continue
+        path = Path(source)
+        if not path.exists() or not path.is_file():
+            continue
+        target = input_dir / path.name
+        if path.resolve() != target.resolve():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, target)
+        artifacts[key] = str(target)
 
 
 def route_add_compounds_after_load(state: AddCompoundsState) -> str:
@@ -281,6 +451,258 @@ def route_add_compounds_after_duplicate_check(state: AddCompoundsState) -> str:
 
 def route_add_compounds_after_generation(state: AddCompoundsState) -> str:
     return "fail" if manifest_has_errors(state.get("issues", [])) or state.get("status") == "fail" else "continue"
+
+
+def _method_config_from_request(request) -> dict[str, Any]:
+    return {
+        "version": 1,
+        "source": "request",
+        "template_docx": request.template_docx,
+        "references_path": request.references_path,
+        "loadings_schema_docx": request.loadings_schema_docx,
+        "loadings_scope_docx": request.loadings_scope_docx,
+        "mnova_exe": request.mnova_exe,
+        "mnova_graphics_profile": request.mnova_graphics_profile,
+        "mnova_graphics_profile_1h": request.mnova_graphics_profile_1h,
+        "mnova_graphics_profile_13c": request.mnova_graphics_profile_13c,
+        "no_extract_nmr": bool(request.no_extract_nmr),
+        "insert_spectra_as": _spectrum_embed_mode(request.insert_spectra_as),
+        "target_signal_height_fraction": _float_value(request.target_signal_height_fraction, 0.80),
+        "peak_threshold_fraction": _optional_float_value(request.peak_threshold_fraction),
+        "peak_threshold_fraction_1h": _optional_float_value(request.peak_threshold_fraction_1h),
+        "peak_threshold_fraction_13c": _optional_float_value(request.peak_threshold_fraction_13c),
+        "x_range_ppm_1h": _ppm_range(request.x_range_ppm_1h, DEFAULT_X_RANGES["1H"]),
+        "x_range_ppm_13c": _ppm_range(request.x_range_ppm_13c, DEFAULT_X_RANGES["13C"]),
+        "baseline_mode": _baseline_mode(request.baseline_mode),
+        "baseline_apply_1h": bool(request.baseline_apply_1h),
+        "baseline_apply_13c": bool(request.baseline_apply_13c),
+        "baseline_poly_order": _int_value(request.baseline_poly_order, 3),
+        "whittaker_lambda": _float_value(request.whittaker_lambda, 100000.0),
+        "whittaker_asymmetry": _float_value(request.whittaker_asymmetry, 0.001),
+        "highlight_solvent_peaks": bool(request.highlight_solvent_peaks),
+        "generate_loadings": bool(request.generate_loadings),
+        "calculate_elemental_analysis": bool(request.calculate_elemental_analysis),
+        "no_check_support": bool(request.no_check_support),
+    }
+
+
+def _overlay_request_method_config(config: dict[str, Any], request) -> None:
+    request_config = _method_config_from_request(request)
+    config["source"] = "manifest+request"
+    for key in (
+        "template_docx",
+        "references_path",
+        "loadings_schema_docx",
+        "loadings_scope_docx",
+    ):
+        if request_config.get(key):
+            config[key] = request_config[key]
+    for key in (
+        "mnova_exe",
+        "generate_loadings",
+        "calculate_elemental_analysis",
+        "no_check_support",
+    ):
+        config[key] = request_config[key]
+    if request.generate_loadings:
+        config["loadings_schema_docx"] = request.loadings_schema_docx
+        config["loadings_scope_docx"] = request.loadings_scope_docx
+
+
+def _method_config_from_manifest(
+    run_config: dict[str, Any],
+    manifest: dict[str, Any],
+    manifest_path: Path,
+    issues: list[dict[str, str]],
+    *,
+    skip_path_keys: set[str] | None = None,
+) -> dict[str, Any]:
+    config = {
+        "version": _int_value(run_config.get("version"), 1),
+        "source": "manifest",
+        "mnova_exe": None,
+        "no_extract_nmr": bool(run_config.get("no_extract_nmr", False)),
+        "insert_spectra_as": _spectrum_embed_mode(run_config.get("insert_spectra_as", "png")),
+        "target_signal_height_fraction": _float_value(run_config.get("target_signal_height_fraction"), 0.80),
+        "peak_threshold_fraction": _optional_float_value(run_config.get("peak_threshold_fraction")),
+        "peak_threshold_fraction_1h": _optional_float_value(run_config.get("peak_threshold_fraction_1h")),
+        "peak_threshold_fraction_13c": _optional_float_value(run_config.get("peak_threshold_fraction_13c")),
+        "x_range_ppm_1h": _ppm_range(run_config.get("x_range_ppm_1h"), DEFAULT_X_RANGES["1H"]),
+        "x_range_ppm_13c": _ppm_range(run_config.get("x_range_ppm_13c"), DEFAULT_X_RANGES["13C"]),
+        "baseline_mode": _baseline_mode(run_config.get("baseline_mode", "auto")),
+        "baseline_apply_1h": bool(run_config.get("baseline_apply_1h", False)),
+        "baseline_apply_13c": bool(run_config.get("baseline_apply_13c", True)),
+        "baseline_poly_order": _int_value(run_config.get("baseline_poly_order"), 3),
+        "whittaker_lambda": _float_value(run_config.get("whittaker_lambda"), 100000.0),
+        "whittaker_asymmetry": _float_value(run_config.get("whittaker_asymmetry"), 0.001),
+        "highlight_solvent_peaks": bool(run_config.get("highlight_solvent_peaks", False)),
+        "generate_loadings": bool(run_config.get("generate_loadings", False)),
+        "calculate_elemental_analysis": bool(run_config.get("calculate_elemental_analysis", False)),
+        "no_check_support": bool(run_config.get("no_check_support", False)),
+    }
+    skip_path_keys = skip_path_keys or set()
+    for key in PATH_CONFIG_KEYS:
+        if key in skip_path_keys:
+            config[key] = None
+            continue
+        config[key] = _resolve_manifest_config_path(key, run_config.get(key), manifest, manifest_path, issues)
+    return config
+
+
+def _validate_method_config(config: dict[str, Any], issues: list[dict[str, str]]) -> None:
+    if config.get("generate_loadings") and (not config.get("loadings_schema_docx") or not config.get("loadings_scope_docx")):
+        issues.append(
+            _issue(
+                "ADD_LOADINGS_CONFIG_MISSING",
+                "error",
+                "loadings calculation is enabled, but Reaction_schema.docx or Scope.docx is missing.",
+            )
+        )
+
+
+def _validate_add_loadings_numbers(config: dict[str, Any], compounds, issues: list[dict[str, str]]) -> None:
+    if not config.get("generate_loadings"):
+        return
+
+    numbers = {str(compound.number or "").strip() for compound in compounds if str(compound.number or "").strip()}
+    scope_path = config.get("loadings_scope_docx")
+    if not numbers or not scope_path:
+        return
+
+    try:
+        scope_numbers = {row.product_number.strip() for row in read_scope(scope_path) if row.product_number.strip()}
+    except Exception as exc:
+        issues.append(
+            _issue(
+                "ADD_LOADINGS_SCOPE_READ_FAILED",
+                "error",
+                f"could not read Scope.docx: {exc}",
+                path=str(scope_path),
+            )
+        )
+        return
+    if scope_numbers == numbers:
+        return
+    missing_in_scope = sorted(numbers - scope_numbers)
+    extra_in_scope = sorted(scope_numbers - numbers)
+    message_parts = [
+        "New compound table and Scope.docx contain different compound numbers.",
+        f"New compounds: {', '.join(sorted(numbers)) or '<none>'}.",
+        f"Scope products: {', '.join(sorted(scope_numbers)) or '<none>'}.",
+    ]
+    if missing_in_scope:
+        message_parts.append(f"Missing in Scope.docx: {', '.join(missing_in_scope)}.")
+    if extra_in_scope:
+        message_parts.append(f"Extra in Scope.docx: {', '.join(extra_in_scope)}.")
+    issues.append(
+        _issue(
+            "ADD_LOADINGS_SCOPE_INPUT_MISMATCH",
+            "error",
+            " ".join(message_parts),
+            path=str(scope_path),
+        )
+    )
+
+
+def _resolve_manifest_config_path(
+    key: str,
+    raw_value: Any,
+    manifest: dict[str, Any],
+    manifest_path: Path,
+    issues: list[dict[str, str]],
+) -> Path | None:
+    raw_text = str(raw_value or "").strip().strip('"')
+    if not raw_text:
+        return None
+    path = Path(raw_text)
+    if not path.is_absolute():
+        path = _manifest_output_root(manifest, manifest_path) / path
+    path = path.resolve()
+    if not path.exists():
+        issues.append(
+            _issue(
+                "ADD_RUN_CONFIG_FILE_MISSING",
+                "error",
+                f"run_config file for {key} was not found: {path}",
+                path=str(path),
+            )
+        )
+    return path
+
+
+def _manifest_output_root(manifest: dict[str, Any], manifest_path: Path) -> Path:
+    for section_name in ("output_paths", "artifacts"):
+        section = manifest.get(section_name, {})
+        if not isinstance(section, dict):
+            continue
+        raw_root = str(section.get("output_root") or "").strip()
+        if not raw_root:
+            continue
+        root = Path(raw_root)
+        if root.is_absolute():
+            return root.resolve()
+        return (manifest_path.parent / root).resolve()
+    if manifest_path.parent.name.lower() == "docx":
+        return manifest_path.parent.parent.resolve()
+    return manifest_path.parent.resolve()
+
+
+def _spectrum_embed_mode(value: Any) -> SpectrumEmbedMode:
+    if value in {"png", "mnova", "none"}:
+        return value
+    return "png"
+
+
+def _baseline_mode(value: Any) -> BaselineMode:
+    if value in {"auto", "off", "bernstein", "whittaker"}:
+        return value
+    return "auto"
+
+
+def _ppm_range(value: Any, default: tuple[float, float]) -> tuple[float, float]:
+    if isinstance(value, (list, tuple)) and len(value) == 2:
+        try:
+            first, second = float(value[0]), float(value[1])
+        except (TypeError, ValueError):
+            return default
+        if first != second:
+            return (min(first, second), max(first, second))
+    return default
+
+
+def _optional_float_value(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _float_value(value: Any, default: float) -> float:
+    parsed = _optional_float_value(value)
+    return default if parsed is None else parsed
+
+
+def _int_value(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _jsonable_method_config(config: dict[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in config.items():
+        if isinstance(value, Path):
+            result[key] = str(value)
+        elif isinstance(value, tuple):
+            result[key] = list(value)
+        else:
+            result[key] = value
+    return result
 
 
 def _append_generated_docx_blocks(
@@ -387,6 +809,8 @@ def _merge_manifest(
     source_manifest: Path,
     output_docx: Path,
     output_manifest: Path,
+    method_mode: str,
+    method_config: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     merged = deepcopy(old_manifest)
     merged.setdefault("order", [])
@@ -402,6 +826,7 @@ def _merge_manifest(
         entry["id"] = merged_id
         entry["docx_block_id"] = f"compound:{merged_id}"
         entry["docx_bookmark"] = bookmark_name_for_block_id(f"compound:{merged_id}")
+        entry["add_method_mode"] = method_mode
         entry.pop("relative_artifacts", None)
         snapshot = entry.get("domain_snapshot")
         if isinstance(snapshot, dict):
@@ -417,6 +842,7 @@ def _merge_manifest(
     add_result = {
         "added_ids": added_ids,
         "duplicate_numbers": [],
+        "method_mode": method_mode,
         "generated_support_docx": new_manifest.get("output_paths", {}).get("support_docx")
         or new_manifest.get("artifacts", {}).get("support_docx", ""),
     }
@@ -426,6 +852,8 @@ def _merge_manifest(
             "source_manifest": str(source_manifest),
             "output_manifest": str(output_manifest),
             "output_docx": str(output_docx),
+            "method_mode": method_mode,
+            "method_config": _jsonable_method_config(method_config),
             "result": add_result,
         }
     )
@@ -792,6 +1220,7 @@ def _empty_add_result() -> dict[str, Any]:
     return {
         "added_ids": [],
         "duplicate_numbers": [],
+        "method_mode": "",
         "generated_support_docx": "",
     }
 

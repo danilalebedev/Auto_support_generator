@@ -64,15 +64,20 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertEqual(_render_spec_arg(None), "{}")
         self.assertEqual(_render_spec_arg({}), "{}")
 
-    def test_example_mngp_profiles_encode_grid_difference(self) -> None:
-        grid = (MNGP_STYLES / "grid.mngp").read_bytes()
-        classic = (MNGP_STYLES / "classic.mngp").read_bytes()
-        header = "MestReNova Graphic Properties".encode("utf-16-be")
+    def test_example_mngp_profiles_are_available_per_nucleus(self) -> None:
+        expected = [
+            MNGP_STYLES / "classic_1H.mngp",
+            MNGP_STYLES / "grid_1H.mngp",
+            MNGP_STYLES / "classic_13C.mngp",
+            MNGP_STYLES / "grid_13C.mngp",
+        ]
 
-        self.assertIn(header, grid[:80])
-        self.assertIn(header, classic[:80])
-        self.assertEqual(grid[196], 3)
-        self.assertEqual(classic[196], 0)
+        for path in expected:
+            self.assertTrue(path.is_file(), str(path))
+            self.assertGreater(path.stat().st_size, 0)
+
+        self.assertNotEqual((MNGP_STYLES / "classic_1H.mngp").read_bytes(), (MNGP_STYLES / "grid_1H.mngp").read_bytes())
+        self.assertNotEqual((MNGP_STYLES / "classic_13C.mngp").read_bytes(), (MNGP_STYLES / "grid_13C.mngp").read_bytes())
 
     def test_plan_nmr_processing_carries_custom_render_policy(self) -> None:
         compound = Compound(id="cmp_001", number="2a", name="Example", h1_spectrum_path="1/fid", c13_spectrum_path="2/fid")
@@ -141,27 +146,30 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertIn("var singleMnovaPath = parts.length >= 7 ? parts[6] : \"\";", script)
         self.assertIn("var graphicsProfilePath = parts.length >= 8 ? parts[7] : \"\";", script)
         self.assertIn("_saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath", script)
-        self.assertIn("function _applyGraphicsProfile(spectrum, graphicsProfilePath, statusPath)", script)
-        self.assertIn("loadGraphicPropertiesFromFile", script)
-        self.assertIn("loadNMRGraphicsProfile", script)
+        self.assertIn("function _readMNGPSpectrumProperties(profilePath, statusPath)", script)
+        self.assertIn("function _applyGraphicsProfileDefault(graphicsProfilePath, statusPath)", script)
+        self.assertIn("new BinaryStream(file)", script)
+        self.assertIn("new Settings(\"NMR\")", script)
+        self.assertIn("setValue(\"Spectrum Properties\", payload)", script)
+        self.assertIn("GRAPHICS_PROFILE settings=NMR/Spectrum Properties", script)
+        self.assertNotIn("loadGraphicPropertiesFromFile", script)
+        self.assertNotIn("loadNMRGraphicsProfile", script)
         self.assertIn("WARNING graphics profile not applied", script)
         self.assertIn("_referenceSpectrum(spectrum, nucleus, renderSpec || {});", script)
         self.assertIn("function _highlightSolventPeaks(renderSpec)", script)
         self.assertIn("function _hideSolventPeakAnnotations(spectrum)", script)
         self.assertIn("peaks.showAnnotations", script)
-        self.assertIn("function _gridSettingFromGraphicsProfile(graphicsProfilePath, statusPath)", script)
-        self.assertIn("new BinaryStream(file)", script)
-        self.assertIn("stream.readInt8()", script)
-        self.assertIn("MestReNova Graphic Properties", script)
-        self.assertIn("byte196=0", script)
-        self.assertIn("GRAPHICS_PROFILE fallback=grid", script)
-        self.assertIn("grid.showhorizontal", script)
+        self.assertNotIn("function _gridSettingFromGraphicsProfile", script)
+        self.assertNotIn("byte196", script)
+        self.assertNotIn("fallback=grid", script)
+        self.assertNotIn("grid.showhorizontal", script)
         self.assertIn("function _isSolventPeak(spectrum, nucleus, peak, delta)", script)
         self.assertIn("x_range_ppm", script)
         self.assertIn("_targetSignalHeightFraction(renderSpec", script)
         self.assertIn("_peakThresholdFraction(nucleus, renderSpec", script)
         self.assertIn("_filterMultipletReportByPeakThreshold", script)
         self.assertIn("_isIgnoredByRenderSpec(delta, renderSpec", script)
+        self.assertIn("_applyGraphicsProfileDefault(graphicsProfilePath, statusPath);", script)
         self.assertIn("_prepareSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {}, tasks[i].graphicsProfilePath || \"\", statusPath)", script)
 
     def test_mnova_qs_uses_render_spec_for_baseline_processing(self) -> None:

@@ -7,7 +7,9 @@ from .nodes.add_compounds import (
     check_duplicate_compound_numbers_node,
     generate_new_support_node,
     load_add_manifest_node,
+    prepare_add_output_layout_node,
     read_new_compounds_node,
+    resolve_add_method_config_node,
     route_add_compounds_after_duplicate_check,
     route_add_compounds_after_generation,
     route_add_compounds_after_load,
@@ -28,6 +30,13 @@ from .nodes.settings import load_settings_node
 from .nodes.spectra import mnova_batch_node, plan_nmr_processing_node, prepare_spectra_source_node, route_nmr_processing
 from .nodes.validation import validate_input_node, validate_support_node
 from .state import AddCompoundsState, CheckSIState, GenerateSIState, PatchSIState
+
+
+FATAL_INPUT_MISMATCH_CODES = {
+    "SPECTRA_SOURCE_INPUT_MISMATCH",
+    "LOADINGS_FILES_INCOMPLETE",
+    "LOADINGS_SCOPE_INPUT_MISMATCH",
+}
 
 
 def build_generate_si_graph():
@@ -55,7 +64,14 @@ def build_generate_si_graph():
     builder.add_edge("load_settings", "read_input_table")
     builder.add_edge("read_input_table", "normalize_compounds")
     builder.add_edge("normalize_compounds", "prepare_spectra_source")
-    builder.add_edge("prepare_spectra_source", "plan_nmr_processing")
+    builder.add_conditional_edges(
+        "prepare_spectra_source",
+        route_generate_after_required_input_check,
+        {
+            "continue": "plan_nmr_processing",
+            "fail": "write_manifest",
+        },
+    )
     builder.add_edge("plan_nmr_processing", "validate_input")
     builder.add_conditional_edges(
         "validate_input",
@@ -69,7 +85,14 @@ def build_generate_si_graph():
     builder.add_edge("parse_nmr_reports", "apply_peak_picking_policy")
     builder.add_edge("apply_peak_picking_policy", "calculate_hrms")
     builder.add_edge("calculate_hrms", "calculate_loadings")
-    builder.add_edge("calculate_loadings", "calculate_elemental_analysis")
+    builder.add_conditional_edges(
+        "calculate_loadings",
+        route_generate_after_required_input_check,
+        {
+            "continue": "calculate_elemental_analysis",
+            "fail": "write_manifest",
+        },
+    )
     builder.add_edge("calculate_elemental_analysis", "validate_support")
     builder.add_edge("validate_support", "build_document_model")
     builder.add_edge("build_document_model", "render_docx")
@@ -78,6 +101,17 @@ def build_generate_si_graph():
     builder.add_edge("write_manifest", END)
 
     return builder.compile()
+
+
+def route_generate_after_required_input_check(state: GenerateSIState) -> str:
+    fatal_codes = {
+        issue.get("code")
+        for issue in state.get("issues", [])
+        if issue.get("severity") == "error" and issue.get("code") in FATAL_INPUT_MISMATCH_CODES
+    }
+    if fatal_codes or state.get("status") == "fail":
+        return "fail"
+    return "continue"
 
 
 def build_check_si_graph():
@@ -112,14 +146,17 @@ def build_add_compounds_graph():
     builder = StateGraph(AddCompoundsState)
 
     builder.add_node("load_manifest", load_add_manifest_node)
+    builder.add_node("prepare_output_layout", prepare_add_output_layout_node)
     builder.add_node("read_new_compounds", read_new_compounds_node)
     builder.add_node("check_duplicate_numbers", check_duplicate_compound_numbers_node)
+    builder.add_node("resolve_method_config", resolve_add_method_config_node)
     builder.add_node("generate_new_support", generate_new_support_node)
     builder.add_node("append_new_blocks", append_new_blocks_node)
     builder.add_node("write_manifest", write_add_manifest_node)
     builder.add_node("write_report", write_add_compounds_report_node)
 
-    builder.add_edge(START, "load_manifest")
+    builder.add_edge(START, "prepare_output_layout")
+    builder.add_edge("prepare_output_layout", "load_manifest")
     builder.add_conditional_edges(
         "load_manifest",
         route_add_compounds_after_load,
@@ -132,6 +169,14 @@ def build_add_compounds_graph():
     builder.add_conditional_edges(
         "check_duplicate_numbers",
         route_add_compounds_after_duplicate_check,
+        {
+            "continue": "resolve_method_config",
+            "fail": "write_report",
+        },
+    )
+    builder.add_conditional_edges(
+        "resolve_method_config",
+        route_add_compounds_after_generation,
         {
             "continue": "generate_new_support",
             "fail": "write_report",

@@ -20,19 +20,30 @@ def run_add_compounds(request: AddCompoundsRequest) -> AddCompoundsState:
 
 
 def add_compounds_request_from_args(args: Namespace) -> AddCompoundsRequest:
-    input_path = Path(getattr(args, "add_word_input", None) or getattr(args, "add_input", None))
+    generate_loadings = bool(
+        getattr(args, "generate_loadings", False)
+        or getattr(args, "loadings_schema_docx", None)
+        or getattr(args, "loadings_scope_docx", None)
+    )
     return AddCompoundsRequest(
         manifest_path=Path(args.add_compounds_manifest),
         support_docx=Path(args.support_docx) if getattr(args, "support_docx", None) else None,
-        input_path=input_path,
-        input_kind="word" if getattr(args, "add_word_input", None) else "csv",
-        output_docx=Path(getattr(args, "add_output", None) or getattr(args, "output", None)),
+        previous_output_dir=Path(args.previous_output_folder) if getattr(args, "previous_output_folder", None) else None,
+        input_path=Path(args.add_word_input),
+        input_kind="word",
+        output_docx=Path(getattr(args, "add_output", None) or getattr(args, "output", None)) if (getattr(args, "add_output", None) or getattr(args, "output", None)) else None,
+        output_folder=Path(args.add_output_folder) if getattr(args, "add_output_folder", None) else None,
+        method_mode=_add_method_mode(getattr(args, "add_method_mode", "same-series")),
         template_docx=Path(args.template_docx) if getattr(args, "template_docx", None) else None,
         references_path=Path(args.references) if getattr(args, "references", None) else None,
+        loadings_schema_docx=Path(args.loadings_schema_docx) if getattr(args, "loadings_schema_docx", None) else None,
+        loadings_scope_docx=Path(args.loadings_scope_docx) if getattr(args, "loadings_scope_docx", None) else None,
         spectra_source=Path(args.spectra_source) if getattr(args, "spectra_source", None) else None,
         spectra_zip=Path(args.spectra_zip) if getattr(args, "spectra_zip", None) else None,
         mnova_exe=Path(args.mnova_exe) if getattr(args, "mnova_exe", None) else None,
         mnova_graphics_profile=Path(args.mnova_graphics_profile) if getattr(args, "mnova_graphics_profile", None) else None,
+        mnova_graphics_profile_1h=Path(args.mnova_graphics_profile_1h) if getattr(args, "mnova_graphics_profile_1h", None) else None,
+        mnova_graphics_profile_13c=Path(args.mnova_graphics_profile_13c) if getattr(args, "mnova_graphics_profile_13c", None) else None,
         no_extract_nmr=bool(getattr(args, "no_extract_nmr", False)),
         insert_spectra_as=_spectrum_embed_mode(getattr(args, "insert_spectra_as", "png")),
         target_signal_height_fraction=_fraction_arg(
@@ -51,7 +62,7 @@ def add_compounds_request_from_args(args: Namespace) -> AddCompoundsRequest:
         whittaker_lambda=float(getattr(args, "whittaker_lambda", 100000.0) or 100000.0),
         whittaker_asymmetry=float(getattr(args, "whittaker_asymmetry", 0.001) or 0.001),
         highlight_solvent_peaks=bool(getattr(args, "highlight_solvent_peaks", False)),
-        generate_loadings=bool(getattr(args, "generate_loadings", False)),
+        generate_loadings=generate_loadings,
         calculate_elemental_analysis=bool(getattr(args, "calculate_elemental_analysis", False)),
         no_check_support=bool(getattr(args, "no_check_support", False)),
         strict_artifacts=not bool(getattr(args, "no_strict_artifacts", False)),
@@ -62,6 +73,13 @@ def _spectrum_embed_mode(value: str | None) -> SpectrumEmbedMode:
     if value in {"png", "mnova", "none"}:
         return value
     return "png"
+
+
+def _add_method_mode(value: str | None) -> str:
+    normalized = (value or "same-series").strip().lower().replace("_", "-")
+    if normalized == "new-method":
+        return "new_method"
+    return "same_series"
 
 
 def _peak_threshold_arg(value: float | None) -> float | None:

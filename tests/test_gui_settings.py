@@ -27,7 +27,10 @@ class GuiSettingsTests(unittest.TestCase):
                     "peak_threshold_13c_percent": "4",
                     "loadings_schema_docx": Path("Reaction_schema.docx"),
                     "loadings_scope_docx": Path("Scope.docx"),
+                    "add_output_folder": Path("add/output"),
                     "mnova_graphics_profile": Path("default.mngp"),
+                    "mnova_graphics_profile_1h": Path("h1.mngp"),
+                    "mnova_graphics_profile_13c": Path("c13.mngp"),
                     "check_support": "false",
                     "generate_loadings": "yes",
                     "calculate_elemental_analysis": "true",
@@ -48,7 +51,10 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(settings["peak_threshold_13c_percent"], "4")
         self.assertEqual(settings["loadings_schema_docx"], "Reaction_schema.docx")
         self.assertEqual(settings["loadings_scope_docx"], "Scope.docx")
+        self.assertEqual(settings["add_output_folder"], str(Path("add/output")))
         self.assertEqual(settings["mnova_graphics_profile"], "default.mngp")
+        self.assertEqual(settings["mnova_graphics_profile_1h"], "h1.mngp")
+        self.assertEqual(settings["mnova_graphics_profile_13c"], "c13.mngp")
         self.assertNotIn("unknown", settings)
         self.assertNotIn("insert_spectra_as", settings)
         self.assertFalse(settings["check_support"])
@@ -76,7 +82,10 @@ class GuiSettingsTests(unittest.TestCase):
                     "peak_threshold_13c_percent": "4",
                     "loadings_schema_docx": "C:/data/loadings/Reaction_schema.docx",
                     "loadings_scope_docx": "C:/data/loadings/Scope.docx",
+                    "add_output_folder": "C:/data/add_output",
                     "mnova_graphics_profile": "C:/data/profiles/default.mngp",
+                    "mnova_graphics_profile_1h": "C:/data/profiles/h1.mngp",
+                    "mnova_graphics_profile_13c": "C:/data/profiles/c13.mngp",
                     "check_support": True,
                     "generate_loadings": False,
                     "calculate_elemental_analysis": True,
@@ -89,7 +98,7 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(loaded["input_path"], "C:/data/input.docx")
         self.assertEqual(loaded["spectra_zip"], "C:/data/spectra.zip")
         self.assertEqual(loaded["output_folder"], "C:/data/output")
-        self.assertEqual(loaded["input_kind"], "csv")
+        self.assertNotIn("input_kind", loaded)
         self.assertEqual(loaded["insert_spectra_as"], "mnova")
         self.assertEqual(loaded["theme_mode"], "dark")
         self.assertEqual(loaded["target_signal_height_percent"], "85")
@@ -101,7 +110,10 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(loaded["peak_threshold_13c_percent"], "4")
         self.assertEqual(loaded["loadings_schema_docx"], "C:/data/loadings/Reaction_schema.docx")
         self.assertEqual(loaded["loadings_scope_docx"], "C:/data/loadings/Scope.docx")
+        self.assertEqual(loaded["add_output_folder"], "C:/data/add_output")
         self.assertEqual(loaded["mnova_graphics_profile"], "C:/data/profiles/default.mngp")
+        self.assertEqual(loaded["mnova_graphics_profile_1h"], "C:/data/profiles/h1.mngp")
+        self.assertEqual(loaded["mnova_graphics_profile_13c"], "C:/data/profiles/c13.mngp")
         self.assertTrue(loaded["check_support"])
         self.assertFalse(loaded["generate_loadings"])
         self.assertTrue(loaded["calculate_elemental_analysis"])

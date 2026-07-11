@@ -778,230 +778,61 @@ function _referenceOffsetFromPeaks(spectrum, nucleus)
     return 0;
 }
 
-function _tryApplyGraphicsProfileMethod(target, methodName, profilePath, statusPath)
+function _readMNGPSpectrumProperties(profilePath, statusPath)
 {
-    if (target === undefined || target === null || !profilePath) {
-        return false;
+    var file = new File(profilePath);
+    if (!file.open(File.ReadOnly)) {
+        throw "Could not open .mngp file: " + profilePath;
     }
-    try {
-        if (target[methodName] !== undefined) {
-            target[methodName](profilePath);
-            _appendText(statusPath, "GRAPHICS_PROFILE method=" + methodName + " path=" + profilePath + "\n");
-            return true;
-        }
-    } catch (e) {
-        _appendText(statusPath, "WARNING graphics profile method " + methodName + " failed: " + e + "\n");
-    }
-    return false;
-}
 
-function _tryApplyGraphicsProfileProperties(target, profilePath, statusPath)
-{
-    if (target === undefined || target === null || !profilePath) {
-        return false;
+    var stream = new BinaryStream(file);
+    stream.endianness = BinaryStream.eBig;
+    var header = stream.readString();
+    if (header !== "MestReNova Graphic Properties") {
+        file.close();
+        throw "Unsupported .mngp header: " + header;
     }
-    try {
-        if (target.properties !== undefined && target.properties.load !== undefined) {
-            target.properties.load(profilePath);
-            _appendText(statusPath, "GRAPHICS_PROFILE method=properties.load path=" + profilePath + "\n");
-            return true;
-        }
-    } catch (e) {
-        _appendText(statusPath, "WARNING graphics profile properties.load failed: " + e + "\n");
-    }
-    return false;
-}
 
-function _graphicsProfileName(profilePath)
-{
-    var path = String(profilePath || "").replace(/\\/g, "/");
-    var slash = path.lastIndexOf("/");
-    var name = slash >= 0 ? path.substr(slash + 1) : path;
-    return name.toLowerCase();
-}
+    stream.readInt32();
+    stream.readInt32();
+    stream.readInt32();
+    stream.readInt32();
+    stream.readReal64();
+    stream.readReal64();
+    stream.readReal64();
+    stream.readReal64();
+    stream.readReal64();
+    stream.readReal64();
+    stream.readReal64();
+    stream.readReal64();
+    stream.readInt8();
 
-function _readGraphicsProfileBytes(graphicsProfilePath, count)
-{
-    var file = new File(graphicsProfilePath);
-    var stream, bytes, i;
-    file.open(File.ReadOnly);
-    stream = new BinaryStream(file);
-    bytes = [];
-    for (i = 0; i < count; i++) {
-        bytes.push(stream.readInt8());
+    var payloadSize = stream.readInt32();
+    if (payloadSize <= 0 || payloadSize > 10000000) {
+        file.close();
+        throw "Invalid .mngp payload size: " + payloadSize;
     }
+    var payload = stream.readBytes(payloadSize);
     file.close();
-    return bytes;
+    _appendText(statusPath, "GRAPHICS_PROFILE payload_size=" + payloadSize + " path=" + profilePath + "\n");
+    return payload;
 }
 
-function _hasGraphicsProfileHeader(bytes)
-{
-    var header = "MestReNova Graphic Properties";
-    var start = 4;
-    var i;
-    if (!bytes) {
-        return false;
-    }
-    for (i = 0; i < header.length; i++) {
-        if (bytes[start + i * 2] !== 0 || bytes[start + i * 2 + 1] !== header.charCodeAt(i)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-function _gridSettingFromGraphicsProfile(graphicsProfilePath, statusPath)
-{
-    var bytes, flag;
-    try {
-        bytes = _readGraphicsProfileBytes(graphicsProfilePath, 208);
-        if (!_hasGraphicsProfileHeader(bytes)) {
-            return undefined;
-        }
-        flag = bytes[196];
-        if (flag === 0) {
-            _appendText(statusPath, "GRAPHICS_PROFILE parsed=mngp grid=false byte196=0\n");
-            return false;
-        }
-        if (flag === 1 || flag === 3 || flag === 15) {
-            _appendText(statusPath, "GRAPHICS_PROFILE parsed=mngp grid=true byte196=" + flag + "\n");
-            return true;
-        }
-    } catch (e) {
-        _appendText(statusPath, "WARNING graphics profile binary parse failed: " + e + "\n");
-    }
-    return undefined;
-}
-
-function _applyGraphicsProfileFallback(spectrum, graphicsProfilePath, statusPath)
-{
-    var name = _graphicsProfileName(graphicsProfilePath);
-    var gridEnabled = _gridSettingFromGraphicsProfile(graphicsProfilePath, statusPath);
-    if (!name) {
-        return false;
-    }
-    if (gridEnabled === undefined) {
-        if (name.indexOf("grid") >= 0) {
-            gridEnabled = true;
-        } else if (name.indexOf("classic") >= 0 || name.indexOf("default") >= 0) {
-            gridEnabled = false;
-        } else {
-            return false;
-        }
-    }
-
-    try {
-        spectrum.setProperty("grid.showhorizontal", gridEnabled);
-        spectrum.setProperty("grid.showvertical", gridEnabled);
-        spectrum.setProperty("grid.showframe", gridEnabled);
-        spectrum.setProperty("grid.showbaseline", gridEnabled);
-        spectrum.setProperty("grid.showover", gridEnabled);
-        if (gridEnabled) {
-            spectrum.setProperty("grid.color", "#D0D7E2");
-            spectrum.setProperty("grid.linewidth", 0.45);
-        }
-        spectrum.update();
-        _appendText(statusPath, "GRAPHICS_PROFILE fallback=grid name=" + name + " enabled=" + gridEnabled + "\n");
-        return true;
-    } catch (e) {
-        _appendText(statusPath, "WARNING graphics profile fallback failed: " + e + "\n");
-        return false;
-    }
-}
-
-function _applyGraphicsProfile(spectrum, graphicsProfilePath, statusPath)
+function _applyGraphicsProfileDefault(graphicsProfilePath, statusPath)
 {
     if (!graphicsProfilePath) {
         return false;
     }
-
-    var methods = [
-        "loadProperties",
-        "loadGraphicProperties",
-        "loadGraphicPropertiesFromFile",
-        "loadGraphicsProfile",
-        "loadNMRGraphicProperties",
-        "loadNMRGraphicsProfile",
-        "importProperties",
-        "importGraphicProperties",
-        "applyProperties",
-        "applyGraphicProperties",
-        "applyGraphicPropertiesFromFile",
-        "readProperties",
-        "applyGraphicsProfile"
-    ];
-    var targets = [spectrum];
-    var activeDocument, activePage, activeItem, activeWindow;
-    var i, j;
-
     try {
-        activeDocument = mainWindow.activeDocument;
-        if (activeDocument !== undefined && activeDocument !== null) {
-            targets.push(activeDocument);
-            try {
-                activePage = activeDocument.curPage();
-                if (activePage !== undefined && activePage !== null) {
-                    targets.push(activePage);
-                }
-            } catch (pageError) {
-            }
-            activeItem = activeDocument.getActiveItem("NMR Spectrum");
-            if (activeItem !== undefined && activeItem !== null) {
-                targets.push(activeItem);
-            }
-        }
-    } catch (e) {
-    }
-
-    try {
-        activeWindow = mainWindow.activeWindow();
-        if (activeWindow !== undefined && activeWindow !== null) {
-            targets.push(activeWindow);
-        }
-    } catch (windowError) {
-    }
-
-    try {
-        if (typeof nmr !== "undefined" && nmr !== null) {
-            targets.push(nmr);
-        }
-    } catch (nmrError) {
-    }
-
-    try {
-        if (typeof draw !== "undefined" && draw !== null) {
-            targets.push(draw);
-        }
-    } catch (drawError) {
-    }
-
-    try {
-        activeItem = mainWindow.activeDocument.getActiveItem("NMR Spectrum");
-        if (activeItem !== undefined && activeItem !== null) {
-            targets.push(activeItem);
-        }
-    } catch (fallbackError) {
-    }
-
-    for (i = 0; i < targets.length; i++) {
-        for (j = 0; j < methods.length; j++) {
-            if (_tryApplyGraphicsProfileMethod(targets[i], methods[j], graphicsProfilePath, statusPath)) {
-                _applyGraphicsProfileFallback(spectrum, graphicsProfilePath, statusPath);
-                return true;
-            }
-        }
-        if (_tryApplyGraphicsProfileProperties(targets[i], graphicsProfilePath, statusPath)) {
-            _applyGraphicsProfileFallback(spectrum, graphicsProfilePath, statusPath);
-            return true;
-        }
-    }
-
-    if (_applyGraphicsProfileFallback(spectrum, graphicsProfilePath, statusPath)) {
+        var payload = _readMNGPSpectrumProperties(graphicsProfilePath, statusPath);
+        var nmrSettings = new Settings("NMR");
+        nmrSettings.setValue("Spectrum Properties", payload);
+        _appendText(statusPath, "GRAPHICS_PROFILE settings=NMR/Spectrum Properties path=" + graphicsProfilePath + "\n");
         return true;
+    } catch (e) {
+        _appendText(statusPath, "WARNING graphics profile not applied: " + e + " path=" + graphicsProfilePath + "\n");
+        return false;
     }
-
-    _appendText(statusPath, "WARNING graphics profile not applied; this MestReNova scripting API may not expose .mngp loading: " + graphicsProfilePath + "\n");
-    return false;
 }
 
 function _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec, graphicsProfilePath, statusPath)
@@ -1033,7 +864,6 @@ function _prepareSpectrumForExport(spectrum, nucleus, renderSpec, graphicsProfil
         _hideProtonImageClutter(spectrum);
     }
     _filterPeaksForImage(spectrum, nucleus, renderSpec || {});
-    _applyGraphicsProfile(spectrum, graphicsProfilePath || "", statusPath);
     spectrum.horzZoom(range[0], range[1]);
     _fitVerticalScaleForImage(spectrum, nucleus, renderSpec || {});
     spectrum.update();
@@ -1132,6 +962,7 @@ function extractSpectrumReportsBatch(tasksPath, outputJsonPath, statusPath)
             var error = "";
 
             try {
+                _applyGraphicsProfileDefault(graphicsProfilePath, statusPath);
                 if (!serialization.open(inputPath)) {
                     error = "Could not open " + inputPath;
                 } else {
@@ -1247,7 +1078,7 @@ function _saveProcessedMnovaFiles(tasks, statusPath)
 function _saveProcessedMnovaFile(compound, tasks, statusPath)
 {
     var mnovaPath = tasks.length ? tasks[0].mnovaPath : "";
-    var doc, paths, i, nmrItems, spectrum, nucleus;
+    var doc, i, nmrItems, spectrum, nucleus;
 
     if (!mnovaPath) {
         return;
@@ -1259,11 +1090,10 @@ function _saveProcessedMnovaFile(compound, tasks, statusPath)
         doc.newPage();
         Application.lockDocument(doc);
 
-        paths = [];
         for (i = 0; i < tasks.length; i++) {
-            paths.push(_importableNmrPath(tasks[i].inputPath));
+            _applyGraphicsProfileDefault(tasks[i].graphicsProfilePath || "", statusPath);
+            serialization.importFile(_importableNmrPath(tasks[i].inputPath), "", doc);
         }
-        serialization.importFile(paths, "", doc);
 
         nmrItems = doc.itemsByName("NMR Spectrum");
         for (i = 0; i < nmrItems.length && i < tasks.length; i++) {

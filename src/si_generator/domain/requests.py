@@ -9,6 +9,7 @@ from ..output_layout import output_root_for
 
 
 InputKind = Literal["csv", "word"]
+AddMethodMode = Literal["same_series", "new_method"]
 
 
 @dataclass(slots=True)
@@ -24,6 +25,8 @@ class GenerateSIRequest:
     loadings_scope_docx: Path | None = None
     mnova_exe: Path | None = None
     mnova_graphics_profile: Path | None = None
+    mnova_graphics_profile_1h: Path | None = None
+    mnova_graphics_profile_13c: Path | None = None
     no_extract_nmr: bool = False
     insert_spectra_as: SpectrumEmbedMode = "png"
     target_signal_height_fraction: float = 0.80
@@ -83,14 +86,21 @@ class AddCompoundsRequest:
     manifest_path: Path
     input_path: Path
     input_kind: InputKind
-    output_docx: Path
+    output_docx: Path | None = None
+    output_folder: Path | None = None
+    method_mode: AddMethodMode = "same_series"
+    previous_output_dir: Path | None = None
     support_docx: Path | None = None
     template_docx: Path | None = None
     references_path: Path | None = None
+    loadings_schema_docx: Path | None = None
+    loadings_scope_docx: Path | None = None
     spectra_source: Path | None = None
     spectra_zip: Path | None = None
     mnova_exe: Path | None = None
     mnova_graphics_profile: Path | None = None
+    mnova_graphics_profile_1h: Path | None = None
+    mnova_graphics_profile_13c: Path | None = None
     no_extract_nmr: bool = False
     insert_spectra_as: SpectrumEmbedMode = "png"
     target_signal_height_fraction: float = 0.80

@@ -117,6 +117,10 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_png"], str(Path("spectra") / "processed_spectra" / "2a" / "2a_1H.png"))
         self.assertEqual(manifest["compounds"]["cmp_001"]["relative_artifacts"]["h1_mnova"], str(Path("spectra") / "processed_spectra" / "2a" / "2a_1H.mnova"))
         self.assertEqual(manifest["configs"]["spectra"]["extract_nmr"], False)
+        self.assertEqual(manifest["run_config"]["insert_spectra_as"], "png")
+        self.assertEqual(manifest["run_config"]["template_docx"], "")
+        self.assertEqual(manifest["run_config"]["x_range_ppm_1h"], [-1.0, 12.0])
+        self.assertEqual(run_summary["run_config"], manifest["run_config"])
         self.assertEqual(
             manifest["compounds"]["cmp_001"]["docx_bookmark"],
             bookmark_name_for_block_id("compound:cmp_001"),

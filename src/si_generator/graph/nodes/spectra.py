@@ -4,12 +4,12 @@ import shutil
 from pathlib import Path
 
 from ..compound_store import ordered_compounds
-from ..state import GenerateSIState
+from ..state import GenerateSIState, Issue
 from ...domain.spectra_config import build_spectrum_render_spec
 from ...domain.types import SpectrumRenderSpec
 from ...nmr_fill import fill_nmr_from_mnova
 from ...output_layout import output_root_for, prepare_output_layout
-from ...spectra_zip import assign_spectra_from_folder, prepare_spectra_source
+from ...spectra_zip import assign_spectra_from_folder, prepare_spectra_source, spectra_source_compound_numbers
 
 
 def prepare_spectra_source_node(state: GenerateSIState) -> dict:
@@ -33,11 +33,45 @@ def prepare_spectra_source_node(state: GenerateSIState) -> dict:
         return {"output_path": output_path, "artifacts": artifacts}
 
     spectra_root = prepare_spectra_source(spectra_source, dirs["input_dir"] / "spectra")
+    mismatch = _spectra_source_input_number_mismatch(compounds, spectra_root)
+    if mismatch:
+        issues = [*state.get("issues", []), mismatch]
+        return {
+            "output_path": output_path,
+            "artifacts": {**artifacts, "spectra_root": str(spectra_root)},
+            "issues": issues,
+            "status": "fail",
+        }
+
     assign_spectra_from_folder(compounds, spectra_root)
     return {
         "output_path": output_path,
         "compounds": state.get("compounds", {}),
         "artifacts": {**artifacts, "spectra_root": str(spectra_root)},
+    }
+
+
+def _spectra_source_input_number_mismatch(compounds, spectra_root: Path) -> Issue | None:
+    input_numbers = {str(compound.number or "").strip() for compound in compounds if str(compound.number or "").strip()}
+    spectra_numbers = spectra_source_compound_numbers(spectra_root)
+    if input_numbers == spectra_numbers:
+        return None
+    missing_in_spectra = sorted(input_numbers - spectra_numbers)
+    extra_in_spectra = sorted(spectra_numbers - input_numbers)
+    message_parts = [
+        "Spectra source and compound table contain different compound numbers.",
+        f"Input compounds: {', '.join(sorted(input_numbers)) or '<none>'}.",
+        f"Spectra folders: {', '.join(sorted(spectra_numbers)) or '<none>'}.",
+    ]
+    if missing_in_spectra:
+        message_parts.append(f"Missing in spectra source: {', '.join(missing_in_spectra)}.")
+    if extra_in_spectra:
+        message_parts.append(f"Extra in spectra source: {', '.join(extra_in_spectra)}.")
+    return {
+        "code": "SPECTRA_SOURCE_INPUT_MISMATCH",
+        "severity": "error",
+        "message": " ".join(message_parts),
+        "path": str(spectra_root),
     }
 
 def _copy_input_artifacts(request, input_dir: Path) -> dict[str, str]:
@@ -49,6 +83,8 @@ def _copy_input_artifacts(request, input_dir: Path) -> dict[str, str]:
         "loadings_schema_copy": request.loadings_schema_docx,
         "loadings_scope_copy": request.loadings_scope_docx,
         "mnova_graphics_profile_copy": request.mnova_graphics_profile,
+        "mnova_graphics_profile_1h_copy": request.mnova_graphics_profile_1h,
+        "mnova_graphics_profile_13c_copy": request.mnova_graphics_profile_13c,
     }.items():
         if not source:
             continue
@@ -108,6 +144,8 @@ def mnova_batch_node(state: GenerateSIState) -> dict:
         output_root=output_root_for(state.get("output_path", request.output_path)),
         mnova_exe=mnova_exe,
         mnova_graphics_profile_path=spectra_config.get("mnova_graphics_profile_path"),
+        mnova_graphics_profile_1h_path=spectra_config.get("mnova_graphics_profile_1h_path"),
+        mnova_graphics_profile_13c_path=spectra_config.get("mnova_graphics_profile_13c_path"),
         render_specs_by_compound=state.get("spectra_plan"),
     )
     return {"compounds": state.get("compounds", {})}

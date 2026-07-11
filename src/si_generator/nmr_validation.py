@@ -95,6 +95,8 @@ def validate_elemental_analysis(compounds: list[Compound], tolerance_percent: fl
     for compound in compounds:
         if not compound.formula or not compound.elemental_analysis:
             continue
+        if compound.elemental_analysis.get("skip"):
+            continue
         found = found_from_block(compound.elemental_analysis)
         if not found:
             continue

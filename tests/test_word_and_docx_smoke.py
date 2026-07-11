@@ -28,6 +28,30 @@ class WordAndDocxSmokeTests(unittest.TestCase):
         self.assertEqual(_first_number("Found 272,9921"), "272.9921")
         self.assertEqual(_first_number("calcd 100.0000. Found 272,9920"), "272.9920")
 
+    def test_word_input_treats_dash_as_missing_optional_field(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            input_path = Path(tmp) / "input.docx"
+            document = Document()
+            table = document.add_table(rows=2, cols=8)
+            headers = ["number", "name", "color", "mp", "Rf", "HRMS", "Elemental_analysis", "IR"]
+            values = ["2a", "Example compound", "-", "-", "-", "-", "-", "-"]
+            for index, header in enumerate(headers):
+                table.rows[0].cells[index].text = header
+                table.rows[1].cells[index].text = values[index]
+            document.save(input_path)
+
+            compounds = read_word_compounds(input_path)
+
+        self.assertEqual(len(compounds), 1)
+        compound = compounds[0]
+        self.assertEqual(compound.color, "")
+        self.assertEqual(compound.state, "")
+        self.assertEqual(compound.melting_point, "")
+        self.assertEqual(compound.rf, "")
+        self.assertEqual(compound.hrms_found, "")
+        self.assertEqual(compound.elemental_analysis, {"skip": True})
+        self.assertEqual(compound.ir, "")
+
     def test_cli_generates_docx_without_mnova(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             requested_output_path = Path(tmp) / "support_information.docx"

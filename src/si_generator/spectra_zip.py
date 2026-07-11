@@ -73,6 +73,17 @@ def assign_spectra_from_folder(compounds: list[Compound], spectra_root: str | Pa
             compound.c13_spectrum_path = str(spectra["13C"])
 
 
+def spectra_source_compound_numbers(spectra_root: str | Path) -> set[str]:
+    spectra_root = Path(spectra_root).resolve()
+    if not spectra_root.exists() or not spectra_root.is_dir():
+        return set()
+    return {
+        child.name.strip()
+        for child in spectra_root.iterdir()
+        if child.is_dir() and child.name.strip() and not _ignored_source_dir(child.name)
+    }
+
+
 def validate_spectra_zip(
     archive: zipfile.ZipFile,
     target: str | Path,
@@ -131,6 +142,11 @@ def _validate_zip_member_type(member: zipfile.ZipInfo) -> None:
 
 def _looks_like_compound_dir(path: Path) -> bool:
     return any((child / "fid").exists() for child in path.iterdir() if child.is_dir())
+
+
+def _ignored_source_dir(name: str) -> bool:
+    lowered = name.lower()
+    return name.startswith(".") or lowered in {"__macosx", "thumbs.db"}
 
 
 def _find_bruker_spectra(compound_dir: Path) -> dict[str, Path]:

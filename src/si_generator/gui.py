@@ -38,15 +38,18 @@ from .workflows.patch_si import run_patch_si
 
 
 INSTRUCTION_TEMPLATE_FILES = (
-    ("Word table", Path("starter") / "compound_table_starter.docx", "Main compound table with ChemDraw OLE structures."),
-    ("CSV table", Path("starter") / "compound_table_starter.csv", "Text-table alternative when structures are provided by paths or generated later."),
+    ("Word table", Path("starter") / "compound_table_starter.docx", "Editable compound table based on the working test_input_2 example."),
+    ("Spectra zip", Path("spectra_2.zip"), "Raw spectra source matching the Word table example."),
     ("Spectra layout", Path("starter") / "spectra_source_layout.txt", "Folder naming rules for raw 1H and 13C spectra."),
-    ("SI template", Path("templates") / "SI_template_visual_current.docx", "Visual Word template for compound blocks and spectra appendix."),
-    ("Reaction schema", Path("loadings") / "Reaction_schema.docx", "Reagent equivalents, MW, density and concentration settings."),
-    ("Scope table", Path("loadings") / "Scope.docx", "Reaction scope table used for reagent-loading calculations."),
-    ("Mnova grid style", Path("mngp_styles") / "grid.mngp", "Example MestReNova graphic profile with grid enabled."),
-    ("Mnova classic style", Path("mngp_styles") / "classic.mngp", "Example MestReNova graphic profile with grid disabled."),
-    ("Starter notes", Path("starter") / "README_starter_files.md", "Short description of bundled starter files."),
+    ("SI template", Path("templates") / "SI_template.docx", "Visual Word template for compound descriptions and spectra appendix."),
+    ("Reaction schema", Path("loadings") / "Reaction_schema.docx", "Optional reagent equivalents, MW, density and concentration settings."),
+    ("Scope table", Path("loadings") / "Scope.docx", "Optional reaction scope table for reagent-loading calculations."),
+    ("1H classic", Path("mngp_styles") / "classic_1H.mngp", "Default MestReNova graphic profile for 1H spectra."),
+    ("13C classic", Path("mngp_styles") / "classic_13C.mngp", "Default MestReNova graphic profile for 13C spectra."),
+    ("1H grid", Path("mngp_styles") / "grid_1H.mngp", "Example 1H MestReNova profile with grid enabled."),
+    ("13C grid", Path("mngp_styles") / "grid_13C.mngp", "Example 13C MestReNova profile with grid enabled."),
+    ("Example output", Path("example_output") / "support_information.docx", "Generated support example for visual comparison."),
+    ("Starter notes", Path("starter") / "README_starter_files.md", "Short description of all copied starter files."),
 )
 STARTER_FILE_RELATIVE_PATHS = tuple(relative_path for _, relative_path, _ in INSTRUCTION_TEMPLATE_FILES)
 
@@ -107,6 +110,8 @@ class SIGeneratorApp:
         self.loadings_scope_docx = StringVar()
         self.mnova_exe = StringVar()
         self.mnova_graphics_profile = StringVar()
+        self.mnova_graphics_profile_1h = StringVar()
+        self.mnova_graphics_profile_13c = StringVar()
         self.output_docx = StringVar(value=str(default_output_path()))
         self.output_folder = StringVar(value=str(default_output_path().parent))
         self.theme_mode = StringVar(value="light")
@@ -143,18 +148,25 @@ class SIGeneratorApp:
         self.patch_renumber = StringVar(value="")
         self.patch_remove = StringVar(value="")
         self.patch_reorder = StringVar(value="")
+        self.add_previous_output_dir = StringVar(value="")
         self.add_manifest = StringVar(value="")
         self.add_support_docx = StringVar(value="")
+        self.add_template_docx = StringVar(value="")
+        self.add_loadings_schema_docx = StringVar(value="")
+        self.add_loadings_scope_docx = StringVar(value="")
         self.add_input_path = StringVar(value="")
         self.add_spectra_source = StringVar(value="")
         self.add_output_docx = StringVar(value="")
+        self.add_output_folder = StringVar(value=str(default_output_path().parent))
         self.add_input_kind = StringVar(value="word")
+        self.add_method_mode = StringVar(value="same_series")
         self.page_title = StringVar(value="Generate SI")
         self.page_subtitle = StringVar(value="Create formatted Supporting Information from a compound table and spectra.")
 
         self._is_running = False
         self._last_output_folder: Path | None = None
         self._log_queue: queue.Queue[Any] = queue.Queue()
+        self.log = _RunLogBuffer()
         self._poll_after_id: str | None = None
         self._theme = THEME_PALETTES["light"]
         self._nav_buttons: dict[str, _PillButton] = {}
@@ -167,6 +179,7 @@ class SIGeneratorApp:
         self._logo_mark_image: tk.PhotoImage | None = None
 
         self._load_saved_settings()
+        self._set_default_mngp_profiles_if_empty()
         if self.theme_mode.get() not in THEME_PALETTES:
             self.theme_mode.set("light")
         self.dark_theme.set(self.theme_mode.get() == "dark")
@@ -335,9 +348,8 @@ class SIGeneratorApp:
         self.progress = ttk.Progressbar(footer, mode="indeterminate", length=150)
         self.progress.grid(row=0, column=1, sticky="e", padx=(12, 0))
         ttk.Button(footer, text="Open last output", command=self._open_output_folder).grid(row=0, column=2, sticky="e", padx=(8, 0))
-        ttk.Button(footer, text="Clear log", command=lambda: self.log.clear()).grid(row=0, column=3, sticky="e", padx=(8, 0))
         self.run_button = ttk.Button(footer, text="Generate SI", command=self._start_generation, style="Accent.TButton")
-        self.run_button.grid(row=0, column=4, sticky="e", padx=(8, 0))
+        self.run_button.grid(row=0, column=3, sticky="e", padx=(8, 0))
 
     def _make_page(self, parent: ttk.Frame, key: str) -> ttk.Frame:
         page = ttk.Frame(parent, style="App.TFrame")
@@ -349,17 +361,25 @@ class SIGeneratorApp:
 
     def _build_generate_page(self, parent: ttk.Frame) -> None:
         page = self._make_page(parent, "generate")
-        page.rowconfigure(2, weight=1)
+        page.rowconfigure(0, weight=1)
+        generate_scroll = _ScrollableFrame(page, padding=2)
+        self._scrollable_frames.append(generate_scroll)
+        generate_scroll.grid(row=0, column=0, sticky="nsew")
+        content = generate_scroll.content
+        content.columnconfigure(0, weight=1)
 
-        simple = ttk.LabelFrame(page, text="Simple", padding=12, style="Card.TLabelframe")
+        simple = ttk.LabelFrame(content, text="Simple", padding=12, style="Card.TLabelframe")
         simple.grid(row=0, column=0, sticky="ew")
         simple.columnconfigure(1, weight=1)
         self._file_row(simple, 0, "Compound table", self.input_path, self._browse_input)
         self._source_row(simple, 1, "Spectra source", self.spectra_source, self._browse_spectra_source, self._browse_spectra_folder)
         self._folder_row(simple, 2, "Output folder", self.output_folder, self._browse_output_folder)
 
-        results = ttk.LabelFrame(page, text="Results", padding=12, style="Card.TLabelframe")
-        results.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        self._build_optional_inputs_block(content, 1)
+        self._build_loadings_block(content, 2)
+
+        results = ttk.LabelFrame(content, text="Results", padding=12, style="Card.TLabelframe")
+        results.grid(row=3, column=0, sticky="ew", pady=(10, 0))
         results.columnconfigure(1, weight=1)
         self._result_row(results, 0, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"), "Open support")
         self._result_row(results, 1, "Output folder", self.result_output_folder, lambda: self._open_result_path(self.result_output_folder, "Output folder"), "Open output folder")
@@ -367,27 +387,9 @@ class SIGeneratorApp:
         self._result_row(results, 3, "Report", self.result_report, lambda: self._open_result_path(self.result_report, "Report"), "Open report")
         ttk.Label(results, textvariable=self.result_overview, style="Muted.TLabel").grid(row=4, column=0, columnspan=3, sticky="ew", pady=(6, 0))
 
-        log_frame = ttk.LabelFrame(page, text="Run Log", padding=8, style="Card.TLabelframe")
-        log_frame.grid(row=2, column=0, sticky="nsew", pady=(10, 0))
-        log_frame.columnconfigure(0, weight=1)
-        log_frame.rowconfigure(0, weight=1)
-        self.log = _LogText(log_frame, height=8)
-        self.log.grid(row=0, column=0, sticky="nsew")
-        scroll = ttk.Scrollbar(log_frame, command=self.log.yview)
-        scroll.grid(row=0, column=1, sticky="ns")
-        self.log.configure(yscrollcommand=scroll.set)
-
-    def _build_advanced_page(self, parent: ttk.Frame) -> None:
-        page = self._make_page(parent, "advanced")
-        page.rowconfigure(0, weight=1)
-        advanced_scroll = _ScrollableFrame(page, padding=2)
-        self._scrollable_frames.append(advanced_scroll)
-        advanced_scroll.grid(row=0, column=0, sticky="nsew")
-        advanced = advanced_scroll.content
-        advanced.columnconfigure(0, weight=1)
-
-        files = ttk.LabelFrame(advanced, text="Optional inputs", padding=12, style="Card.TLabelframe")
-        files.grid(row=0, column=0, sticky="ew")
+    def _build_optional_inputs_block(self, parent: ttk.Frame, row: int) -> None:
+        files = ttk.LabelFrame(parent, text="Optional inputs", padding=12, style="Card.TLabelframe")
+        files.grid(row=row, column=0, sticky="ew", pady=(10, 0))
         files.columnconfigure(1, weight=1)
         self._file_row(files, 0, "SI template .docx", self.template_docx, lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
         self._file_row(
@@ -402,22 +404,71 @@ class SIGeneratorApp:
         self._file_row(
             files,
             2,
-            "Mnova graphics .mngp",
-            self.mnova_graphics_profile,
+            "1H .mngp",
+            self.mnova_graphics_profile_1h,
             lambda: self._browse_file(
-                self.mnova_graphics_profile,
+                self.mnova_graphics_profile_1h,
+                [("MestReNova graphic properties", "*.mngp"), ("All files", "*.*")],
+            ),
+            optional=True,
+        )
+        self._file_row(
+            files,
+            3,
+            "13C .mngp",
+            self.mnova_graphics_profile_13c,
+            lambda: self._browse_file(
+                self.mnova_graphics_profile_13c,
                 [("MestReNova graphic properties", "*.mngp"), ("All files", "*.*")],
             ),
             optional=True,
         )
 
+    def _build_loadings_block(self, parent: ttk.Frame, row: int) -> None:
+        loadings = ttk.LabelFrame(parent, text="Reagent Loadings", padding=12, style="Card.TLabelframe")
+        loadings.grid(row=row, column=0, sticky="ew", pady=(10, 0))
+        loadings.columnconfigure(1, weight=1)
+        ttk.Checkbutton(
+            loadings,
+            text="Calculate reagent loadings",
+            variable=self.generate_loadings,
+        ).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        self._file_row(
+            loadings,
+            1,
+            "Reaction schema .docx",
+            self.loadings_schema_docx,
+            lambda: self._browse_file(self.loadings_schema_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
+            optional=True,
+        )
+        self._file_row(
+            loadings,
+            2,
+            "Scope .docx",
+            self.loadings_scope_docx,
+            lambda: self._browse_file(self.loadings_scope_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
+            optional=True,
+        )
+
+    def _build_advanced_page(self, parent: ttk.Frame) -> None:
+        page = self._make_page(parent, "advanced")
+        page.rowconfigure(0, weight=1)
+        advanced_scroll = _ScrollableFrame(page, padding=2)
+        self._scrollable_frames.append(advanced_scroll)
+        advanced_scroll.grid(row=0, column=0, sticky="nsew")
+        advanced = advanced_scroll.content
+        advanced.columnconfigure(0, weight=1)
+
         options = ttk.LabelFrame(advanced, text="Processing", padding=12, style="Card.TLabelframe")
-        options.grid(row=1, column=0, sticky="ew", pady=(10, 0))
-        ttk.Label(options, text="Compound table type").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
-        kind = ttk.Frame(options)
-        kind.grid(row=0, column=1, columnspan=3, sticky="w", pady=4)
-        ttk.Radiobutton(kind, text="Word table with ChemDraw objects", variable=self.input_kind, value="word").pack(side="left")
-        ttk.Radiobutton(kind, text="CSV table", variable=self.input_kind, value="csv").pack(side="left", padx=(16, 0))
+        options.grid(row=0, column=0, sticky="ew")
+        ttk.Label(options, text="Compound table").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Label(options, text="Word table with ChemDraw OLE structures (.docx)", style="Muted.TLabel").grid(
+            row=0,
+            column=1,
+            columnspan=3,
+            sticky="w",
+            pady=4,
+        )
         ttk.Checkbutton(
             options,
             text="Check support (NMR, HRMS, elemental analysis)",
@@ -461,7 +512,7 @@ class SIGeneratorApp:
         ).grid(row=6, column=0, columnspan=2, sticky="w", pady=4)
 
         baseline = ttk.LabelFrame(advanced, text="Baseline correction", padding=12, style="Card.TLabelframe")
-        baseline.grid(row=2, column=0, sticky="ew", pady=(10, 0))
+        baseline.grid(row=1, column=0, sticky="ew", pady=(10, 0))
         ttk.Label(baseline, text="Mode").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
         ttk.Combobox(
             baseline,
@@ -478,31 +529,6 @@ class SIGeneratorApp:
         ttk.Entry(baseline, textvariable=self.whittaker_lambda, width=12).grid(row=2, column=1, sticky="w", pady=4)
         ttk.Label(baseline, text="Whittaker asymmetry").grid(row=2, column=2, sticky="e", padx=(12, 8), pady=4)
         ttk.Entry(baseline, textvariable=self.whittaker_asymmetry, width=10).grid(row=2, column=3, sticky="w", pady=4)
-
-        loadings = ttk.LabelFrame(advanced, text="Reagent Loadings", padding=12, style="Card.TLabelframe")
-        loadings.grid(row=3, column=0, sticky="ew", pady=(10, 0))
-        loadings.columnconfigure(1, weight=1)
-        ttk.Checkbutton(
-            loadings,
-            text="Calculate reagent loadings",
-            variable=self.generate_loadings,
-        ).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
-        self._file_row(
-            loadings,
-            1,
-            "Reaction schema .docx",
-            self.loadings_schema_docx,
-            lambda: self._browse_file(self.loadings_schema_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
-            optional=True,
-        )
-        self._file_row(
-            loadings,
-            2,
-            "Scope .docx",
-            self.loadings_scope_docx,
-            lambda: self._browse_file(self.loadings_scope_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
-            optional=True,
-        )
 
     def _build_check_page(self, parent: ttk.Frame) -> None:
         page = self._make_page(parent, "check")
@@ -584,25 +610,42 @@ class SIGeneratorApp:
         add_box = ttk.LabelFrame(add_tab, text="Add compounds", padding=12, style="Card.TLabelframe")
         add_box.grid(row=0, column=0, sticky="ew")
         add_box.columnconfigure(1, weight=1)
-        self._file_row(add_box, 0, "Existing manifest", self.add_manifest, lambda: self._browse_file(self.add_manifest, [("Manifest JSON", "*.json"), ("All files", "*.*")]), optional=True)
-        self._file_row(add_box, 1, "Existing support .docx", self.add_support_docx, lambda: self._browse_file(self.add_support_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
-        ttk.Label(add_box, text="New table type").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
-        add_kind = ttk.Frame(add_box)
-        add_kind.grid(row=2, column=1, columnspan=2, sticky="w", pady=4)
-        ttk.Radiobutton(add_kind, text="Word table with ChemDraw objects", variable=self.add_input_kind, value="word").pack(side="left")
-        ttk.Radiobutton(add_kind, text="CSV table", variable=self.add_input_kind, value="csv").pack(side="left", padx=(16, 0))
-        self._file_row(add_box, 3, "New compound table", self.add_input_path, self._browse_add_input, optional=True)
+        self._folder_row(add_box, 0, "Previous output folder", self.add_previous_output_dir, self._browse_add_previous_output, optional=True)
+        self._file_row(add_box, 1, "Existing manifest", self.add_manifest, lambda: self._browse_file(self.add_manifest, [("Manifest JSON", "*.json"), ("All files", "*.*")]), optional=True)
+        self._file_row(add_box, 2, "Existing support .docx", self.add_support_docx, lambda: self._browse_file(self.add_support_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
+        ttk.Label(add_box, text="Add mode").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
+        add_mode = ttk.Frame(add_box)
+        add_mode.grid(row=3, column=1, columnspan=2, sticky="w", pady=4)
+        ttk.Radiobutton(add_mode, text="Same series", variable=self.add_method_mode, value="same_series").pack(side="left")
+        ttk.Radiobutton(add_mode, text="New method", variable=self.add_method_mode, value="new_method").pack(side="left", padx=(16, 0))
+        ttk.Label(
+            add_box,
+            text="Same series reuses old template/reaction schema. New method can use new template/schema/scope; spectra settings stay from Processing.",
+            foreground=self._theme["muted"],
+        ).grid(row=4, column=1, columnspan=2, sticky="w", pady=(0, 4))
+        ttk.Label(add_box, text="New compound table").grid(row=5, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Label(add_box, text="Word table with ChemDraw OLE structures (.docx)", style="Muted.TLabel").grid(
+            row=5,
+            column=1,
+            columnspan=2,
+            sticky="w",
+            pady=4,
+        )
+        self._file_row(add_box, 6, "New compound table", self.add_input_path, self._browse_add_input, optional=True)
         self._source_row(
             add_box,
-            4,
+            7,
             "New spectra source",
             self.add_spectra_source,
             lambda: self._browse_file(self.add_spectra_source, [("Zip archives", "*.zip"), ("All files", "*.*")]),
             lambda: self._browse_folder(self.add_spectra_source),
             optional=True,
         )
-        self._file_row(add_box, 5, "Output .docx", self.add_output_docx, self._browse_add_output, optional=True)
-        ttk.Button(add_box, text="Add compounds", command=self._start_add_compounds).grid(row=6, column=2, sticky="e", padx=(8, 0), pady=(8, 0))
+        self._file_row(add_box, 8, "New SI template .docx", self.add_template_docx, lambda: self._browse_file(self.add_template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
+        self._file_row(add_box, 9, "New Reaction_schema.docx", self.add_loadings_schema_docx, lambda: self._browse_file(self.add_loadings_schema_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
+        self._file_row(add_box, 10, "New Scope.docx", self.add_loadings_scope_docx, lambda: self._browse_file(self.add_loadings_scope_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
+        self._folder_row(add_box, 11, "Output folder", self.add_output_folder, self._browse_add_output_folder, optional=True)
+        ttk.Button(add_box, text="Add compounds", command=self._start_add_compounds).grid(row=12, column=2, sticky="e", padx=(8, 0), pady=(8, 0))
 
     def _build_instructions_page(self, parent: ttk.Frame) -> None:
         page = self._make_page(parent, "instructions")
@@ -617,17 +660,92 @@ class SIGeneratorApp:
         ttk.Label(
             quick,
             text=(
-                "1. Open Generate and select Compound table, Spectra source and Output folder.\n"
-                "2. Open Processing only when you need a custom template, Mnova style, thresholds or loadings.\n"
-                "3. Click Generate SI. Results are saved into a separate run folder with docx, spectra, mnova, logs and reports."
+                "1. Prepare example files\n"
+                "   - Click Copy all examples.\n"
+                "   - Choose a folder where the editable examples will be copied.\n"
+                "2. Fill Generate\n"
+                "   - Compound table: compound_table_starter.docx.\n"
+                "   - Spectra source: spectra_2.zip or your own spectra folder/zip.\n"
+                "   - Output folder: any folder where a new run folder can be created.\n"
+                "3. Optional settings\n"
+                "   - In Generate, add an SI template, MestReNova path/styles, or reagent-loading files if needed.\n"
+                "   - Open Processing for spectra mode, peak thresholds, ppm ranges, baseline correction, and checks.\n"
+                "4. Run\n"
+                "   - Click Generate SI.\n"
+                "   - Open Results when the run finishes."
             ),
             wraplength=760,
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        templates = self._instruction_block(content, 1, "Templates", "Open or copy editable starter files.", expanded=True)
+        generate = self._instruction_block(content, 1, "Generate", "Main inputs needed to build a new SI.", expanded=True)
+        ttk.Label(
+            generate,
+            text=(
+                "Required fields\n"
+                "- Compound table: upload the filled Word table (.docx). Recommended starter: compound_table_starter.docx.\n"
+                "- Spectra source: upload a .zip archive or choose a folder with raw spectra.\n"
+                "- Output folder: choose where the run folder will be created.\n"
+                "- Optional inputs: add SI_template.docx, MestReNova.exe, and separate 1H/13C .mngp files when defaults are not enough.\n"
+                "- Reagent Loadings: enable this block and provide Reaction_schema.docx plus Scope.docx to calculate amounts.\n"
+                "- Generate SI: starts SI generation.\n\n"
+                "Important rules\n"
+                "- Compound numbers in the table must match spectra folder names, for example 3a, 3b, 3c.\n"
+                "- The Word table should contain editable ChemDraw OLE structures in the structure column.\n"
+                "- Every run writes a separate output folder with docx, input copies, spectra, Mnova files, logs and reports."
+            ),
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+
+        processing = self._instruction_block(content, 2, "Processing", "Spectra controls, preprocessing, and validation options.")
+        ttk.Label(
+            processing,
+            text=(
+                "Spectra rendering\n"
+                "- Spectra appendix: choose png, mnova or none.\n"
+                "- png: inserts static pictures.\n"
+                "- mnova: inserts clickable Mnova spectrum objects.\n"
+                "- none: skips spectra appendix.\n"
+                "- PPM ranges: control exported image windows for 1H and 13C.\n"
+                "- Target signal height: controls vertical scaling of the highest signal.\n\n"
+                "Peak picking and baseline\n"
+                "- 1H threshold / 13C threshold: minimum relative peak height. Increase if noise or impurities are picked.\n"
+                "- Baseline mode: auto/off/Bernstein/Whittaker.\n"
+                "- Whittaker settings: advanced baseline parameters for difficult 13C spectra.\n"
+                "- Highlight solvent peaks: keep off for normal reports unless you explicitly want solvent peaks marked.\n\n"
+                "Chemistry options\n"
+                "- Check support: validates NMR, HRMS and elemental analysis when enough data are available.\n"
+                "- Calculate elemental analysis: generates calculated elemental-analysis values for rows where this block is not explicitly disabled."
+            ),
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+
+        results = self._instruction_block(content, 3, "Results", "Where generated files are stored.")
+        ttk.Label(
+            results,
+            text=(
+                "Buttons\n"
+                "- Open support: opens generated support_information.docx.\n"
+                "- Open output folder: opens the full run folder.\n"
+                "- Open logs: opens diagnostic logs for Word, ChemDraw and Mnova automation.\n"
+                "- Open report: opens the readable run report.\n\n"
+                "Output folder structure\n"
+                "- docx: final support and manifest.\n"
+                "- input: copied input files used for this run.\n"
+                "- spectra: exported spectrum pictures.\n"
+                "- mnova: processed Mnova files.\n"
+                "- logs: automation diagnostics.\n"
+                "- reports: NMR text reports and validation summaries."
+            ),
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+
+        templates = self._instruction_block(content, 4, "Example files", "Open or copy editable starter files.", expanded=True)
         templates.columnconfigure(1, weight=1)
-        ttk.Button(templates, text="Copy all", command=self._copy_starter_files).grid(row=0, column=2, sticky="e", padx=(8, 0), pady=(0, 8))
+        ttk.Button(templates, text="Copy all examples", command=self._copy_starter_files).grid(row=0, column=2, sticky="e", padx=(8, 0), pady=(0, 8))
         for row, (label, relative_path, description) in enumerate(INSTRUCTION_TEMPLATE_FILES, start=1):
             ttk.Label(templates, text=label, font=("Segoe UI", 10, "bold")).grid(row=row, column=0, sticky="w", padx=(0, 10), pady=3)
             ttk.Label(templates, text=description, wraplength=560, justify="left").grid(row=row, column=1, sticky="ew", pady=3)
@@ -637,53 +755,229 @@ class SIGeneratorApp:
                 command=lambda relative_path=relative_path: self._open_example_file(relative_path),
             ).grid(row=row, column=2, sticky="e", padx=(8, 0), pady=3)
 
-        spectra = self._instruction_block(content, 2, "Spectra processing", "Controls that affect generated NMR descriptions and images.")
+        spectra = self._instruction_block(content, 5, "Spectra source", "How raw spectra should be organized.")
         ttk.Label(
             spectra,
             text=(
-                "Spectra source can be a .zip archive or a folder with compound-number subfolders. "
-                "Peak thresholds are independent for 1H and 13C and define the minimum relative height for picked peaks. "
-                "PPM ranges control image export windows. Highlight solvent peaks should stay off for normal reports; then CDCl3 is used for referencing but not labeled on images."
+                "Accepted input\n"
+                "- A .zip archive, for example spectra_2.zip.\n"
+                "- Or a normal folder with the same internal layout.\n\n"
+                "Required layout\n"
+                "- Top level: one folder per compound number, for example 3a, 3b, 3c.\n"
+                "- Inside each compound folder: raw Bruker experiment folders containing fid files.\n"
+                "- Folder names inside each compound can be arbitrary.\n\n"
+                "Detection\n"
+                "- The program searches for fid files.\n"
+                "- Acquisition metadata is used to decide whether a spectrum is 1H or 13C.\n"
+                "- Compound numbers in spectra source and compound table must be identical."
             ),
             wraplength=760,
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        aliases = self._instruction_block(content, 3, "Template aliases", "Main placeholders used inside the Word SI template.")
+        aliases = self._instruction_block(content, 6, "Template aliases", "Placeholders available inside SI_template.docx.")
+        self._build_alias_reference(aliases)
+
+        check = self._instruction_block(content, 7, "Check", "Validate an existing generated SI.")
         ttk.Label(
-            aliases,
+            check,
             text=(
-                "Use entity-first aliases: {Product.number}, {Product.yield.percent}, {Reagent_1.number}, "
-                "{Reagent_2.name}, {AcOH.mmol}, {Solvent_MeCN.mL}. "
-                "Structure placeholder: {compound.number.structure}. "
-                "Spectrum placeholders: {compound.number.nmr.1h.picture} and {compound.number.nmr.13c.picture}. "
-                "Bold or italic formatting applied to a placeholder in Word is preserved in the rendered value."
+                "Fields\n"
+                "- Existing manifest: upload support_information.manifest.json from a previous run.\n"
+                "- Support .docx override: optional. Use only if the support file was moved or renamed.\n\n"
+                "What it checks\n"
+                "- Manifest structure and listed artifacts.\n"
+                "- NMR count mismatches.\n"
+                "- HRMS mismatches.\n"
+                "- Elemental-analysis warnings.\n\n"
+                "Output\n"
+                "- JSON check report.\n"
+                "- Short readable summary in the GUI."
             ),
             wraplength=760,
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        loadings = self._instruction_block(content, 4, "Loadings and checks", "Optional chemistry validation and reagent calculations.")
+        patch = self._instruction_block(content, 8, "Patch", "Create a modified copy of an existing SI.")
         ttk.Label(
-            loadings,
+            patch,
             text=(
-                "Check support validates NMR, HRMS and elemental analysis against the structural formula when enough data are available. "
-                "Calculate reagent loadings uses Reaction_schema.docx and Scope.docx to fill preparation text and product yield fields."
+                "Fields\n"
+                "- Existing manifest: upload manifest from the run you want to modify.\n"
+                "- Existing support .docx override: optional path if the old support was moved.\n"
+                "- Patched output .docx: optional path for the new file.\n\n"
+                "Patch commands\n"
+                "- Renumber: comma-separated map, for example 2a=3a,2b=3b.\n"
+                "- Remove: compound numbers to remove, for example 2a,2c.\n"
+                "- Reorder: final compound order.\n\n"
+                "Output\n"
+                "- Patch writes a new support file.\n"
+                "- The old support is not edited in place."
             ),
             wraplength=760,
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        existing = self._instruction_block(content, 5, "Existing SI tools", "Workflows for already generated documents.")
+        add = self._instruction_block(content, 9, "Add", "Append new compounds to an old SI.")
         ttk.Label(
-            existing,
+            add,
             text=(
-                "Check validates an existing support from a manifest. Patch creates a modified copy with renumbered, removed or reordered compounds. "
-                "Add appends new compounds to the end without rewriting old compound blocks."
+                "Fields\n"
+                "- Previous output folder: choose the old run folder; the app fills manifest and support automatically when possible.\n"
+                "- Existing manifest: upload manifest from the old run when no previous output folder is selected.\n"
+                "- Existing support .docx: optional override if the old support file was moved.\n"
+                "- Add mode: choose how formatting and processing settings are selected.\n"
+                "- New compound table: upload a Word table containing only new compounds.\n"
+                "- New spectra source: optional folder or zip with spectra only for the new compounds.\n"
+                "- New SI template: optional. In Same series it overrides the old template; in New method it defines the new method layout.\n"
+                "- New Reaction_schema: optional in Same series if the old schema should be reused; required for new loadings in New method.\n"
+                "- New Scope: new scope table for the added compounds. Required when loadings are enabled.\n"
+                "- Output folder: folder where the app creates a new run folder and combined support file.\n\n"
+                "Add modes\n"
+                "- Same series: reuses old template, Reaction_schema, Mnova styles, ppm ranges, thresholds, baseline, checks and loadings mode.\n"
+                "- Same series never reuses old Scope, compound table or spectra source. These must come from this Add page.\n"
+                "- New method: can use new template, Reaction_schema and Scope. Spectra display/preprocessing settings stay unified with Processing.\n"
+                "- Both modes stop if a new compound number already exists in the old manifest.\n\n"
+                "Current workflow\n"
+                "- Loads the old manifest and old support.\n"
+                "- Reads new compounds from the new table.\n"
+                "- Stops if any new compound number already exists in the old manifest.\n"
+                "- Generates a temporary support for the new compounds using the normal Generate pipeline.\n"
+                "- Copies bookmarked new compound blocks into the old support.\n"
+                "- Copies new spectra appendix entries after the old appendix.\n"
+                "- Writes a merged manifest and an add_report JSON into the new run folder.\n\n"
+                "Limitations\n"
+                "- Old compound blocks are not regenerated.\n"
+                "- The old support file is never edited in place."
             ),
             wraplength=760,
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
+
+    def _build_alias_reference(self, parent: ttk.Frame) -> None:
+        parent.columnconfigure(0, weight=1)
+        row = 0
+        ttk.Label(
+            parent,
+            text=(
+                "Use aliases in Word as {Object.attribute}. Formatting is inherited from the placeholder: "
+                "if the placeholder is bold or italic, the inserted value keeps that style."
+            ),
+            wraplength=760,
+            justify="left",
+        ).grid(row=row, column=0, sticky="ew", pady=(0, 10))
+        row += 1
+
+        row = self._alias_table(
+            parent,
+            row,
+            "Product aliases",
+            (
+                ("{Product.name}", "ChemDraw structure / compound table", "Generated nomenclature name of the product."),
+                ("{Product.number}", "Compound table", "Product number used in the SI, spectra folders, and captions."),
+                ("{Product.mg}", "Scope.docx or yield text", "Product mass in milligrams."),
+                ("{Product.g}", "Calculated from Product.mg", "Product mass in grams: mg / 1000."),
+                ("{Product.kg}", "Calculated from Product.mg", "Product mass in kilograms: mg / 1,000,000."),
+                ("{Product.mmol}", "Scope.docx + product structure/MW", "Product amount in mmol: product mass / molecular weight."),
+                ("{Product.mol}", "Calculated from Product.mmol", "Product amount in mol: mmol / 1000."),
+                ("{Product.structure}", "Word compound table", "Editable product structure inserted as the ChemDraw OLE object."),
+                ("{Product.nmr.1h.picture}", "Processed spectra", "1H spectrum appendix object: PNG or clickable Mnova object, depending on GUI choice."),
+                ("{Product.nmr.13c.picture}", "Processed spectra", "13C spectrum appendix object: PNG or clickable Mnova object, depending on GUI choice."),
+                ("{Product.yield.percent}", "Scope.docx + limiting scale", "Product yield percent calculated from product mmol and reaction scale."),
+                ("{Product.appearance}", "Compound table", "Color and physical state, for example white solid."),
+                ("{Product.mp}", "Compound table", "Melting point without the °C suffix."),
+                ("{Product.rf.value}", "Compound table Rf field", "Rf value only."),
+                ("{Product.rf.system}", "Compound table Rf field", "TLC eluent system from parentheses."),
+                ("{Product.preparation}", "Template/loadings workflow", "Prepared synthetic description paragraph for the product."),
+                ("{Product.support.warning}", "Support check", "Red warning text if NMR/HRMS/elemental-analysis validation found a mismatch."),
+            ),
+        )
+        row = self._alias_table(
+            parent,
+            row,
+            "Reagent aliases",
+            (
+                ("{Reagent_1.name}", "Scope.docx structure / Reaction_schema.docx", "Generated or fallback name of reagent 1."),
+                ("{Reagent_1.mg}", "Scope.docx / calculated from eq and MW", "Reagent mass in milligrams."),
+                ("{Reagent_1.g}", "Calculated from Reagent_1.mg", "Reagent mass in grams: mg / 1000."),
+                ("{Reagent_1.kg}", "Calculated from Reagent_1.mg", "Reagent mass in kilograms: mg / 1,000,000."),
+                ("{Reagent_1.mmol}", "Reaction_schema.docx + reaction scale", "Reagent amount in mmol."),
+                ("{Reagent_1.mol}", "Calculated from Reagent_1.mmol", "Reagent amount in mol: mmol / 1000."),
+                ("{Reagent_1.mcl}", "Density or concentration calculation", "Reagent volume in microliters."),
+                ("{Reagent_1.ml}", "Calculated from mcl or concentration", "Reagent volume in milliliters."),
+                ("{Reagent_1.l}", "Calculated from ml", "Reagent volume in liters."),
+                ("{Reagent_1.eq}", "Reaction_schema.docx", "Equivalents of the reagent relative to the limiting scale."),
+                ("{K2CO3.mg}", "Named row in Reaction_schema.docx", "Same attributes work for named common reagents."),
+                ("{AcOH.mcl}", "Named row + density", "Example of a named liquid reagent volume in microliters."),
+                ("{AcOH.mmol}", "Named row + equivalents", "Example of a named reagent amount in mmol."),
+            ),
+        )
+        row = self._alias_table(
+            parent,
+            row,
+            "Solvent aliases",
+            (
+                ("{Solvent_MeCN.name}", "Reaction_schema.docx", "Displayed solvent name. Solvent_MeCN is shown as MeCN."),
+                ("{Solvent_MeCN.mcl}", "Reaction scale / concentration", "Solvent volume in microliters."),
+                ("{Solvent_MeCN.ml}", "Reaction scale / concentration", "Solvent volume in milliliters."),
+                ("{Solvent_MeCN.l}", "Calculated from ml", "Solvent volume in liters."),
+            ),
+        )
+        row = self._alias_table(
+            parent,
+            row,
+            "NMR aliases",
+            (
+                ("{nmr.1h.label}", "Mnova report / input table", "1H NMR label, usually 1H NMR."),
+                ("{nmr.1h.conditions}", "Mnova report / input table", "1H NMR solvent and frequency, for example CDCl3, 600 MHz."),
+                ("{nmr.1h.peaks}", "Mnova report / input table", "1H NMR peak list after delta =."),
+                ("{nmr.13c.label}", "Mnova report / input table", "13C NMR label, usually 13C{1H} NMR."),
+                ("{nmr.13c.conditions}", "Mnova report / input table", "13C NMR solvent and frequency."),
+                ("{nmr.13c.peaks}", "Mnova report / input table", "13C NMR peak list after delta =."),
+                ("{nmr.extra}", "Input table", "Additional NMR lines, for example 19F NMR."),
+            ),
+        )
+        row = self._alias_table(
+            parent,
+            row,
+            "HRMS, elemental analysis, IR",
+            (
+                ("{hrms.label}", "Input table / HRMS settings", "HRMS method label."),
+                ("{hrms.adduct}", "Input table / default adduct", "Ion adduct, for example [M+H]+."),
+                ("{hrms.formula}", "Structure formula + adduct", "Calculated ion formula with isotope labels when applicable."),
+                ("{hrms.calculated}", "Formula calculation", "Calculated m/z value."),
+                ("{hrms.found}", "Input table", "Experimental found m/z value."),
+                ("{anal.label}", "Elemental-analysis block", "Elemental analysis label, usually Anal."),
+                ("{anal.formula}", "Product formula", "Formula used for elemental analysis."),
+                ("{anal.calculated}", "Formula calculation", "Calculated C/H/N/etc percentages."),
+                ("{anal.found}", "Input table", "Experimental elemental analysis values."),
+                ("{ir.label}", "IR parser", "IR label."),
+                ("{ir.method}", "IR parser / default", "IR method, for example KBr."),
+                ("{ir.peaks}", "Input table", "IR peak list in cm-1."),
+                ("{reaction.loadings}", "Reaction loading block", "Fallback full loading line if the template uses automatic loading text."),
+            ),
+        )
+
+    def _alias_table(self, parent: ttk.Frame, row: int, title: str, rows: tuple[tuple[str, str, str], ...]) -> int:
+        ttk.Label(parent, text=title, font=("Segoe UI", 10, "bold")).grid(row=row, column=0, sticky="w", pady=(8, 4))
+        row += 1
+        table = ttk.Frame(parent)
+        table.grid(row=row, column=0, sticky="ew", pady=(0, 8))
+        table.columnconfigure(0, weight=0)
+        table.columnconfigure(1, weight=1)
+        table.columnconfigure(2, weight=2)
+        headers = ("Alias", "Source", "Meaning")
+        for col, header in enumerate(headers):
+            ttk.Label(table, text=header, font=("Segoe UI", 9, "bold"), padding=(6, 4), relief="solid").grid(
+                row=0,
+                column=col,
+                sticky="nsew",
+            )
+        for item_row, (alias, source, meaning) in enumerate(rows, start=1):
+            ttk.Label(table, text=alias, font=("Consolas", 9), padding=(6, 3), relief="solid").grid(row=item_row, column=0, sticky="nsew")
+            ttk.Label(table, text=source, wraplength=190, padding=(6, 3), relief="solid", justify="left").grid(row=item_row, column=1, sticky="nsew")
+            ttk.Label(table, text=meaning, wraplength=330, padding=(6, 3), relief="solid", justify="left").grid(row=item_row, column=2, sticky="nsew")
+        return row + 1
 
     def _instruction_block(self, parent: ttk.Frame, row: int, title: str, summary: str, *, expanded: bool = False) -> ttk.Frame:
         block = _CollapsibleInstructionBlock(parent, title=title, summary=summary, theme=self._theme, expanded=expanded)
@@ -695,7 +989,7 @@ class SIGeneratorApp:
     def _show_page(self, page: str) -> None:
         page_text = {
             "generate": ("Generate SI", "Create formatted Supporting Information from a compound table and spectra."),
-            "advanced": ("Processing", "Template, spectra rendering, peak picking, baseline correction, and loadings."),
+            "advanced": ("Processing", "Spectra rendering, peak picking, baseline correction, and validation."),
             "check": ("Check support", "Run validation from an existing manifest and optional support document."),
             "patch": ("Patch SI", "Create a new support document with renumbered, removed, or reordered compounds."),
             "add": ("Add compounds", "Append new compound blocks and spectra to an existing support document."),
@@ -771,11 +1065,8 @@ class SIGeneratorApp:
             ttk.Button(parent, text=button_text, command=open_command).grid(row=row, column=2, sticky="e", padx=(8, 0), pady=3)
 
     def _browse_input(self) -> None:
-        if self.input_kind.get() == "csv":
-            types = [("CSV files", "*.csv"), ("All files", "*.*")]
-        else:
-            types = [("Word documents", "*.docx"), ("All files", "*.*")]
-        self._browse_file(self.input_path, types)
+        self.input_kind.set("word")
+        self._browse_file(self.input_path, [("Word documents", "*.docx"), ("All files", "*.*")])
         if self.input_path.get() and not self.output_folder.get():
             self._set_output_folder(str(Path(self.input_path.get()).parent), save=False)
 
@@ -845,30 +1136,35 @@ class SIGeneratorApp:
             self._save_settings()
 
     def _browse_add_input(self) -> None:
-        if self.add_input_kind.get() == "csv":
-            types = [("CSV files", "*.csv"), ("All files", "*.*")]
-        else:
-            types = [("Word documents", "*.docx"), ("All files", "*.*")]
-        self._browse_file(self.add_input_path, types)
+        self.add_input_kind.set("word")
+        self._browse_file(self.add_input_path, [("Word documents", "*.docx"), ("All files", "*.*")])
 
-    def _browse_add_output(self) -> None:
-        kwargs: dict[str, object] = {
-            "defaultextension": ".docx",
-            "filetypes": [("Word documents", "*.docx"), ("All files", "*.*")],
-            "initialfile": Path(self.add_output_docx.get()).name if self.add_output_docx.get() else "support_information_added.docx",
-        }
-        initialdir = _dialog_initialdir(self.add_output_docx.get(), self.add_input_path.get(), self.output_folder.get(), self.output_docx.get(), self._last_output_folder)
+    def _browse_add_previous_output(self) -> None:
+        before = self.add_previous_output_dir.get()
+        self._browse_folder(self.add_previous_output_dir)
+        selected = self.add_previous_output_dir.get()
+        if selected and selected != before:
+            manifest, support = _previous_output_defaults(Path(selected))
+            if manifest:
+                self.add_manifest.set(str(manifest))
+            if support:
+                self.add_support_docx.set(str(support))
+            self._save_settings()
+
+    def _browse_add_output_folder(self) -> None:
+        kwargs: dict[str, object] = {}
+        initialdir = _dialog_initialdir(self.add_output_folder.get(), self.output_folder.get(), self.add_input_path.get(), self._last_output_folder)
         if initialdir:
             kwargs["initialdir"] = initialdir
-        path = filedialog.asksaveasfilename(**kwargs)
+        path = filedialog.askdirectory(**kwargs)
         if path:
-            self.add_output_docx.set(path)
+            self.add_output_folder.set(path)
             self._save_settings()
 
     def _load_examples(self) -> None:
         examples = examples_dir()
-        table = examples / "test_input.docx"
-        spectra = examples / "test_input.zip"
+        table = examples / "test_input_2.docx"
+        spectra = examples / "spectra_2.zip"
         if not table.exists() or not spectra.exists():
             messagebox.showerror("Auto Support Generator", f"Example files were not found in:\n{examples}")
             return
@@ -928,6 +1224,7 @@ class SIGeneratorApp:
             messagebox.showerror("SI Generator", str(exc))
             return
 
+        self.log.clear()
         preflight_issues = preflight_generate_request(request)
         if _has_preflight_code(preflight_issues, "PREFLIGHT_OUTPUT_LOCKED"):
             original_output = request.output_path
@@ -943,7 +1240,7 @@ class SIGeneratorApp:
             self.log.write("\n> Preflight checks\n" + format_preflight_issues(preflight_issues) + "\n")
         if issue_has_errors(preflight_issues):
             self.status_text.set("Ready")
-            messagebox.showerror("SI Generator", "Preflight checks failed. See Run Log for details.")
+            messagebox.showerror("SI Generator", "Preflight checks failed:\n\n" + format_preflight_issues(preflight_issues))
             return
 
         self._save_settings()
@@ -1009,14 +1306,21 @@ class SIGeneratorApp:
             request = _build_add_compounds_request(
                 manifest_text=self.add_manifest.get() or self.existing_manifest.get(),
                 support_docx_text=self.add_support_docx.get(),
+                previous_output_dir_text=self.add_previous_output_dir.get(),
                 input_kind=self.add_input_kind.get(),
+                method_mode_text=self.add_method_mode.get(),
                 input_path_text=self.add_input_path.get(),
-                output_docx_text=self.add_output_docx.get(),
+                output_folder_text=self.add_output_folder.get() or self.output_folder.get(),
+                output_docx_text="",
                 spectra_source_text=self.add_spectra_source.get(),
-                template_docx_text=self.template_docx.get(),
-                references_text=self.references_file.get(),
+                template_docx_text=self.add_template_docx.get(),
+                references_text="",
+                loadings_schema_docx_text=self.add_loadings_schema_docx.get(),
+                loadings_scope_docx_text=self.add_loadings_scope_docx.get(),
                 mnova_exe_text=self.mnova_exe.get(),
-                mnova_graphics_profile_text=self.mnova_graphics_profile.get(),
+                mnova_graphics_profile_text="",
+                mnova_graphics_profile_1h_text=self.mnova_graphics_profile_1h.get(),
+                mnova_graphics_profile_13c_text=self.mnova_graphics_profile_13c.get(),
                 insert_spectra_as=self.insert_spectra_as.get(),
                 target_signal_height_percent_text=self.target_signal_height_percent.get(),
                 h1_ppm_min_text=self.h1_ppm_min.get(),
@@ -1051,7 +1355,7 @@ class SIGeneratorApp:
             return
         self._start_background_operation(
             "Add compounds",
-            f"Manifest: {request.manifest_path}\nNew table: {request.input_path}\nOutput: {request.output_docx}\n",
+            f"Manifest: {request.manifest_path}\nNew table: {request.input_path}\nOutput folder: {request.output_folder or request.output_docx}\n",
             self._run_add_compounds_workflow,
             (run_add_compounds, request),
         )
@@ -1061,6 +1365,7 @@ class SIGeneratorApp:
         self.run_button.configure(state="disabled")
         self.status_text.set("Running")
         self.progress.start(12)
+        self.log.clear()
         self.log.write(f"\n> {title}\n{details}\n")
         thread = threading.Thread(target=target, args=(request,), daemon=True)
         thread.start()
@@ -1076,7 +1381,9 @@ class SIGeneratorApp:
             loadings_schema_text=self.loadings_schema_docx.get(),
             loadings_scope_text=self.loadings_scope_docx.get(),
             mnova_exe_text=self.mnova_exe.get(),
-            mnova_graphics_profile_text=self.mnova_graphics_profile.get(),
+            mnova_graphics_profile_text="",
+            mnova_graphics_profile_1h_text=self.mnova_graphics_profile_1h.get(),
+            mnova_graphics_profile_13c_text=self.mnova_graphics_profile_13c.get(),
             insert_spectra_as=self.insert_spectra_as.get(),
             target_signal_height_percent_text=self.target_signal_height_percent.get(),
             h1_ppm_min_text=self.h1_ppm_min.get(),
@@ -1102,8 +1409,13 @@ class SIGeneratorApp:
         try:
             with redirect_stdout(writer), redirect_stderr(writer):
                 result = run_generate_si(request)
+            for issue in result.get("issues", []):
+                self._log_queue.put(f"[{issue.get('severity', 'warning').upper()}] {issue.get('code', 'GENERATE')}: {issue.get('message', '')}\n")
             summary = _build_result_summary(result)
-            self._log_queue.put(f"\nGenerated {summary['support_docx']}\n")
+            if manifest_has_errors(result.get("issues", [])):
+                self._log_queue.put(f"\nGeneration failed. Intended DOCX path: {summary.get('support_docx', '')}\n")
+            else:
+                self._log_queue.put(f"\nGenerated {summary['support_docx']}\n")
             if summary.get("processed_spectra_zip"):
                 self._log_queue.put(f"Spectra package: {summary['processed_spectra_zip']}\n")
             if summary.get("manifest"):
@@ -1114,8 +1426,12 @@ class SIGeneratorApp:
                 self._log_queue.put(f"Input warnings: {summary['input_warnings']}\n")
             if summary.get("support_warnings"):
                 self._log_queue.put(f"Support warnings: {summary['support_warnings']}\n")
-            self._log_queue.put("\nDone.\n")
-            self._log_queue.put({"type": "run_succeeded", "summary": summary})
+            if manifest_has_errors(result.get("issues", [])):
+                self._log_queue.put("\nGeneration failed.\n")
+                self._log_queue.put({"type": "run_failed", "error": "Generation failed", "summary": summary, "issues": result.get("issues", [])})
+            else:
+                self._log_queue.put("\nDone.\n")
+                self._log_queue.put({"type": "run_succeeded", "summary": summary})
         except Exception as exc:
             self._log_queue.put(f"\nERROR: {exc}\n")
             self._log_queue.put({"type": "run_failed", "error": str(exc)})
@@ -1132,7 +1448,7 @@ class SIGeneratorApp:
                 self._log_queue.put(f"Check report: {summary['run_summary']}\n")
             if manifest_has_errors(result.get("issues", [])):
                 self._log_queue.put("\nManifest check failed.\n")
-                self._log_queue.put({"type": "run_failed", "error": "Manifest check failed", "summary": summary})
+                self._log_queue.put({"type": "run_failed", "error": "Manifest check failed", "summary": summary, "issues": result.get("issues", [])})
             else:
                 self._log_queue.put("\nManifest check passed.\n")
                 self._log_queue.put({"type": "run_succeeded", "summary": summary})
@@ -1152,7 +1468,7 @@ class SIGeneratorApp:
                 self._log_queue.put(f"Patch report: {summary['run_summary']}\n")
             if manifest_has_errors(result.get("issues", [])):
                 self._log_queue.put("\nPatch check failed.\n")
-                self._log_queue.put({"type": "run_failed", "error": "Patch check failed", "summary": summary})
+                self._log_queue.put({"type": "run_failed", "error": "Patch check failed", "summary": summary, "issues": result.get("issues", [])})
             else:
                 self._log_queue.put(f"\nPatched {summary.get('support_docx', '')}\n")
                 if summary.get("manifest"):
@@ -1176,7 +1492,7 @@ class SIGeneratorApp:
                 self._log_queue.put(f"Add compounds report: {summary['run_summary']}\n")
             if manifest_has_errors(result.get("issues", [])):
                 self._log_queue.put("\nAdd compounds failed.\n")
-                self._log_queue.put({"type": "run_failed", "error": "Add compounds failed", "summary": summary})
+                self._log_queue.put({"type": "run_failed", "error": "Add compounds failed", "summary": summary, "issues": result.get("issues", [])})
             else:
                 self._log_queue.put(f"\nGenerated {summary.get('support_docx', '')}\n")
                 self._log_queue.put({"type": "run_succeeded", "summary": summary})
@@ -1201,6 +1517,7 @@ class SIGeneratorApp:
                     self.status_text.set("Failed")
                     if isinstance(item.get("summary"), dict):
                         self._apply_result_summary(item.get("summary", {}))
+                    messagebox.showerror("SI Generator", _failure_dialog_message(item))
                 else:
                     self.log.write(item)
         except queue.Empty:
@@ -1241,6 +1558,7 @@ class SIGeneratorApp:
             self._last_output_folder = Path(output_folder).expanduser()
         if summary.get("manifest"):
             self.existing_manifest.set(summary["manifest"])
+        self.log.save_to_logs_dir(summary.get("logs_dir", ""))
         self._save_settings()
 
     def _load_saved_settings(self) -> None:
@@ -1249,6 +1567,8 @@ class SIGeneratorApp:
             value = settings.get(key)
             if isinstance(value, str):
                 variable.set(value)
+        self.input_kind.set("word")
+        self.add_input_kind.set("word")
         if not self.spectra_source.get() and isinstance(settings.get("spectra_zip"), str):
             self.spectra_source.set(str(settings["spectra_zip"]))
         if isinstance(settings.get("output_folder"), str) and self.output_folder.get():
@@ -1267,6 +1587,12 @@ class SIGeneratorApp:
             value = settings.get(key)
             if isinstance(value, bool):
                 variable.set(value)
+
+    def _set_default_mngp_profiles_if_empty(self) -> None:
+        if not self.mnova_graphics_profile_1h.get().strip():
+            self.mnova_graphics_profile_1h.set(_default_mngp_profile_text("1H"))
+        if not self.mnova_graphics_profile_13c.get().strip():
+            self.mnova_graphics_profile_13c.set(_default_mngp_profile_text("13C"))
 
     def _save_settings(self) -> None:
         self._sync_output_docx_from_folder()
@@ -1290,7 +1616,8 @@ class SIGeneratorApp:
             "loadings_schema_docx": self.loadings_schema_docx,
             "loadings_scope_docx": self.loadings_scope_docx,
             "mnova_exe": self.mnova_exe,
-            "mnova_graphics_profile": self.mnova_graphics_profile,
+            "mnova_graphics_profile_1h": self.mnova_graphics_profile_1h,
+            "mnova_graphics_profile_13c": self.mnova_graphics_profile_13c,
             "output_docx": self.output_docx,
             "output_folder": self.output_folder,
             "theme_mode": self.theme_mode,
@@ -1313,12 +1640,18 @@ class SIGeneratorApp:
             "patch_renumber": self.patch_renumber,
             "patch_remove": self.patch_remove,
             "patch_reorder": self.patch_reorder,
+            "add_previous_output_dir": self.add_previous_output_dir,
             "add_manifest": self.add_manifest,
             "add_support_docx": self.add_support_docx,
+            "add_template_docx": self.add_template_docx,
+            "add_loadings_schema_docx": self.add_loadings_schema_docx,
+            "add_loadings_scope_docx": self.add_loadings_scope_docx,
             "add_input_path": self.add_input_path,
             "add_spectra_source": self.add_spectra_source,
             "add_output_docx": self.add_output_docx,
+            "add_output_folder": self.add_output_folder,
             "add_input_kind": self.add_input_kind,
+            "add_method_mode": self.add_method_mode,
         }
 
     def _set_output_folder(self, folder: str, *, save: bool = True) -> None:
@@ -1643,6 +1976,30 @@ class _LogText(ttk.Frame):
         self.text.delete("1.0", "end")
 
 
+class _RunLogBuffer:
+    def __init__(self) -> None:
+        self._parts: list[str] = []
+
+    def configure(self, *args, **kwargs) -> None:
+        return None
+
+    def write(self, text: str) -> None:
+        self._parts.append(str(text))
+
+    def clear(self) -> None:
+        self._parts.clear()
+
+    def save_to_logs_dir(self, logs_dir: str) -> None:
+        if not logs_dir:
+            return
+        try:
+            path = Path(logs_dir).expanduser()
+            path.mkdir(parents=True, exist_ok=True)
+            (path / "gui_run.log").write_text("".join(self._parts), encoding="utf-8")
+        except OSError:
+            return
+
+
 class _QueueWriter:
     def __init__(self, log_queue: queue.Queue[str]) -> None:
         self.log_queue = log_queue
@@ -1669,6 +2026,8 @@ def _build_generate_request(
     loadings_scope_text: str = "",
     mnova_exe_text: str = "",
     mnova_graphics_profile_text: str = "",
+    mnova_graphics_profile_1h_text: str = "",
+    mnova_graphics_profile_13c_text: str = "",
     insert_spectra_as: str = "png",
     peak_threshold_percent_text: str = "",
     peak_threshold_1h_percent_text: str = "",
@@ -1689,8 +2048,7 @@ def _build_generate_request(
     calculate_elemental_analysis: bool = False,
     check_support: bool = True,
 ) -> GenerateSIRequest:
-    input_suffixes = (".csv",) if input_kind == "csv" else (".docx",)
-    input_path = _required_existing_file(input_path_text, "Choose an existing compound table.", suffixes=input_suffixes)
+    input_path = _required_existing_file(input_path_text, "Choose an existing compound table.", suffixes=(".docx",))
     output_docx = Path(output_docx_text.strip().strip('"')).expanduser()
     if not output_docx.name.lower().endswith(".docx"):
         raise ValueError("Output file must be a .docx file.")
@@ -1704,7 +2062,7 @@ def _build_generate_request(
 
     return GenerateSIRequest(
         input_path=input_path,
-        input_kind="csv" if input_kind == "csv" else "word",
+        input_kind="word",
         output_path=output_docx,
         spectra_source=_optional_spectra_source(spectra_source_text or spectra_zip_text),
         template_docx=_optional_existing_file(template_docx_text, "SI template .docx", suffixes=(".docx",)),
@@ -1715,6 +2073,16 @@ def _build_generate_request(
         mnova_graphics_profile=_optional_existing_file(
             mnova_graphics_profile_text,
             "Mnova graphics .mngp",
+            suffixes=(".mngp",),
+        ),
+        mnova_graphics_profile_1h=_optional_existing_file(
+            mnova_graphics_profile_1h_text,
+            "1H .mngp",
+            suffixes=(".mngp",),
+        ),
+        mnova_graphics_profile_13c=_optional_existing_file(
+            mnova_graphics_profile_13c_text,
+            "13C .mngp",
             suffixes=(".mngp",),
         ),
         insert_spectra_as=_validated_spectrum_mode(insert_spectra_as),
@@ -1756,13 +2124,19 @@ def _build_add_compounds_request(
     manifest_text: str,
     support_docx_text: str,
     input_kind: str,
+    method_mode_text: str = "same_series",
     input_path_text: str,
-    output_docx_text: str,
+    output_folder_text: str = "",
+    output_docx_text: str = "",
     spectra_source_text: str = "",
     template_docx_text: str = "",
     references_text: str = "",
+    loadings_schema_docx_text: str = "",
+    loadings_scope_docx_text: str = "",
     mnova_exe_text: str = "",
     mnova_graphics_profile_text: str = "",
+    mnova_graphics_profile_1h_text: str = "",
+    mnova_graphics_profile_13c_text: str = "",
     insert_spectra_as: str = "png",
     peak_threshold_percent_text: str = "",
     peak_threshold_1h_percent_text: str = "",
@@ -1782,26 +2156,56 @@ def _build_add_compounds_request(
     generate_loadings: bool = False,
     calculate_elemental_analysis: bool = False,
     check_support: bool = True,
+    previous_output_dir_text: str = "",
 ) -> AddCompoundsRequest:
-    input_suffixes = (".csv",) if input_kind == "csv" else (".docx",)
-    input_path = _required_existing_file(input_path_text, "Choose an existing new compound table.", suffixes=input_suffixes)
-    output_docx = Path(output_docx_text.strip().strip('"')).expanduser()
-    if not output_docx.name.lower().endswith(".docx"):
-        raise ValueError("Add compounds output file must be a .docx file.")
+    input_path = _required_existing_file(input_path_text, "Choose an existing new compound table.", suffixes=(".docx",))
+    output_docx = _optional_output_docx(output_docx_text)
+    output_folder = _optional_output_folder(output_folder_text)
+    if not output_docx and not output_folder:
+        output_folder = input_path.parent
+    previous_output_dir = _optional_existing_folder(previous_output_dir_text, "Previous output folder")
+    if previous_output_dir:
+        default_manifest, default_support = _previous_output_defaults(previous_output_dir)
+        manifest_text = manifest_text or (str(default_manifest) if default_manifest else "")
+        support_docx_text = support_docx_text or (str(default_support) if default_support else "")
     shared_peak_threshold = _optional_peak_threshold_fraction(peak_threshold_percent_text)
+    add_loadings_requested = generate_loadings or bool(loadings_schema_docx_text.strip() or loadings_scope_docx_text.strip())
     return AddCompoundsRequest(
         manifest_path=_required_existing_file(manifest_text, "Choose an existing manifest JSON.", suffixes=(".json",)),
         support_docx=_optional_existing_file(support_docx_text, "Existing support .docx", suffixes=(".docx",)),
+        previous_output_dir=previous_output_dir,
         input_path=input_path,
-        input_kind="csv" if input_kind == "csv" else "word",
+        input_kind="word",
         output_docx=output_docx,
+        output_folder=output_folder,
+        method_mode=_validated_add_method_mode(method_mode_text),
         spectra_source=_optional_spectra_source(spectra_source_text),
         template_docx=_optional_existing_file(template_docx_text, "SI template .docx", suffixes=(".docx",)),
         references_path=_optional_existing_file(references_text, "References .yml", suffixes=(".yml", ".yaml")),
+        loadings_schema_docx=_optional_existing_file(
+            loadings_schema_docx_text,
+            "Reaction schema .docx",
+            suffixes=(".docx",),
+        ),
+        loadings_scope_docx=_optional_existing_file(
+            loadings_scope_docx_text,
+            "Scope table .docx",
+            suffixes=(".docx",),
+        ),
         mnova_exe=_optional_existing_file(mnova_exe_text, "MestReNova .exe", suffixes=(".exe",)),
         mnova_graphics_profile=_optional_existing_file(
             mnova_graphics_profile_text,
             "Mnova graphics .mngp",
+            suffixes=(".mngp",),
+        ),
+        mnova_graphics_profile_1h=_optional_existing_file(
+            mnova_graphics_profile_1h_text,
+            "1H .mngp",
+            suffixes=(".mngp",),
+        ),
+        mnova_graphics_profile_13c=_optional_existing_file(
+            mnova_graphics_profile_13c_text,
+            "13C .mngp",
             suffixes=(".mngp",),
         ),
         insert_spectra_as=_validated_spectrum_mode(insert_spectra_as),
@@ -1824,7 +2228,7 @@ def _build_add_compounds_request(
         whittaker_lambda=_validated_positive_float(whittaker_lambda_text, "Whittaker lambda"),
         whittaker_asymmetry=_validated_fraction(whittaker_asymmetry_text, "Whittaker asymmetry"),
         highlight_solvent_peaks=bool(highlight_solvent_peaks),
-        generate_loadings=generate_loadings,
+        generate_loadings=add_loadings_requested,
         calculate_elemental_analysis=calculate_elemental_analysis,
         no_check_support=not check_support,
     )
@@ -2006,6 +2410,35 @@ def _has_preflight_code(issues: list[dict[str, Any]], code: str) -> bool:
     return any(issue.get("code") == code for issue in issues)
 
 
+def _failure_dialog_message(item: dict[str, Any]) -> str:
+    title = str(item.get("error") or "Operation failed")
+    issues = [issue for issue in item.get("issues", []) if isinstance(issue, dict)]
+    errors = [issue for issue in issues if issue.get("severity") == "error"]
+    selected_issues = errors or issues
+    if not selected_issues:
+        return title
+
+    lines = [title, "", "Details:"]
+    for issue in selected_issues[:6]:
+        lines.extend(_issue_dialog_lines(issue))
+    if len(selected_issues) > 6:
+        lines.append(f"- ... and {len(selected_issues) - 6} more issue(s).")
+    summary = item.get("summary")
+    if isinstance(summary, dict) and summary.get("run_summary"):
+        lines.extend(["", f"Report: {summary['run_summary']}"])
+    return "\n".join(lines)
+
+
+def _issue_dialog_lines(issue: dict[str, Any]) -> list[str]:
+    code = str(issue.get("code") or "ERROR")
+    message = str(issue.get("message") or "").strip()
+    path = str(issue.get("path") or "").strip()
+    lines = [f"- {code}: {message}" if message else f"- {code}"]
+    if path:
+        lines.append(f"  File: {path}")
+    return lines
+
+
 def _next_available_docx_path(path: Path) -> Path:
     path = path.resolve()
     for index in range(1, 1000):
@@ -2039,7 +2472,16 @@ def _output_docx_from_folder(output_folder_text: str, fallback_docx_text: str = 
     return fallback_docx_text.strip().strip('"')
 
 
+def _default_mngp_profile_text(nucleus: str) -> str:
+    filename = "classic_13C.mngp" if nucleus == "13C" else "classic_1H.mngp"
+    path = examples_dir() / "mngp_styles" / filename
+    return str(path) if path.exists() else ""
+
+
 def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) -> dict[str, str]:
+    examples = table.parent
+    classic_1h = examples / "mngp_styles" / "classic_1H.mngp"
+    classic_13c = examples / "mngp_styles" / "classic_13C.mngp"
     return {
         "input_kind": "word",
         "input_path": str(table),
@@ -2052,6 +2494,8 @@ def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) ->
         "loadings_schema_docx": "",
         "loadings_scope_docx": "",
         "mnova_graphics_profile": "",
+        "mnova_graphics_profile_1h": str(classic_1h) if classic_1h.exists() else "",
+        "mnova_graphics_profile_13c": str(classic_13c) if classic_13c.exists() else "",
         "h1_ppm_min": f"{DEFAULT_X_RANGES['1H'][0]:g}",
         "h1_ppm_max": f"{DEFAULT_X_RANGES['1H'][1]:g}",
         "c13_ppm_min": f"{DEFAULT_X_RANGES['13C'][0]:g}",
@@ -2062,11 +2506,17 @@ def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) ->
         "patch_renumber": "",
         "patch_remove": "",
         "patch_reorder": "",
+        "add_previous_output_dir": "",
         "add_manifest": "",
         "add_support_docx": "",
+        "add_template_docx": "",
+        "add_loadings_schema_docx": "",
+        "add_loadings_scope_docx": "",
         "add_input_path": "",
         "add_spectra_source": "",
         "add_output_docx": "",
+        "add_output_folder": str(output_docx.parent),
+        "add_method_mode": "same_series",
     }
 
 
@@ -2087,6 +2537,33 @@ def _optional_existing_file(raw_path: str, label: str, *, suffixes: tuple[str, .
         raise ValueError(f"{label} does not exist: {path}")
     _validate_existing_file(path, label=label, suffixes=suffixes)
     return path
+
+
+def _optional_existing_folder(raw_path: str, label: str) -> Path | None:
+    raw_path = str(raw_path).strip().strip('"')
+    if not raw_path:
+        return None
+    path = Path(raw_path).expanduser()
+    if not path.exists():
+        raise ValueError(f"{label} does not exist: {path}")
+    if not path.is_dir():
+        raise ValueError(f"{label} must be a folder: {path}")
+    return path
+
+
+def _previous_output_defaults(output_dir: Path) -> tuple[Path | None, Path | None]:
+    root = Path(output_dir).expanduser()
+    candidates = [
+        root / "docx" / "support_information.manifest.json",
+        root / "support_information.manifest.json",
+    ]
+    manifest = next((path for path in candidates if path.exists() and path.is_file()), None)
+    support_candidates = [
+        root / "docx" / "support_information.docx",
+        root / "support_information.docx",
+    ]
+    support = next((path for path in support_candidates if path.exists() and path.is_file()), None)
+    return manifest, support
 
 
 def _optional_spectra_source(raw_path: str) -> Path | None:
@@ -2115,8 +2592,18 @@ def _optional_output_docx(raw_path: str) -> Path | None:
     if not raw_path:
         return None
     path = Path(raw_path).expanduser()
-    if not path.name.lower().endswith(".docx"):
-        raise ValueError("Patched output file must be a .docx file.")
+    if path.suffix.lower() != ".docx":
+        raise ValueError("Output file must be a .docx file.")
+    return path
+
+
+def _optional_output_folder(raw_path: str) -> Path | None:
+    raw_path = raw_path.strip().strip('"')
+    if not raw_path:
+        return None
+    path = Path(raw_path).expanduser()
+    if path.suffix:
+        raise ValueError("Output folder must be a folder path, not a file.")
     return path
 
 
@@ -2125,6 +2612,13 @@ def _validated_spectrum_mode(value: str) -> SpectrumEmbedMode:
     if value in {"png", "mnova", "none"}:
         return value
     return "png"
+
+
+def _validated_add_method_mode(value: str) -> str:
+    normalized = str(value or "same_series").strip().lower().replace("-", "_")
+    if normalized in {"same_series", "new_method"}:
+        return normalized
+    return "same_series"
 
 
 def _validated_baseline_mode(value: str) -> str:
@@ -2227,8 +2721,7 @@ def copy_starter_files_to(destination_parent: str | Path, *, examples_root: Path
     destination = _next_available_folder(Path(destination_parent).expanduser() / "AutoSupportGenerator_starter_files")
     destination.mkdir(parents=True, exist_ok=False)
     for relative_path, source in sources:
-        target_name = "SI_template.docx" if relative_path.name == "SI_template_visual_current.docx" else relative_path.name
-        shutil.copy2(source, destination / target_name)
+        shutil.copy2(source, destination / relative_path.name)
     return destination
 
 

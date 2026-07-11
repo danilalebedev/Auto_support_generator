@@ -27,10 +27,9 @@ def output_path_from_state(state: GenerateSIState) -> Path:
 
 
 def request_from_args(args: Namespace) -> GenerateSIRequest:
-    input_path = Path(args.word_input or args.input)
     return GenerateSIRequest(
-        input_path=input_path,
-        input_kind="word" if args.word_input else "csv",
+        input_path=Path(args.word_input),
+        input_kind="word",
         output_path=Path(args.output),
         template_docx=Path(args.template_docx) if args.template_docx else None,
         references_path=Path(args.references) if args.references else None,
@@ -40,6 +39,8 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
         loadings_scope_docx=Path(args.loadings_scope_docx) if getattr(args, "loadings_scope_docx", None) else None,
         mnova_exe=Path(args.mnova_exe) if args.mnova_exe else None,
         mnova_graphics_profile=Path(args.mnova_graphics_profile) if getattr(args, "mnova_graphics_profile", None) else None,
+        mnova_graphics_profile_1h=Path(args.mnova_graphics_profile_1h) if getattr(args, "mnova_graphics_profile_1h", None) else None,
+        mnova_graphics_profile_13c=Path(args.mnova_graphics_profile_13c) if getattr(args, "mnova_graphics_profile_13c", None) else None,
         no_extract_nmr=bool(args.no_extract_nmr),
         insert_spectra_as=_spectrum_embed_mode(getattr(args, "insert_spectra_as", "png")),
         target_signal_height_fraction=_fraction_arg(

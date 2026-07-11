@@ -202,7 +202,7 @@ output/runs/<дата>_<input_name>/docx/support_information.docx
 
 | Поле | Что означает | Когда заполнять |
 | --- | --- | --- |
-| `Compound table` | Word `.docx` или CSV с данными по соединениям | всегда |
+| `Compound table` | Word `.docx`-таблица с данными по соединениям и ChemDraw OLE-структурами | всегда |
 | `Spectra source` | zip-архив или папка с raw-спектрами | если нужно автоматически обработать ЯМР |
 | `Output folder` | папка для результатов | всегда |
 
@@ -257,7 +257,6 @@ output/runs/<дата>_<input_name>/docx/support_information.docx
 
 | Поле | Значение по умолчанию | Что делает |
 | --- | --- | --- |
-| `Compound table type` | `Word table with ChemDraw objects` | выбирает формат таблицы: Word с OLE-структурами или CSV |
 | `Check support` | включено | проверяет NMR, HRMS и elemental analysis |
 | `Calculate elemental analysis` | выключено | добавляет расчетный elemental analysis по формуле |
 | `Spectra appendix` | `png` | выбирает, как вставлять спектры в конец SI |
@@ -354,27 +353,32 @@ Patch workflow всегда создает новый `.docx`, новый manife
 
 ## GUI: страница Add compounds
 
-Эта страница добавляет новые соединения к уже созданному SI.
+Эта страница добавляет новые соединения к уже созданному SI и не перегенерирует старые блоки соединений.
 
 | Поле | Что означает |
 | --- | --- |
-| `Existing manifest` | manifest старого SI |
-| `Existing support .docx` | старый SI `.docx` |
-| `New table type` | формат новой таблицы: Word или CSV |
-| `New compound table` | таблица только с новыми соединениями |
+| `Previous output folder` | папка старого запуска. Программа пытается автоматически подставить `Existing manifest` и `Existing support .docx` из подпапки `docx/` |
+| `Existing manifest` | manifest старого SI. Заполняется вручную, если не выбран previous output folder |
+| `Existing support .docx` | старый SI `.docx`, optional override если файл был перемещен |
+| `Add mode` | режим `Same series` или `New method` |
+| `New compound table` | Word `.docx`-таблица только с новыми соединениями |
 | `New spectra source` | спектры только для новых соединений |
+| `New SI template .docx` | optional template override. В New method может задавать оформление новой методики |
+| `New Reaction_schema.docx` | схема реакции для новых расчетов загрузок. Same series использует старую schema, если это поле пустое |
+| `New Scope.docx` | scope-таблица для новых соединений. Обязательна, если включены loadings |
 | `Output .docx` | новый объединенный SI |
 
-Если номер нового соединения уже есть в старом manifest, workflow
-останавливается с ошибкой `DUPLICATE_COMPOUND_NUMBER`. Это сделано специально,
-чтобы случайно не перезаписать старый блок.
+`Same series` переиспользует старый template, Reaction_schema, Mnova styles, ppm ranges, thresholds, baseline settings и check settings из старого manifest. Старый Scope, compound table и spectra source не переиспользуются.
 
+`New method` может использовать новый template, Reaction_schema и Scope. Настройки отображения и preprocessing спектров остаются едиными с предыдущим запуском, если в старом manifest есть run_config.
+
+Если номер нового соединения уже есть в старом manifest, workflow останавливается с ошибкой `DUPLICATE_COMPOUND_NUMBER`.
 ## Кнопки в верхней и нижней части GUI
 
 | Кнопка | Что делает |
 | --- | --- |
 | `Load example` | подставляет пример из папки `examples/` |
-| `Copy starter files` | копирует starter-набор в выбранную папку: таблицу `.docx`, CSV, template `.docx` и описание структуры spectra source |
+| `Copy starter files` | копирует starter-набор в выбранную папку: Word-таблицу, template `.docx`, примеры loadings и описание структуры spectra source |
 | `Open examples` | открывает папку с примерами |
 | `Generate SI` | запускает генерацию |
 | `Open last output` | открывает последнюю папку результата |
@@ -436,23 +440,6 @@ C, 30.75; H, 7.74; S, 41.04
 - повторяющийся номер соединения;
 - выбранный input-файл не существует;
 - output path не является `.docx`.
-
-## CSV-таблица
-
-CSV можно использовать, если не нужны структуры как OLE-объекты ChemDraw.
-
-Плюсы CSV:
-
-- проще создать программно;
-- удобно для быстрых тестов.
-
-Минусы CSV:
-
-- нельзя вставить ChemDraw OLE-структуру;
-- если нужна структура, придется передавать путь к файлу структуры и отдельно
-  включать соответствующую обработку.
-
-Для обычного SI с редактируемыми структурами лучше использовать Word-таблицу.
 
 ## Формат spectra source
 
@@ -827,7 +814,6 @@ Preview стандартного Word-шаблона:
 | `examples/test_input_2.docx` | дополнительный пример input-таблицы |
 | `examples/spectra_2/` | пример spectra source как обычной папки |
 | `examples/starter/compound_table_starter.docx` | starter Word-таблица: все основные поля и 3 строки-примера |
-| `examples/starter/compound_table_starter.csv` | starter CSV с теми же основными полями |
 | `examples/starter/spectra_source_layout.txt` | пример структуры папки или zip со спектрами |
 | `examples/starter/README_starter_files.md` | короткая инструкция к starter-файлам |
 | `examples/templates/SI_template_visual_current.docx` | пример Word-шаблона оформления |
@@ -908,7 +894,6 @@ AutoSupportGenerator.exe ^
 | Параметр | Что делает |
 | --- | --- |
 | `--word-input` | Word-таблица с ChemDraw OLE-структурами |
-| `--input` | CSV-таблица |
 | `--spectra-source` | zip или папка со спектрами |
 | `--output` | путь к итоговому `.docx` |
 | `--template-docx` | Word-шаблон SI |

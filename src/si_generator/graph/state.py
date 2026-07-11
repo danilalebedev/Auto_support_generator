@@ -33,6 +33,7 @@ class GenerateSIState(TypedDict, total=False):
     artifacts: dict[str, str]
     issues: list[Issue]
     manifest: dict[str, Any]
+    status: Literal["pass", "fail"]
 
 
 class CheckSIState(TypedDict, total=False):
@@ -59,9 +60,11 @@ class AddCompoundsState(TypedDict, total=False):
     request: AddCompoundsRequest
     manifest: dict[str, Any]
     new_compounds: list[Compound]
+    add_method_config: dict[str, Any]
     new_generate_state: dict[str, Any]
     add_id_map: dict[str, str]
     add_result: dict[str, Any]
+    output_path: Path
     artifacts: dict[str, str]
     issues: list[Issue]
     status: Literal["pass", "fail"]

@@ -28,7 +28,7 @@ from .runtime_paths import bundled_resource_path
 DEFAULT_TEMPLATE_RESOURCE = Path("si_generator/templates/SI_template.docx")
 
 PLACEHOLDER_RE = re.compile(r"\[\{([^{}]+)\}\]|\{([^{}]+)\}")
-NMR_LABEL_RE = re.compile(r"13C\{1H\}|1H(?=\s*NMR\b)")
+NMR_LABEL_RE = re.compile(r"13C(?:\{1H\})?(?=\s*NMR\b)|1H(?=\s*NMR\b)")
 STEREOCHEMISTRY_RE = re.compile(r"\((?:\d*[EZ](?:,\d*[EZ])*)\)")
 RF_RE = re.compile(r"\bRf\b")
 GP_RE = re.compile(r"\bGP\d+\b")
@@ -41,7 +41,7 @@ def default_template_path() -> Path:
     candidates = [
         bundled_resource_path(DEFAULT_TEMPLATE_RESOURCE, package_file=__file__),
         Path(__file__).resolve().parent / "templates" / "SI_template.docx",
-        Path(__file__).resolve().parents[2] / "examples" / "templates" / "SI_template_visual_current.docx",
+        Path(__file__).resolve().parents[2] / "examples" / "templates" / "SI_template.docx",
     ]
     for path in candidates:
         if path.exists():
@@ -172,9 +172,10 @@ def _render_template_paragraphs(
             continue
 
         paragraph = _clone_paragraph(document, template_paragraph)
+        _remove_empty_optional_fragments(paragraph, values)
         _replace_placeholders(paragraph, values)
         _apply_inline_formatting(paragraph)
-        if compound.nmr_check_warning and "{compound.support_warning}" in text:
+        if compound.nmr_check_warning and ("{compound.support_warning}" in text or "{Product.support.warning}" in text):
             _style_warning_paragraph(paragraph)
 
 
@@ -219,6 +220,84 @@ def _replace_placeholders(paragraph: Paragraph, values: dict[str, str]) -> None:
         cursor = match.end()
     _append_original_run_segments(segments, runs, run_texts, spans, cursor, len(full_text))
     _replace_paragraph_runs(paragraph, segments)
+
+
+def _remove_empty_optional_fragments(paragraph: Paragraph, values: dict[str, str]) -> None:
+    runs = list(paragraph.runs)
+    if not runs:
+        return
+    full_text = "".join(run.text or "" for run in runs)
+    cleaned = _cleanup_optional_text_fragments(full_text, values)
+    if cleaned == full_text:
+        return
+    first_run = next((run for run in runs if run.text), runs[0])
+    _replace_paragraph_runs(paragraph, [(cleaned, deepcopy(first_run._r.rPr))])
+
+
+def _cleanup_optional_text_fragments(text: str, values: dict[str, str]) -> str:
+    cleaned = text
+    if not values.get("anal.found"):
+        cleaned = _remove_fragment_with_placeholder(cleaned, "anal.found", r"\s*Found\s*:\s*{placeholder}\s*\.?")
+    if not _any_value(values, "product.yield.percent", "yield.product.percent", "percent.yield.product"):
+        cleaned = _remove_fragment_with_any_placeholder(
+            cleaned,
+            ("product.yield.percent", "yield.product.percent", "percent.yield.product"),
+            r"\s*\(\s*{placeholder}\s*\)",
+        )
+    if not _any_value(values, "product.mg", "product.yield.mg", "yield.product.mg", "mg.yield.product"):
+        cleaned = _remove_fragment_with_any_placeholder(
+            cleaned,
+            ("product.mg", "product.yield.mg", "yield.product.mg", "mg.yield.product"),
+            r"\s*Yield\s+{placeholder}\s*mg\s*(?:\([^)]*\))?\s*[;.]?",
+        )
+    if not values.get("product.appearance"):
+        cleaned = _remove_fragment_with_placeholder(cleaned, "product.appearance", r"\s*;\s*{placeholder}")
+        cleaned = _remove_fragment_with_placeholder(cleaned, "product.appearance", r"{placeholder}\s*;\s*")
+    if not values.get("product.mp"):
+        cleaned = _remove_fragment_with_placeholder(cleaned, "product.mp", r"\s*(?:[;.]\s*)?mp\s+{placeholder}\s*(?:°C|deg\.?\s*C|C)?")
+    if not values.get("product.rf.value"):
+        cleaned = _remove_fragment_with_placeholder(
+            cleaned,
+            "product.rf.value",
+            r"\s*[;.]\s*Rf\s*=\s*{placeholder}\s*(?:\(\s*" + _placeholder_any_pattern(("product.rf.system",)) + r"\s*\))?",
+        )
+    if values.get("product.rf.value") and not values.get("product.rf.system"):
+        cleaned = _remove_fragment_with_placeholder(cleaned, "product.rf.system", r"\s*\(\s*{placeholder}\s*\)")
+    return _normalize_optional_cleanup(cleaned)
+
+
+def _remove_fragment_with_placeholder(text: str, key: str, pattern_template: str) -> str:
+    return _remove_fragment_with_any_placeholder(text, (key,), pattern_template)
+
+
+def _remove_fragment_with_any_placeholder(text: str, keys: tuple[str, ...], pattern_template: str) -> str:
+    for key in keys:
+        placeholder = _placeholder_any_pattern((key,))
+        text = re.sub(pattern_template.replace("{placeholder}", placeholder), "", text, flags=re.IGNORECASE)
+    return text
+
+
+def _placeholder_any_pattern(keys: tuple[str, ...]) -> str:
+    alternatives = []
+    for key in keys:
+        escaped = re.escape(key)
+        alternatives.append(r"\[\{\s*" + escaped + r"\s*\}\]")
+        alternatives.append(r"\{\s*" + escaped + r"\s*\}")
+    return r"(?:" + "|".join(alternatives) + r")"
+
+
+def _any_value(values: dict[str, str], *keys: str) -> bool:
+    return any(values.get(_key(key)) for key in keys)
+
+
+def _normalize_optional_cleanup(text: str) -> str:
+    text = re.sub(r"\s+([,.;])", r"\1", text)
+    text = re.sub(r";\s*;", ";", text)
+    text = re.sub(r"\(\s*\)", "", text)
+    text = re.sub(r"\s{2,}", " ", text)
+    text = re.sub(r";\s*\.", ".", text)
+    text = re.sub(r"\s+\.", ".", text)
+    return text.strip()
 
 
 def _append_original_run_segments(
@@ -336,6 +415,8 @@ def _inline_format_segments(text: str) -> list[tuple[str, dict[str, bool]]]:
 def _nmr_label_segments(token: str) -> list[tuple[str, dict[str, bool]]]:
     if token == "1H":
         return [("1", {"superscript": True}), ("H", {})]
+    if token == "13C":
+        return [("13", {"superscript": True}), ("C", {})]
     return [("13", {"superscript": True}), ("C{", {}), ("1", {"superscript": True}), ("H}", {})]
 
 
@@ -480,7 +561,7 @@ def _is_structure_placeholder_paragraph(text: str) -> bool:
     if stripped.startswith("[[STRUCTURE:") or stripped.startswith("[[SPECTRUM_STRUCTURE:"):
         return True
     keys = _placeholder_keys(stripped)
-    return bool(keys) and keys.issubset({"compound.number.structure", "spectrum.structure.marker"})
+    return bool(keys) and keys.issubset({"product.structure", "compound.number.structure", "spectrum.structure.marker"})
 
 
 def _is_spectrum_artifact_paragraph(text: str) -> bool:
@@ -490,6 +571,8 @@ def _is_spectrum_artifact_paragraph(text: str) -> bool:
     return bool(
         keys
         & {
+            "product.nmr.1h.picture",
+            "product.nmr.13c.picture",
             "compound.number.nmr.1h.picture",
             "compound.number.nmr.13c.picture",
             "spectrum.picture",
@@ -513,13 +596,13 @@ def _should_skip_paragraph(text: str, values: dict[str, str]) -> bool:
         return True
     if any(key.startswith("ir.") for key in keys) and not values.get("ir.peaks"):
         return True
-    if "compound.preparation" in keys and not values.get("compound.preparation"):
+    if ("compound.preparation" in keys or "product.preparation" in keys) and not values.get("product.preparation"):
         return True
     if "reaction.loadings" in keys and not values.get("reaction.loadings"):
         return True
-    if _has_loadings_placeholders(keys) and not (values.get("number.product") or values.get("product.number")):
+    if _has_loadings_placeholders(keys) and not values.get("product.number"):
         return True
-    if "compound.support_warning" in keys and not values.get("compound.support_warning"):
+    if ("compound.support_warning" in keys or "product.support.warning" in keys) and not values.get("product.support.warning"):
         return True
     return False
 
@@ -530,22 +613,29 @@ def _emu_to_pt(value: int) -> float:
 
 def _compound_values(compound: Compound) -> dict[str, str]:
     loadings_values = {str(key): str(value) for key, value in compound.reaction.get("template_values", {}).items()}
+    product_values = _product_values(compound)
     values = {
         "compound.name": compound.name,
         "compound.number": compound.number,
         "compound.label": compound.label,
         "compound.number.structure": f"[[STRUCTURE:{compound.number}]]",
+        "product.name": compound.name,
+        "product.number": compound.number,
+        "product.structure": f"[[STRUCTURE:{compound.number}]]",
         "compound.preparation": "" if loadings_values else _summary_text(compound),
+        "product.preparation": "" if loadings_values else _summary_text(compound),
         "compound.support_warning": f"(Support check: {compound.nmr_check_warning})" if compound.nmr_check_warning else "",
+        "product.support.warning": f"(Support check: {compound.nmr_check_warning})" if compound.nmr_check_warning else "",
         "reaction.loadings": _reaction_loadings_text(compound),
         "nmr.1h.label": _nmr_label_from_text(compound.h1_nmr, "1H NMR"),
         "nmr.1h.conditions": compound.h1_conditions,
         "nmr.1h.peaks": _nmr_peaks_text(compound.h1_nmr),
-        "nmr.13c.label": _nmr_label_from_text(compound.c13_nmr, "13C{1H} NMR"),
+        "nmr.13c.label": _nmr_label_from_text(compound.c13_nmr, "13C NMR"),
         "nmr.13c.conditions": compound.c13_conditions,
         "nmr.13c.peaks": _nmr_peaks_text(compound.c13_nmr),
         "nmr.extra": compound.extra_nmr.strip(),
     }
+    values.update(product_values)
     values.update(_hrms_values(compound))
     values.update(_elemental_values(compound))
     values.update(_ir_values(compound))
@@ -563,16 +653,93 @@ def _spectrum_values(compound: Compound, nucleus: str) -> dict[str, str]:
             "spectrum.picture": f"[[SPECTRUM:{compound.number}:1H]]",
             "compound.number.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:1H]]",
             "compound.number.nmr.1h.picture": f"[[SPECTRUM:{compound.number}:1H]]",
+            "product.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:1H]]",
+            "product.nmr.1h.picture": f"[[SPECTRUM:{compound.number}:1H]]",
         }
     return {
         "spectrum.nucleus": "13C",
-        "spectrum.label": _nmr_label_from_text(compound.c13_nmr, "13C{1H} NMR"),
+        "spectrum.label": _nmr_label_from_text(compound.c13_nmr, "13C NMR"),
         "spectrum.conditions": compound.c13_conditions,
         "spectrum.structure.marker": f"[[SPECTRUM_STRUCTURE:{compound.number}:13C]]",
         "spectrum.picture": f"[[SPECTRUM:{compound.number}:13C]]",
         "compound.number.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:13C]]",
         "compound.number.nmr.13c.picture": f"[[SPECTRUM:{compound.number}:13C]]",
+        "product.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:13C]]",
+        "product.nmr.13c.picture": f"[[SPECTRUM:{compound.number}:13C]]",
     }
+
+
+def _product_values(compound: Compound) -> dict[str, str]:
+    mass_mg = _product_mass_mg(compound)
+    rf_value, rf_system = _split_rf(compound.rf)
+    return {
+        "product.mg": _format_mass_mg(mass_mg),
+        "product.g": _format_scaled_amount(_scale_value(mass_mg, 1 / 1000)),
+        "product.kg": _format_scaled_amount(_scale_value(mass_mg, 1 / 1_000_000)),
+        "product.mmol": "",
+        "product.mol": "",
+        "product.yield.percent": _product_yield_percent(compound),
+        "product.appearance": _compound_appearance(compound),
+        "product.mp": _strip_temperature_unit(compound.melting_point),
+        "product.rf.value": rf_value,
+        "product.rf.system": rf_system,
+    }
+
+
+def _product_mass_mg(compound: Compound) -> float | None:
+    match = re.search(r"(\d+(?:[.,]\d+)?)\s*mg\b", compound.yield_text or "", flags=re.IGNORECASE)
+    return _to_float(match.group(1)) if match else None
+
+
+def _product_yield_percent(compound: Compound) -> str:
+    match = re.search(r"(\d+(?:[.,]\d+)?)\s*%", compound.yield_text or "")
+    if not match:
+        return ""
+    value = _to_float(match.group(1))
+    return _format_scaled_amount(value) + "%" if value is not None else ""
+
+
+def _split_rf(value: str) -> tuple[str, str]:
+    text = str(value or "").strip()
+    match = re.match(r"(.+?)\s*\((.+)\)\s*$", text)
+    if not match:
+        return text, ""
+    return match.group(1).strip(), match.group(2).strip()
+
+
+def _compound_appearance(compound: Compound) -> str:
+    return " ".join(part.strip() for part in [compound.color, compound.state] if part and part.strip()).rstrip(".;")
+
+
+def _strip_temperature_unit(value: str) -> str:
+    return re.sub(r"\s*(?:deg\.?\s*C|degrees?\s*C|°C|C)\s*$", "", str(value or "").strip(), flags=re.IGNORECASE)
+
+
+def _scale_value(value: float | None, factor: float) -> float | None:
+    return None if value is None else value * factor
+
+
+def _format_mass_mg(value: float | None) -> str:
+    if value is None:
+        return ""
+    if abs(value) >= 10:
+        return f"{value:.0f}"
+    return _format_scaled_amount(value)
+
+
+def _format_scaled_amount(value: float | None) -> str:
+    if value is None:
+        return ""
+    return f"{value:.6f}".rstrip("0").rstrip(".")
+
+
+def _to_float(value: Any) -> float | None:
+    if value in {None, ""}:
+        return None
+    try:
+        return float(str(value).replace(",", "."))
+    except (TypeError, ValueError):
+        return None
 
 
 def _summary_text(compound: Compound) -> str:
@@ -623,7 +790,7 @@ def _nmr_label_from_text(value: str, fallback: str) -> str:
     text = " ".join(str(value or "").strip().split())
     if not text:
         return fallback
-    if not re.match(r"^(?:1H|13C\{1H\})\s*NMR\b", text, flags=re.IGNORECASE):
+    if not re.match(r"^(?:1H|13C(?:\{1H\})?)\s*NMR\b", text, flags=re.IGNORECASE):
         return fallback
     if "(" in text:
         label = text.split("(", 1)[0].strip()
@@ -661,6 +828,8 @@ def _hrms_values(compound: Compound) -> dict[str, str]:
 def _elemental_values(compound: Compound) -> dict[str, str]:
     if not (compound.formula and compound.elemental_analysis):
         return {}
+    if compound.elemental_analysis.get("skip"):
+        return {}
     try:
         block = calculate_elemental_analysis_block(compound.formula, found_from_block(compound.elemental_analysis))
     except Exception:
@@ -676,6 +845,8 @@ def _elemental_values(compound: Compound) -> dict[str, str]:
         "anal.formula": str(block.get("formula") or compound.formula),
         "anal.calculated": "; ".join(f"{element}, {calculated[element]:.2f}" for element in elements if element in calculated),
         "anal.found": "; ".join(f"{element}, {found[element]:.2f}" for element in elements if element in found),
+        "anal.text": str(block.get("formatted_text") or ""),
+        "anal.formatted.text": str(block.get("formatted_text") or ""),
     }
 
 
@@ -711,16 +882,16 @@ def _style_warning_paragraph(paragraph: Paragraph) -> None:
 
 def _has_loadings_placeholders(keys: set[str]) -> bool:
     prefixes = (
-        "name.reagent",
-        "mg.reagent",
-        "mmol.reagent",
-        "number.product",
-        "mg.yield.product",
-        "reagent.",
         "product.",
+        "reagent.",
         "solvent.",
     )
-    return any(key.startswith(prefix) for key in keys for prefix in prefixes)
+    if any(key.startswith(prefix) for key in keys for prefix in prefixes):
+        return True
+    return any(
+        re.match(r"^[a-z0-9]+(?:_[a-z0-9]+)?\.(?:name|mg|g|kg|mmol|mol|mcl|ml|l|eq)$", key)
+        for key in keys
+    )
 
 
 def _add_bookmark_range(start_paragraph: Paragraph, end_paragraph: Paragraph, name: str) -> None:

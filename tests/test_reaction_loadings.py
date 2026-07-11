@@ -167,6 +167,7 @@ class ReactionLoadingsTests(unittest.TestCase):
         )
 
         self.assertEqual(rows[0].reagent_2.name, "benzene-1,2-diamine")
+        self.assertEqual(rows[0].reagents["Reagent_2"].name, "benzene-1,2-diamine")
         self.assertEqual(rows[0].reagent_2.formula, "C6H8N2")
 
     def test_cli_args_accept_explicit_loadings_files(self) -> None:
@@ -191,16 +192,22 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertEqual(request.loadings_scope_docx, Path("Scope.docx"))
 
     def test_loadings_workflow_generates_preparation_from_examples(self) -> None:
-        compound = Compound(
-            number="3a",
-            name="Example",
-            color="white",
-            state="solid",
-            melting_point="82",
-            rf="0.38 (petroleum ether : ethyl acetate = 7 : 1)",
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            scope_path = _filtered_example_scope(Path(tmp), "3a")
+            compound = Compound(
+                number="3a",
+                name="Example",
+                color="white",
+                state="solid",
+                melting_point="82",
+                rf="0.38 (petroleum ether : ethyl acetate = 7 : 1)",
+            )
 
-        issues = apply_loadings_workflow([compound], EXAMPLES_DIR)
+            issues = apply_loadings_workflow(
+                [compound],
+                EXAMPLES_DIR,
+                paths=LoadingsWorkflowPaths(LOADINGS_DIR / "Reaction_schema.docx", scope_path),
+            )
 
         self.assertTrue(compound.preparation)
         self.assertNotIn("{", compound.preparation)
@@ -212,38 +219,49 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertEqual(compound.formula, "C17H18N2O2")
         self.assertTrue(compound.reaction["preparation_includes_summary"])
         self.assertTrue(compound.reaction["hide_loadings_line"])
-        self.assertEqual([issue["code"] for issue in issues], [
-            "LOADINGS_COMPOUND_NOT_FOUND",
-            "LOADINGS_COMPOUND_NOT_FOUND",
-            "LOADINGS_COMPOUND_NOT_FOUND",
-            "LOADINGS_COMPOUND_NOT_FOUND",
-        ])
+        self.assertEqual(issues, [])
 
-    def test_loadings_workflow_supports_name_reagent_placeholder(self) -> None:
+    def test_loadings_workflow_reports_full_scope_input_mismatch(self) -> None:
+        compound = Compound(
+            number="2a",
+            name="Example",
+            color="white",
+            state="solid",
+            melting_point="82",
+            rf="0.38 (petroleum ether : ethyl acetate = 7 : 1)",
+        )
+
+        issues = apply_loadings_workflow([compound], EXAMPLES_DIR)
+
+        issue_codes = [issue["code"] for issue in issues]
+        self.assertIn("LOADINGS_SCOPE_INPUT_MISMATCH", issue_codes)
+        self.assertFalse(compound.preparation)
+        mismatch = next(issue for issue in issues if issue["code"] == "LOADINGS_SCOPE_INPUT_MISMATCH")
+        self.assertEqual(mismatch["severity"], "error")
+        self.assertIn("Input compounds: 2a", mismatch["message"])
+        self.assertIn("Scope products: 3a", mismatch["message"])
+
+    def test_loadings_workflow_supports_canonical_reagent_aliases(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             template_path = Path(tmp) / "SI_template.docx"
             document = Document()
-            document.add_paragraph("Alkene {number.Product} used {name.Reagent.2} ({mg.Reagent.2} mg, {mmol.Reagent.2} mmol).")
+            document.add_paragraph("Alkene {Product.number} used {Reagent_2.name} ({Reagent_2.mg} mg, {Reagent_2.mmol} mmol).")
             document.save(template_path)
+            scope_path = _filtered_example_scope(Path(tmp), "3a")
             compound = Compound(number="3a", name="Example", color="white", state="solid")
             issues = apply_loadings_workflow(
                 [compound],
                 EXAMPLES_DIR,
                 paths=LoadingsWorkflowPaths(
                     LOADINGS_DIR / "Reaction_schema.docx",
-                    LOADINGS_DIR / "Scope.docx",
+                    scope_path,
                     template_path,
                 ),
                 structure_names_by_cell={(1, 2, 3): "benzene-1,2-diamine"},
             )
 
         self.assertIn("benzene-1,2-diamine (509 mg, 4.7 mmol)", compound.preparation)
-        self.assertEqual([issue["code"] for issue in issues], [
-            "LOADINGS_COMPOUND_NOT_FOUND",
-            "LOADINGS_COMPOUND_NOT_FOUND",
-            "LOADINGS_COMPOUND_NOT_FOUND",
-            "LOADINGS_COMPOUND_NOT_FOUND",
-        ])
+        self.assertEqual(issues, [])
 
     def test_loadings_workflow_supports_entity_first_aliases(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -251,17 +269,18 @@ class ReactionLoadingsTests(unittest.TestCase):
             document = Document()
             document.add_paragraph(
                 "Alkene {Product.precursor_number} from bromide {Reagent_1.number} gave product {Product.number} with "
-                "{Reagent_2.name} ({Reagent_2.mass.mg} mg, {Reagent_2.mmol} mmol). "
-                "Yield {Product.yield.mg} mg ({Product.yield.percent})."
+                "{Reagent_2.name} ({Reagent_2.mg} mg, {Reagent_2.mmol} mmol). "
+                "Yield {Product.mg} mg ({Product.yield.percent})."
             )
             document.save(template_path)
+            scope_path = _filtered_example_scope(Path(tmp), "3a")
             compound = Compound(number="3a", name="Example", color="white", state="solid")
             apply_loadings_workflow(
                 [compound],
                 EXAMPLES_DIR,
                 paths=LoadingsWorkflowPaths(
                     LOADINGS_DIR / "Reaction_schema.docx",
-                    LOADINGS_DIR / "Scope.docx",
+                    scope_path,
                     template_path,
                 ),
                 structure_names_by_cell={(1, 2, 3): "benzene-1,2-diamine"},
@@ -271,6 +290,184 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertIn("benzene-1,2-diamine (509 mg, 4.7 mmol)", compound.preparation)
         self.assertIn("Yield 304 mg (69%)", compound.preparation)
         self.assertNotIn("{", compound.preparation)
+
+    def test_loadings_workflow_supports_named_reagents_without_reagent_2(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            schema_path = root / "Reaction_schema.docx"
+            schema_doc = Document()
+            table = schema_doc.add_table(rows=1, cols=5)
+            for index, header in enumerate(["Reagents", "equiv.", "MW, g/mol", "Density, g/ml", "Concentration, M"]):
+                table.rows[0].cells[index].text = header
+            for values in [
+                ["Reagent_1", "1", "", "", ""],
+                ["NBS", "1", "177.98", "", ""],
+                ["DBP", "0.05", "242.23", "", ""],
+                ["Solvent_MeCN", "", "", "", "0.75"],
+            ]:
+                cells = table.add_row().cells
+                for index, value in enumerate(values):
+                    cells[index].text = value
+            schema_doc.save(schema_path)
+
+            template_path = root / "SI_template.docx"
+            template_doc = Document()
+            template_doc.add_paragraph(
+                "Bromide {Product.number} from {Reagent_1.name} ({Reagent_1.mg} mg, {Reagent_1.mmol} mmol), "
+                "NBS ({NBS.mg} mg, {NBS.mmol} mmol), DBP ({DBP.mg} mg, {DBP.mmol} mmol), "
+                "MeCN ({Solvent_MeCN.ml} mL). Yield {Product.mg} mg ({Product.yield.percent})."
+            )
+            template_doc.save(template_path)
+
+            scope_path = _filtered_example_scope(root, "3a")
+            compound = Compound(number="3a", name="Example", color="white", state="solid")
+            issues = apply_loadings_workflow(
+                [compound],
+                EXAMPLES_DIR,
+                paths=LoadingsWorkflowPaths(schema_path, scope_path, template_path),
+                structure_names_by_cell={(1, 2, 1): "bromide 2a"},
+            )
+
+        self.assertNotIn("LOADINGS_SCHEMA_INCOMPLETE", {issue["code"] for issue in issues})
+        self.assertIn("bromide 2a (400 mg, 1.57 mmol)", compound.preparation)
+        self.assertIn("NBS (279 mg, 1.57 mmol)", compound.preparation)
+        self.assertIn("DBP (19 mg, 0.08 mmol)", compound.preparation)
+        self.assertIn("MeCN (2.09 mL)", compound.preparation)
+        self.assertIn("Yield 304 mg (69%)", compound.preparation)
+        self.assertNotIn("{", compound.preparation)
+
+    def test_loadings_workflow_supports_arbitrary_numbered_reagents(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            schema_path = root / "Reaction_schema.docx"
+            schema_doc = Document()
+            schema_table = schema_doc.add_table(rows=1, cols=5)
+            for index, header in enumerate(["Reagents", "equiv.", "MW, g/mol", "Density, g/ml", "Concentration, M"]):
+                schema_table.rows[0].cells[index].text = header
+            for values in [
+                ["Reagent_1", "1", "100", "", ""],
+                ["Reagent_2", "2", "50", "", ""],
+                ["Reagent_3", "0.5", "200", "", ""],
+            ]:
+                cells = schema_table.add_row().cells
+                for index, value in enumerate(values):
+                    cells[index].text = value
+            schema_doc.save(schema_path)
+
+            scope_path = root / "Scope.docx"
+            scope_doc = Document()
+            scope_table = scope_doc.add_table(rows=1, cols=7)
+            for index, header in enumerate(
+                ["Reagent_1", "Mass of Reagent_1, mg", "Reagent_2", "Reagent_3", "Product", "Product_number", "Mass of product, mg"]
+            ):
+                scope_table.rows[0].cells[index].text = header
+            cells = scope_table.add_row().cells
+            for index, value in enumerate(["", "100", "", "", "", "7a", "42"]):
+                cells[index].text = value
+            scope_doc.save(scope_path)
+
+            template_path = root / "SI_template.docx"
+            template_doc = Document()
+            template_doc.add_paragraph(
+                "{Reagent_1.name} ({Reagent_1.mg} mg, {Reagent_1.mmol} mmol); "
+                "{Reagent_2.name} ({Reagent_2.mg} mg, {Reagent_2.mmol} mmol); "
+                "{Reagent_3.name} ({Reagent_3.mg} mg, {Reagent_3.mmol} mmol)."
+            )
+            template_doc.save(template_path)
+
+            rows = read_scope(scope_path, structure_names_by_cell={(1, 2, 1): "A", (1, 2, 3): "B", (1, 2, 4): "C"})
+            compound = Compound(number="7a", name="Example", color="white", state="solid")
+            issues = apply_loadings_workflow(
+                [compound],
+                root,
+                paths=LoadingsWorkflowPaths(schema_path, scope_path, template_path),
+                structure_names_by_cell={(1, 2, 1): "A", (1, 2, 3): "B", (1, 2, 4): "C"},
+            )
+
+        self.assertEqual(rows[0].reagents["Reagent_3"].name, "C")
+        self.assertEqual(rows[0].reagent_masses_mg["Reagent_1"], 100)
+        self.assertNotIn("LOADINGS_SCHEMA_INCOMPLETE", {issue["code"] for issue in issues})
+        self.assertIn("A (100 mg, 1 mmol)", compound.preparation)
+        self.assertIn("B (100 mg, 2 mmol)", compound.preparation)
+        self.assertIn("C (100 mg, 0.5 mmol)", compound.preparation)
+        self.assertNotIn("{", compound.preparation)
+
+    def test_loadings_template_omits_missing_optional_product_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            schema_path = root / "Reaction_schema.docx"
+            schema_doc = Document()
+            schema_table = schema_doc.add_table(rows=1, cols=5)
+            for index, header in enumerate(["Reagents", "equiv.", "MW, g/mol", "Density, g/ml", "Concentration, M"]):
+                schema_table.rows[0].cells[index].text = header
+            for values in [["Reagent_1", "1", "100", "", ""]]:
+                cells = schema_table.add_row().cells
+                for index, value in enumerate(values):
+                    cells[index].text = value
+            schema_doc.save(schema_path)
+
+            scope_path = root / "Scope.docx"
+            scope_doc = Document()
+            scope_table = scope_doc.add_table(rows=1, cols=5)
+            for index, header in enumerate(["Reagent_1", "Mass of Reagent_1, mg", "Product", "Product_number", "Mass of product, mg"]):
+                scope_table.rows[0].cells[index].text = header
+            cells = scope_table.add_row().cells
+            for index, value in enumerate(["", "100", "", "7a", ""]):
+                cells[index].text = value
+            scope_doc.save(scope_path)
+
+            template_path = root / "SI_template.docx"
+            template_doc = Document()
+            template_doc.add_paragraph(
+                "Product {Product.number} from {Reagent_1.name} ({Reagent_1.mg} mg, {Reagent_1.mmol} mmol). "
+                "Yield {Product.mg} mg ({Product.yield.percent}); {Product.appearance}; "
+                "mp {Product.mp} °C. Rf = {Product.rf.value} ({Product.rf.system})."
+            )
+            template_doc.save(template_path)
+
+            compound = Compound(number="7a", name="Example")
+            apply_loadings_workflow(
+                [compound],
+                root,
+                paths=LoadingsWorkflowPaths(schema_path, scope_path, template_path),
+                structure_names_by_cell={(1, 2, 1): "A"},
+            )
+
+        self.assertIn("Product 7a from A (100 mg, 1 mmol)", compound.preparation)
+        self.assertNotIn("Yield  mg", compound.preparation)
+        self.assertNotIn("()", compound.preparation)
+        self.assertNotIn("; ;", compound.preparation)
+        self.assertNotIn("mp  °C", compound.preparation)
+        self.assertNotIn("Rf =", compound.preparation)
+
+    def test_loadings_workflow_supports_canonical_unit_conversions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            template_path = Path(tmp) / "SI_template.docx"
+            document = Document()
+            document.add_paragraph(
+                "Product {Product.mg} mg, {Product.g} g, {Product.kg} kg, {Product.mmol} mmol, {Product.mol} mol; "
+                "AcOH {AcOH.mcl} uL, {AcOH.ml} mL, {AcOH.l} L; "
+                "{Solvent_MeCN.name} {Solvent_MeCN.mcl} uL, {Solvent_MeCN.ml} mL, {Solvent_MeCN.l} L; "
+                "Reagent {Reagent_2.mol} mol."
+            )
+            document.save(template_path)
+            scope_path = _filtered_example_scope(Path(tmp), "3a")
+            compound = Compound(number="3a", name="Example", color="white", state="solid")
+            apply_loadings_workflow(
+                [compound],
+                EXAMPLES_DIR,
+                paths=LoadingsWorkflowPaths(
+                    LOADINGS_DIR / "Reaction_schema.docx",
+                    scope_path,
+                    template_path,
+                ),
+                structure_names_by_cell={(1, 2, 3): "benzene-1,2-diamine"},
+            )
+
+        self.assertIn("Product 304 mg, 0.304 g, 0.000304 kg, 1.08 mmol, 0.001077 mol", compound.preparation)
+        self.assertIn("AcOH 449 uL, 0.45 mL, 0.000449 L", compound.preparation)
+        self.assertIn("MeCN 2091 uL, 2.09 mL, 0.002091 L", compound.preparation)
+        self.assertIn("Reagent 0.004704 mol", compound.preparation)
 
     def test_loadings_node_uses_examples_dir_when_enabled(self) -> None:
         compounds, order = make_compound_store(
@@ -302,35 +499,37 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertEqual(prepared.reaction["source"], "loadings_workflow")
 
     def test_loadings_node_accepts_explicit_workflow_files(self) -> None:
-        compounds, order = make_compound_store(
-            [
-                Compound(
-                    number="3a",
-                    name="Example",
-                    color="white",
-                    state="solid",
-                    melting_point="82",
-                    rf="0.38 (petroleum ether : ethyl acetate = 7 : 1)",
-                )
-            ]
-        )
-        request = GenerateSIRequest(
-            input_path=Path("input.docx"),
-            input_kind="word",
-            output_path=Path("out.docx"),
-            loadings_schema_docx=LOADINGS_DIR / "Reaction_schema.docx",
-            loadings_scope_docx=LOADINGS_DIR / "Scope.docx",
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            scope_path = _filtered_example_scope(Path(tmp), "3a")
+            compounds, order = make_compound_store(
+                [
+                    Compound(
+                        number="3a",
+                        name="Example",
+                        color="white",
+                        state="solid",
+                        melting_point="82",
+                        rf="0.38 (petroleum ether : ethyl acetate = 7 : 1)",
+                    )
+                ]
+            )
+            request = GenerateSIRequest(
+                input_path=Path("input.docx"),
+                input_kind="word",
+                output_path=Path("out.docx"),
+                loadings_schema_docx=LOADINGS_DIR / "Reaction_schema.docx",
+                loadings_scope_docx=scope_path,
+            )
 
-        result = calculate_loadings_node(
-            {
-                "request": request,
-                "compounds": compounds,
-                "order": order,
-                "generation_config": {"generate_loadings": True},
-                "issues": [],
-            }
-        )
+            result = calculate_loadings_node(
+                {
+                    "request": request,
+                    "compounds": compounds,
+                    "order": order,
+                    "generation_config": {"generate_loadings": True},
+                    "issues": [],
+                }
+            )
 
         prepared = result["compounds"]["cmp_001"]
         self.assertIn("bromide 2a (400 mg, 1.57 mmol)", prepared.preparation)
@@ -338,6 +537,7 @@ class ReactionLoadingsTests(unittest.TestCase):
 
     def test_loadings_workflow_does_not_depend_on_render_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
+            scope_path = _filtered_example_scope(Path(tmp), "3a")
             compound = Compound(
                 id="cmp_001",
                 number="3a",
@@ -346,7 +546,11 @@ class ReactionLoadingsTests(unittest.TestCase):
                 melting_point="82",
                 rf="0.38 (petroleum ether : ethyl acetate = 7 : 1)",
             )
-            apply_loadings_workflow([compound], EXAMPLES_DIR)
+            apply_loadings_workflow(
+                [compound],
+                EXAMPLES_DIR,
+                paths=LoadingsWorkflowPaths(LOADINGS_DIR / "Reaction_schema.docx", scope_path),
+            )
             output_path = Path(tmp) / "support_information.docx"
             renderer = __import__("si_generator.template_renderer", fromlist=["calculate_reaction_loadings"])
             original = renderer.calculate_reaction_loadings
@@ -364,6 +568,19 @@ class ReactionLoadingsTests(unittest.TestCase):
 
 def _raise_render_fallback(_reaction):
     raise AssertionError("loadings must be calculated before rendering")
+
+
+def _filtered_example_scope(root: Path, *numbers: str) -> Path:
+    keep = set(numbers)
+    document = Document(LOADINGS_DIR / "Scope.docx")
+    table = document.tables[0]
+    for row in list(table.rows[1:]):
+        product_number = row.cells[4].text.strip()
+        if product_number not in keep:
+            table._tbl.remove(row._tr)
+    path = root / "Scope.docx"
+    document.save(path)
+    return path
 
 
 if __name__ == "__main__":

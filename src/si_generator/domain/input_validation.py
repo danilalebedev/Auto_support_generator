@@ -59,12 +59,6 @@ def validate_compound_inputs(
             except ValueError as exc:
                 warnings.append(f"{label}: formula could not be parsed ({exc}); HRMS and formula-based checks will be limited.")
 
-        if not hrms_found_text(compound.hrms, compound.hrms_found):
-            warnings.append(f"{label}: HRMS found value is missing; HRMS line/check will be skipped.")
-
-        if not compound.color.strip() and not compound.state.strip():
-            warnings.append(f"{label}: color/state is missing; appearance line will be incomplete.")
-
         if _looks_solid(compound.state) or _looks_solid(compound.color):
             if not compound.melting_point.strip():
                 warnings.append(f"{label}: state looks solid, but melting point is missing.")

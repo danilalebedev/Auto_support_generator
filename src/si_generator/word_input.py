@@ -309,7 +309,8 @@ def _map_row(headers: list[str], values: list[str]) -> dict[str, str]:
     result: dict[str, str] = {}
     blank_seen = 0
 
-    for header, value in zip(headers, values):
+    for header, raw_value in zip(headers, values):
+        value = _clean_empty_value(raw_value)
         key = _normalize_header(header)
         if not key:
             blank_seen += 1
@@ -351,7 +352,10 @@ def _map_row(headers: list[str], values: list[str]) -> dict[str, str]:
         elif key == "ir":
             result["ir"] = value
         elif key in {"elementalanalysis", "elementaryanalysis", "analysis", "anal", "ea"}:
-            result["elemental_analysis"] = value
+            if _is_empty_marker(raw_value):
+                result["elemental_analysis_skip"] = "1"
+            else:
+                result["elemental_analysis"] = value
         elif key in {"references", "refs", "referencekeys"}:
             result["references"] = value
         elif key in {"targetmmol", "reactiontargetmmol"}:
@@ -373,6 +377,8 @@ def _split_appearance(value: str, result: dict[str, str]) -> None:
 
 
 def _elemental_analysis_from_fields(fields: dict[str, str]) -> dict[str, str]:
+    if fields.get("elemental_analysis_skip"):
+        return {"skip": True}
     value = fields.get("elemental_analysis", "")
     return {"found": value} if value else {}
 
@@ -782,6 +788,23 @@ def _apply_structure_layout(shape, width: float, height: float) -> None:
     shape.Top = 0
 
 
+def _is_empty_marker(value: str) -> bool:
+    value = str(value or "").strip()
+    normalized = value.lower()
+    empty_markers = {
+        "-",
+        "—",
+        "–",
+        "−",
+        "n/a",
+        "na",
+        "none",
+        "нет",
+        "no",
+    }
+    return normalized in empty_markers
+
+
 def _clean_empty_value(value: str) -> str:
-    value = value.strip()
-    return "" if value in {"-", "—", "–"} else value
+    value = str(value or "").strip()
+    return "" if _is_empty_marker(value) else value

@@ -6,20 +6,20 @@ You can select either a folder or a .zip archive in the GUI field "Spectra sourc
 The top-level folders must match compound numbers from the compound table:
 
 spectra/
-  2a/
-    da9534_1H/
+  3a/
+    da9081_1H/
       fid
       acqus
       pdata/
-    da9534_13C/
+    da9081_13C/
       fid
       acqus
       pdata/
-  2b/
-    any_name_1H/
+  3b/
+    da9309_1H/
       fid
       acqus
-    any_name_13C/
+    da9309_13C/
       fid
       acqus
 

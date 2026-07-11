@@ -128,6 +128,7 @@ class ReagentAmount(TypedDict, total=False):
     mmol: float
     mass_mg: float
     volume_uL: float
+    volume_mL: float
     density_g_mL: float
     concentration_M: float
 
@@ -198,6 +199,8 @@ class SpectraConfig(TypedDict, total=False):
     peak_picking: PeakPickingPolicy
     mnova_executable_path: str
     mnova_graphics_profile_path: str
+    mnova_graphics_profile_1h_path: str
+    mnova_graphics_profile_13c_path: str
     mnova_script_path: str
     keep_intermediate_reports: bool
 

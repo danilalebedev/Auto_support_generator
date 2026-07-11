@@ -166,7 +166,7 @@ If warnings were produced, open `Open report` or inspect the `logs` folder.
 
 | Field | Meaning | When to fill |
 | --- | --- | --- |
-| `Compound table` | Word `.docx` or CSV table with compound data | Always |
+| `Compound table` | Word `.docx` table with compound data and ChemDraw OLE structures | Always |
 | `Spectra source` | zip archive or folder with raw spectra | When automated NMR processing is needed |
 | `Output folder` | Destination folder for generated files | Always |
 
@@ -217,7 +217,6 @@ The `Detect` button next to `MestReNova .exe` tries to find MestReNova automatic
 
 | Field | Default | What it does |
 | --- | --- | --- |
-| `Compound table type` | `Word table with ChemDraw objects` | Chooses Word or CSV input |
 | `Check support` | Enabled | Checks NMR, HRMS and elemental analysis |
 | `Calculate elemental analysis` | Disabled | Adds calculated elemental analysis from the formula |
 | `Spectra appendix` | `png` | Chooses how spectra are inserted at the end of SI |
@@ -303,19 +302,26 @@ Patch workflow always creates a new `.docx`, a new manifest and a report. The ol
 
 ## GUI: Add Compounds Page
 
-This page appends new compounds to an existing SI.
+This page appends new compounds to an existing SI without regenerating old compound blocks.
 
 | Field | Meaning |
 | --- | --- |
-| `Existing manifest` | Manifest of the old SI |
-| `Existing support .docx` | Old SI `.docx` |
-| `New table type` | Word or CSV format for the new compounds |
-| `New compound table` | Table containing only new compounds |
+| `Previous output folder` | Folder from an earlier generated run. The app tries to fill `Existing manifest` and `Existing support .docx` automatically from `docx/` |
+| `Existing manifest` | Manifest of the old SI. Use this manually when no previous output folder is selected |
+| `Existing support .docx` | Old SI `.docx`, optional override if the file was moved |
+| `Add mode` | `Same series` or `New method` |
+| `New compound table` | Word `.docx` table containing only new compounds |
 | `New spectra source` | Spectra only for new compounds |
+| `New SI template .docx` | Optional template override. In New method this can define a new procedure layout |
+| `New Reaction_schema.docx` | Reaction schema for new reagent-loading calculations. Same series reuses the old schema if this is empty |
+| `New Scope.docx` | Scope table for the new compounds. Required when loadings are enabled |
 | `Output .docx` | New combined SI |
 
-If a new compound number already exists in the old manifest, the workflow stops with `DUPLICATE_COMPOUND_NUMBER`.
+`Same series` reuses the old template, Reaction_schema, Mnova styles, ppm ranges, thresholds, baseline settings and check settings from the old manifest. It does not reuse the old Scope, compound table or spectra source.
 
+`New method` can use a new template, Reaction_schema and Scope. Spectrum display and preprocessing settings are kept unified with the previous run unless no previous run_config is available.
+
+If a new compound number already exists in the old manifest, the workflow stops with `DUPLICATE_COMPOUND_NUMBER`.
 ## Top and Bottom GUI Buttons
 
 | Button | What it does |
@@ -383,20 +389,6 @@ Blocking errors include:
 - duplicate compound number;
 - missing input file;
 - output path is not a `.docx`.
-
-## CSV Table
-
-CSV can be used when editable ChemDraw OLE structures are not required.
-
-Advantages:
-
-- easy to generate programmatically;
-- convenient for fast tests.
-
-Limitations:
-
-- CSV cannot contain ChemDraw OLE structures;
-- if editable structures are needed, use a Word table.
 
 ## Spectra Source Format
 
@@ -659,7 +651,6 @@ Visual template preview:
 | `examples/test_input_2.docx` | Additional input-table example |
 | `examples/spectra_2/` | Spectra source as a normal folder |
 | `examples/starter/compound_table_starter.docx` | Starter Word table with common fields and 3 examples |
-| `examples/starter/compound_table_starter.csv` | Starter CSV with common fields |
 | `examples/starter/spectra_source_layout.txt` | Example spectra folder/zip layout |
 | `examples/starter/README_starter_files.md` | Short starter-file guide |
 | `examples/templates/SI_template_visual_current.docx` | Example visual Word template |
@@ -739,7 +730,6 @@ Common CLI parameters:
 | Parameter | Meaning |
 | --- | --- |
 | `--word-input` | Word table with ChemDraw OLE structures |
-| `--input` | CSV table |
 | `--spectra-source` | zip or folder with spectra |
 | `--output` | Final `.docx` path |
 | `--template-docx` | SI Word template |

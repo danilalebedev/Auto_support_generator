@@ -43,6 +43,8 @@ class SpectraConfigTests(unittest.TestCase):
             insert_spectra_as="mnova",
             mnova_executable_path="C:/Tools/MestReNova.exe",
             mnova_graphics_profile_path="C:/profiles/default.mngp",
+            mnova_graphics_profile_1h_path="C:/profiles/classic_1H.mngp",
+            mnova_graphics_profile_13c_path="C:/profiles/classic_13C.mngp",
             target_signal_height_fraction=0.72,
             peak_threshold_fraction_1h=0.08,
             peak_threshold_fraction_13c=0.035,
@@ -61,6 +63,8 @@ class SpectraConfigTests(unittest.TestCase):
         self.assertEqual(config["insert_spectra_as"], "mnova")
         self.assertEqual(config["mnova_executable_path"], "C:/Tools/MestReNova.exe")
         self.assertEqual(config["mnova_graphics_profile_path"], "C:/profiles/default.mngp")
+        self.assertEqual(config["mnova_graphics_profile_1h_path"], "C:/profiles/classic_1H.mngp")
+        self.assertEqual(config["mnova_graphics_profile_13c_path"], "C:/profiles/classic_13C.mngp")
         self.assertEqual(config["target_signal_height_fraction"], 0.72)
         self.assertEqual(config["peak_threshold_fraction_1h"], 0.08)
         self.assertEqual(config["peak_threshold_fraction_13c"], 0.035)

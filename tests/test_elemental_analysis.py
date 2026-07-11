@@ -90,6 +90,22 @@ class ElementalAnalysisTests(unittest.TestCase):
         self.assertEqual(skipped, {})
         self.assertEqual(applied["compounds"]["cmp_001"].elemental_analysis["calculated"]["C"], 52.14)
 
+    def test_graph_node_respects_explicit_elemental_analysis_skip(self) -> None:
+        compound = Compound(number="2a", name="Example", formula="C2H6O", elemental_analysis={"skip": True})
+        compounds, order = make_compound_store([compound])
+
+        applied = calculate_elemental_analysis_node(
+            {
+                "compounds": compounds,
+                "order": order,
+                "issues": [],
+                "generation_config": {"include_elemental_analysis": True, "calculate_elemental_analysis": True},
+            }
+        )
+
+        self.assertEqual(applied["compounds"]["cmp_001"].elemental_analysis, {"skip": True})
+        self.assertEqual(applied["issues"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

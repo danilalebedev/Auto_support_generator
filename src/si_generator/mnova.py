@@ -22,6 +22,8 @@ def _mnova_script_path() -> Path:
 
 
 SCRIPT_PATH = _mnova_script_path()
+MNOVA_NMR_REGISTRY_SUBKEY = r"Software\Mestrelab Research S.L.\MestReNova\NMR"
+MNOVA_SPECTRUM_PROPERTIES_VALUE = "Spectrum Properties"
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,13 @@ class MnovaBatchError(RuntimeError):
         self.no_status = no_status
         self.returncode = returncode
         self.launch_log = launch_log
+
+
+@dataclass(frozen=True)
+class _RegistryValueSnapshot:
+    exists: bool
+    value: bytes = b""
+    value_type: int = 3
 
 
 def extract_report(input_path: Path, output_path: Path, nucleus: str, timeout: int = 120) -> Path:
@@ -119,6 +128,7 @@ def _extract_reports_batch_once(
     run_status_path = run_dir / "mnova_batch.status.txt"
     output_map: dict[tuple[str, str], dict[str, Path]] = {}
     graphics_profile_map: dict[Path, Path] = {}
+    registry_snapshot = _snapshot_mnova_spectrum_properties(tasks)
 
     for path in [tasks_path, output_json_path, status_path, launch_log_path]:
         if path.exists():
@@ -266,6 +276,7 @@ def _extract_reports_batch_once(
 
         return reports
     finally:
+        _restore_mnova_spectrum_properties(registry_snapshot)
         shutil.rmtree(run_dir, ignore_errors=True)
 
 
@@ -382,6 +393,58 @@ def _active_mnova_processes() -> list[dict[str, object]]:
     if isinstance(data, list):
         return [item for item in data if isinstance(item, dict)]
     return []
+
+
+def _snapshot_mnova_spectrum_properties(tasks: list[MnovaTask]) -> _RegistryValueSnapshot | None:
+    if os.name != "nt" or not any(task.graphics_profile_path for task in tasks):
+        return None
+    try:
+        import winreg
+    except ImportError:
+        return None
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, MNOVA_NMR_REGISTRY_SUBKEY, 0, winreg.KEY_READ)
+    except OSError:
+        return _RegistryValueSnapshot(False)
+    try:
+        value, value_type = winreg.QueryValueEx(key, MNOVA_SPECTRUM_PROPERTIES_VALUE)
+    except FileNotFoundError:
+        return _RegistryValueSnapshot(False)
+    except OSError:
+        return None
+    finally:
+        try:
+            winreg.CloseKey(key)
+        except OSError:
+            pass
+    if isinstance(value, bytes):
+        return _RegistryValueSnapshot(True, bytes(value), int(value_type))
+    return None
+
+
+def _restore_mnova_spectrum_properties(snapshot: _RegistryValueSnapshot | None) -> None:
+    if os.name != "nt" or snapshot is None:
+        return
+    try:
+        import winreg
+    except ImportError:
+        return
+    if snapshot.exists:
+        try:
+            key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, MNOVA_NMR_REGISTRY_SUBKEY, 0, winreg.KEY_SET_VALUE)
+            winreg.SetValueEx(key, MNOVA_SPECTRUM_PROPERTIES_VALUE, 0, snapshot.value_type, snapshot.value)
+            winreg.CloseKey(key)
+        except OSError:
+            return
+        return
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, MNOVA_NMR_REGISTRY_SUBKEY, 0, winreg.KEY_SET_VALUE)
+        winreg.DeleteValue(key, MNOVA_SPECTRUM_PROPERTIES_VALUE)
+        winreg.CloseKey(key)
+    except FileNotFoundError:
+        return
+    except OSError:
+        return
 
 
 def _resolve_spectrum_input(path: Path) -> Path:
