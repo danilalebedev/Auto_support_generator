@@ -1,0 +1,145 @@
+1 pcpd*3:0          ; R
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd  :0
+  pcpd*2:180
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd*3:0          ; R
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd  :0
+  pcpd*2:180
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd*3:180        ;-R
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd  :180
+  pcpd*2:0
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd*3:180        ;-R
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd  :180
+  pcpd*2:0
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd*3:180        ;-R
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd  :180
+  pcpd*2:0
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd*3:0          ; R
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd  :0
+  pcpd*2:180
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd*3:0          ; R
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd  :0
+  pcpd*2:180
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd*3:180        ;-R
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd  :180
+  pcpd*2:0
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd*3:180        ;-R
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd  :180
+  pcpd*2:0
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd*3:180        ;-R
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd  :180
+  pcpd*2:0
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd*3:0          ; R
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd  :0
+  pcpd*2:180
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd*3:0          ; R
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd  :0
+  pcpd*2:180
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd*3:0          ; R
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd  :0
+  pcpd*2:180
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd*3:180        ;-R
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd  :180
+  pcpd*2:0
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd*3:180        ;-R
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+  pcpd  :180
+  pcpd*2:0
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd*3:0          ; R
+  pcpd*4:180
+  pcpd*2:0
+  pcpd*3:180
+  pcpd  :0
+  pcpd*2:180
+  pcpd*4:0
+  pcpd*2:180
+  pcpd*3:0
+ jump to 1

@@ -1,116 +1,63 @@
-# Простая установка Auto Support Generator
+# Установка Auto Support Generator beta 1.2
 
-Эта инструкция рассчитана на пользователя, который не знаком с Python и GitHub.
+## Что установить заранее
 
-## Что нужно установить отдельно
-
-Auto Support Generator автоматизирует сборку SI, но не заменяет внешние
-программы. Для полного workflow на компьютере должны быть установлены:
-
-- Windows 10/11;
+- Windows 10 или 11, 64-bit;
 - Microsoft Word desktop;
-- ChemDraw или ChemOffice с поддержкой OLE-объектов;
+- ChemDraw/ChemOffice с поддержкой OLE;
 - MestReNova.
 
-Проверенные версии:
+Проверенные версии: ChemDraw `22.2.0.3300`, MestReNova `14.2.0-26256`. Python для готовой сборки не нужен.
 
-- ChemDraw `22.2.0.3300`;
-- MestReNova `14.2.0-26256`.
+## Установка
 
-Python устанавливать не нужно, если вы используете готовый установщик
-`AutoSupportGeneratorSetup.exe`.
+1. На странице GitHub Release `Auto_support_generator_beta.1.2` скачайте `AutoSupportGeneratorSetup.exe`.
+2. Запустите скачанный файл.
+3. После сообщения об успешной установке откройте **Auto Support Generator** с рабочего стола или из меню Пуск.
+4. Перед первой генерацией один раз вручную запустите Word, ChemDraw и MestReNova.
 
-## Как установить программу
-
-1. Скачайте `installer/AutoSupportGeneratorSetup.exe` из репозитория.
-   На GitHub откройте папку `installer`, выберите `AutoSupportGeneratorSetup.exe`
-   и нажмите `Download raw file`.
-2. Дважды кликните `AutoSupportGeneratorSetup.exe`.
-3. Дождитесь окончания установки.
-4. Запустите программу через ярлык `Auto Support Generator` на рабочем столе или
-   в меню Пуск.
-
-Программа устанавливается в папку:
+Программа устанавливается для текущего пользователя в:
 
 ```text
 %LOCALAPPDATA%\AutoSupportGenerator
 ```
 
-Там будут лежать:
+Установщик не загружает Python или химические программы из интернета и не требует прав администратора.
 
-- `AutoSupportGenerator.exe` - сама программа;
-- `examples/` - примеры входных данных и готового support;
-- `README.md` и `INSTALL_RU.md` - инструкции.
+## Примеры
 
-## Как пользоваться
-
-В окне программы:
-
-1. В `Table type` выберите тип таблицы:
-   - `Word table with ChemDraw objects` - основной вариант;
-2. В `Compound table` выберите таблицу с веществами.
-3. В `Spectra zip` выберите zip-архив со спектрами.
-4. В `SI template .docx` можно выбрать Word-шаблон оформления. Если оставить
-   поле пустым, используется встроенный шаблон.
-5. В `MestReNova .exe` можно вручную указать путь к MestReNova, если программа
-   не нашла ее автоматически.
-6. В `Output .docx` выберите, куда сохранить готовый support.
-7. Оставьте `Check support` включенным, если хотите проверять ЯМР, HRMS и
-   elemental analysis.
-8. Нажмите `Generate SI`.
-
-После завершения нажмите `Open output folder`, чтобы открыть папку с
-результатами.
-
-## Пример входных файлов
-
-В установленной папке есть пример полного workflow:
+В установленной папке находятся три полных набора:
 
 ```text
-%LOCALAPPDATA%\AutoSupportGenerator\examples\test_input.docx
-%LOCALAPPDATA%\AutoSupportGenerator\examples\test_input.zip
-%LOCALAPPDATA%\AutoSupportGenerator\examples\example_output\support_information.docx
-%LOCALAPPDATA%\AutoSupportGenerator\examples\example_output\processed_spectra.zip
+examples\example_1
+examples\example_2
+examples\example_3
 ```
 
-В GUI выберите `Word table with ChemDraw objects`, затем укажите этот `.docx` в
-поле `Compound table`, а `.zip` - в поле `Spectra zip`.
+Каждый набор использует те же названия, что и поля GUI:
 
-Файлы в `example_output` - это пример результата: готовый SI и архив с
-обработанными спектрами.
+- `Compound_table.docx`;
+- `Spectra_source` или `Spectra_source.zip`;
+- `SI_template.docx`;
+- `Reaction_schema.docx`;
+- `Scope.docx`.
 
-## Что получается на выходе
+Примеры также можно скопировать из раздела **Instructions → Example files**.
 
-В выбранной output-папке будут созданы:
+## Первый запуск
 
-- `support_information.docx` - готовый SI;
-- `processed_spectra.zip` - архив с обработанными спектрами, PNG-картинками и
-  `.mnova` файлами;
-- `processed_spectra/` - те же файлы в виде обычных папок;
-- `logs/` - служебные файлы для отладки.
+1. На странице **Generate** выберите `Compound_table.docx`.
+2. В **Spectra source** выберите zip или папку со спектрами.
+3. Выберите **Output folder**.
+4. При необходимости укажите SI template, отдельные 1H/13C `.mngp`, Reaction schema и Scope.
+5. Проверьте настройки на странице **Processing**.
+6. Нажмите **Generate SI**.
 
-## Если готового установщика нет
+Подробное описание всех функций находится в `README_RU.md` и внутри страницы **Instructions** приложения.
 
-Можно запустить программу из исходников:
+## Если программа не запускается
 
-1. Скачайте проект с GitHub через `Code` -> `Download ZIP`.
-2. Распакуйте архив.
-3. Установите Python 3.12.
-4. Запустите `Setup Auto SI Generator.bat`.
-5. Запустите `Run Auto SI Generator.bat`.
-
-Этот путь нужен в основном разработчикам или для пересборки установщика.
-
-## Что делать, если программа не запускается
-
-Проверьте, что Word, ChemDraw и MestReNova открываются вручную и активированы.
-Если ошибка возникает при обработке спектров, укажите путь к `MestReNova.exe`
-в поле `MestReNova .exe`. Программа также ищет MestReNova через `PATH`, реестр
-Windows, типовые папки `Program Files` и переменные окружения
-`AUTO_SUPPORT_MNOVA_EXE`, `AUTO_SI_MNOVA_EXE`, `MNOVA_EXE`, `MESTRENOVA_EXE`.
-
-Если на компьютере имя пользователя или путь к данным содержит кириллицу,
-программа должна работать автоматически: для ChemDraw/MestReNova создается
-временная ASCII-папка `C:\Users\Public\AutoSupportGenerator\temp`. Если эта
-папка недоступна, создайте любую папку без кириллицы и укажите ее в переменной
-окружения `AUTO_SUPPORT_TEMP_DIR`.
+- Убедитесь, что файл скачан из официального репозитория и не заблокирован Windows.
+- Проверьте, что Word, ChemDraw и MestReNova запускаются вручную.
+- Если MestReNova не найдена, укажите путь к `MestReNova.exe` в Generate.
+- Откройте папку `logs` последнего запуска для подробной диагностики.

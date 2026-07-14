@@ -9,6 +9,10 @@ from .domain.types import Issue
 from .domain.compound import Compound
 
 
+ACS_ORGANIC_LETTERS_HRMS_TOLERANCE_PPM = 5.0
+ACS_ORGANIC_LETTERS_EA_TOLERANCE_PERCENT = 0.4
+
+
 def validate_support(compounds: list[Compound]) -> None:
     _reset_validation(compounds)
     validate_nmr_counts(compounds)
@@ -76,7 +80,10 @@ def validate_nmr_counts(compounds: list[Compound]) -> None:
                     )
 
 
-def validate_hrms(compounds: list[Compound], tolerance_da: float = 0.005) -> None:
+def validate_hrms(
+    compounds: list[Compound],
+    tolerance_ppm: float = ACS_ORGANIC_LETTERS_HRMS_TOLERANCE_PPM,
+) -> None:
     for compound in compounds:
         found_text = hrms_found_text(compound.hrms, compound.hrms_found)
         if not compound.formula or not found_text:
@@ -87,11 +94,22 @@ def validate_hrms(compounds: list[Compound], tolerance_da: float = 0.005) -> Non
         except (ValueError, TypeError):
             _append_validation_issue(compound, "HRMS_CHECK_FAILED", "HRMS could not be checked")
             continue
-        if abs(found - calcd) > tolerance_da:
-            _append_validation_issue(compound, "HRMS_MISMATCH", f"HRMS calcd {calcd:.4f}, found {found:.4f}")
+        error_ppm = abs(found - calcd) / calcd * 1_000_000
+        if error_ppm > tolerance_ppm:
+            _append_validation_issue(
+                compound,
+                "HRMS_MISMATCH",
+                (
+                    f"HRMS calcd {calcd:.4f}, found {found:.4f} "
+                    f"(error {error_ppm:.1f} ppm; limit {tolerance_ppm:g} ppm)"
+                ),
+            )
 
 
-def validate_elemental_analysis(compounds: list[Compound], tolerance_percent: float = 0.4) -> None:
+def validate_elemental_analysis(
+    compounds: list[Compound],
+    tolerance_percent: float = ACS_ORGANIC_LETTERS_EA_TOLERANCE_PERCENT,
+) -> None:
     for compound in compounds:
         if not compound.formula or not compound.elemental_analysis:
             continue
@@ -111,7 +129,8 @@ def validate_elemental_analysis(compounds: list[Compound], tolerance_percent: fl
             if calculated_value is None:
                 _append_validation_issue(compound, "ELEMENTAL_ANALYSIS_UNEXPECTED_ELEMENT", f"EA {element} found {found_value:.2f}, but {element} is absent from formula")
                 continue
-            if abs(found_value - calculated_value) > tolerance_percent:
+            deviation_percent = round(abs(found_value - calculated_value), 2)
+            if deviation_percent > tolerance_percent:
                 _append_validation_issue(compound, "ELEMENTAL_ANALYSIS_MISMATCH", f"EA {element} calcd {calculated_value:.2f}, found {found_value:.2f}")
         for element in block.get("calculated", {}):
             if element in DEFAULT_ELEMENTS and element not in block.get("found", {}):

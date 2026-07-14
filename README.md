@@ -8,22 +8,14 @@ A ChemRxiv preprint describing the method, software architecture, and example wo
 
 Until an open-source license is added, all rights are reserved. You may view and fork this repository under GitHub's Terms of Service, but reuse, redistribution, or derivative works require permission from the author.
 
-Author: Danila Lebedev<br>
+Author: Danila Lebedev  
 Copyright © 2026 Danila Lebedev
 
 ## Choose language
 
-- [Русская версия README](README_RU.md)
-- [English README](README_EN.md)
+- [Русская версия](README_RU.md)
+- [English version](README_EN.md)
 
-## Short description
+![Auto Support Generator interface](docs/assets/gui_overview.png)
 
-Auto Support Generator is a Windows application for automated generation and checking of Supporting Information (SI) files in organic chemistry.
-
-It takes a compound table, ChemDraw structures, raw NMR spectra, HRMS/IR/elemental analysis/physical properties, and generates a formatted `support_information.docx`. It also saves spectrum images, processed `.mnova` files, validation reports, manifests and logs.
-
-## Краткое описание
-
-Auto Support Generator - Windows-программа для автоматической сборки и проверки Supporting Information (SI) в органической химии.
-
-Программа берет таблицу с соединениями, структуры ChemDraw, raw-спектры ЯМР, HRMS/IR/elemental analysis/физические свойства и собирает готовый `support_information.docx` в заданном оформлении. Дополнительно сохраняются картинки спектров, обработанные `.mnova` файлы, отчеты проверки, manifest и служебные логи.
+Auto Support Generator is a Windows application that builds and checks organic-chemistry Supporting Information from Word tables, ChemDraw structures and raw NMR data.

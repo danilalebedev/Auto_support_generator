@@ -19,7 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 class WordAndDocxSmokeTests(unittest.TestCase):
     def test_reads_example_word_input(self) -> None:
-        compounds = read_word_compounds(REPO_ROOT / "examples" / "test_input.docx")
+        compounds = read_word_compounds(REPO_ROOT / "examples" / "example_1" / "Compound_table.docx")
         self.assertEqual([compound.number for compound in compounds[:2]], ["2a", "2b"])
         self.assertTrue(compounds[0].name.startswith("Methyl"))
         self.assertTrue(compounds[0].has_word_structure)
@@ -61,9 +61,9 @@ class WordAndDocxSmokeTests(unittest.TestCase):
                 exit_code = cli_main(
                     [
                         "--word-input",
-                        str(REPO_ROOT / "examples" / "test_input.docx"),
+                        str(REPO_ROOT / "examples" / "example_1" / "Compound_table.docx"),
                         "--spectra-zip",
-                        str(REPO_ROOT / "examples" / "test_input.zip"),
+                        str(REPO_ROOT / "examples" / "example_1" / "Spectra_source"),
                         "--no-extract-nmr",
                         "--no-check-support",
                         "--output",

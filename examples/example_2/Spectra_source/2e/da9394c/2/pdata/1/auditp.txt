@@ -1,0 +1,21 @@
+##TITLE= Audit trail, XWIN-NMR		Version 3.6
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= eos-1
+$$ /opt/xwinnmr/data/eos-1/nmr/da9394c/2/pdata/1/auditp.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, WHAT)
+(   1,<2024-10-04 19:41:33.63 +0300>,<eos-1>,<Avance-400>,
+      <acquisition in progress>)
+(   2,<2024-10-04 19:43:04.30 +0300>,<eos-1>,<Avance-400>,
+      <Start of raw data processing
+       efp BC_mod = 2 LB = 3 FT_mod = 6 PKNL = 1 PHC0 = 27.1665 PHC1 = 14.93224 SI = 128K 
+       data hash MD5: 128K
+       20 D4 36 60 3A A0 A7 C7 CC 35 EA 7D 54 AA CE 7E>)
+(   3,<2024-10-04 19:43:06.55 +0300>,<eos-1>,<Avance-400>,
+      <abs ABSG = 5 
+       data hash MD5: 128K
+       F0 9C BD 8A 6C 3B C6 66 1F F6 B6 F9 3A 07 09 EC>)
+##END=
+
+$$ hash MD5
+$$ CB E4 2C F9 CE 03 B5 E9 88 F4 E6 C9 5A 8E 70 E0

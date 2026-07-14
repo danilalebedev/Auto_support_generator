@@ -1,0 +1,17 @@
+##TITLE= Audit trail, XWIN-NMR		Version 3.6
+##JCAMPDX= 5.01
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= eos-1
+$$ /opt/xwinnmr/data/eos-1/nmr/da9394c/2/audita.txt
+##AUDIT TRAIL=  $$ (NUMBER, WHEN, WHO, WHERE, WHAT)
+(   1,<2024-10-04 19:43:09.99 +0300>,<eos-1>,<Avance-400>,
+      <created by zg, POWCHK disabled, PULCHK disabled
+       terminated by command 'halt'
+       configuration hash MD5:
+       3F 90 07 A6 D9 AC 07 DD F3 50 70 C3 36 99 F4 45
+       data hash MD5: 14490
+       5F DD 87 29 8E 0A 5A 11 0F FA 70 EF F1 7E 01 FF>)
+##END=
+
+$$ hash MD5
+$$ 62 59 95 16 43 46 C3 9F 46 02 9F 4C 52 1B E9 36

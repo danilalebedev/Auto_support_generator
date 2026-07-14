@@ -172,6 +172,8 @@ def _render_template_paragraphs(
             continue
 
         paragraph = _clone_paragraph(document, template_paragraph)
+        if spectrum_block is not None:
+            _normalize_spectrum_paragraph_spacing(paragraph, text)
         _remove_empty_optional_fragments(paragraph, values)
         _replace_placeholders(paragraph, values)
         _apply_inline_formatting(paragraph)
@@ -188,6 +190,17 @@ def _clone_paragraph(document: DocumentObject, paragraph: Paragraph) -> Paragrap
     else:
         body.insert(body.index(sect_pr), new_p)
     return Paragraph(new_p, document._body)
+
+
+def _normalize_spectrum_paragraph_spacing(paragraph: Paragraph, template_text: str) -> None:
+    paragraph.paragraph_format.space_before = Pt(0)
+    paragraph.paragraph_format.space_after = Pt(0)
+    if _is_structure_placeholder_paragraph(template_text):
+        # The appendix structure is a floating OLE object. Collapse its anchor
+        # line so it does not create a blank line above the spectrum image.
+        paragraph.paragraph_format.line_spacing = Pt(1)
+        for run in paragraph.runs:
+            run.font.size = Pt(1)
 
 
 def _replace_placeholders(paragraph: Paragraph, values: dict[str, str]) -> None:
@@ -527,6 +540,7 @@ def _render_spectrum_artifact(
 
     if embed_mode == "mnova" and image_path and mnova_path and mnova_ole_targets is not None:
         paragraph = document.add_paragraph()
+        paragraph.paragraph_format.space_before = Pt(0)
         paragraph.paragraph_format.space_after = Pt(0)
         section = document.sections[-1]
         picture_width = section.page_width - section.left_margin - section.right_margin
@@ -546,6 +560,7 @@ def _render_spectrum_artifact(
 
     if embed_mode in {"png", "mnova"} and image_path:
         paragraph = document.add_paragraph()
+        paragraph.paragraph_format.space_before = Pt(0)
         paragraph.paragraph_format.space_after = Pt(0)
         section = document.sections[-1]
         picture_width = section.page_width - section.left_margin - section.right_margin

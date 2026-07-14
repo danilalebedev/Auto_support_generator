@@ -13,7 +13,7 @@ from tkinter import ttk
 from typing import Any
 
 from .domain.manifest import manifest_has_errors
-from .domain.patching import parse_remove_list, parse_renumber_map, parse_reorder_list
+from .domain.patching import parse_remove_list, parse_renumber_map, parse_reorder_list, parse_swap_pairs
 from .domain.requests import AddCompoundsRequest, CheckSIRequest, GenerateSIRequest, PatchSIRequest
 from .domain.spectra_config import (
     DEFAULT_BASELINE_APPLY_13C,
@@ -38,20 +38,15 @@ from .workflows.patch_si import run_patch_si
 
 
 INSTRUCTION_TEMPLATE_FILES = (
-    ("Word table", Path("starter") / "compound_table_starter.docx", "Editable compound table based on the working test_input_2 example."),
-    ("Spectra zip", Path("spectra_2.zip"), "Raw spectra source matching the Word table example."),
-    ("Spectra layout", Path("starter") / "spectra_source_layout.txt", "Folder naming rules for raw 1H and 13C spectra."),
-    ("SI template", Path("templates") / "SI_template.docx", "Visual Word template for compound descriptions and spectra appendix."),
-    ("Reaction schema", Path("loadings") / "Reaction_schema.docx", "Optional reagent equivalents, MW, density and concentration settings."),
-    ("Scope table", Path("loadings") / "Scope.docx", "Optional reaction scope table for reagent-loading calculations."),
-    ("1H classic", Path("mngp_styles") / "classic_1H.mngp", "Default MestReNova graphic profile for 1H spectra."),
-    ("13C classic", Path("mngp_styles") / "classic_13C.mngp", "Default MestReNova graphic profile for 13C spectra."),
-    ("1H grid", Path("mngp_styles") / "grid_1H.mngp", "Example 1H MestReNova profile with grid enabled."),
-    ("13C grid", Path("mngp_styles") / "grid_13C.mngp", "Example 13C MestReNova profile with grid enabled."),
-    ("Example output", Path("example_output") / "support_information.docx", "Generated support example for visual comparison."),
-    ("Starter notes", Path("starter") / "README_starter_files.md", "Short description of all copied starter files."),
+    ("Example 1 - Compound table", Path("example_1") / "Compound_table.docx", "Four compounds for the first synthetic series."),
+    ("Example 1 - Spectra source", Path("example_1") / "Spectra_source", "Matching raw 1H and 13C spectra as a folder."),
+    ("Example 1 - SI template", Path("example_1") / "SI_template.docx", "Word template controlling text and appendix formatting."),
+    ("Example 1 - Reaction schema", Path("example_1") / "Reaction_schema.docx", "Reagent rules used to calculate reaction loadings."),
+    ("Example 1 - Scope", Path("example_1") / "Scope.docx", "Per-compound reaction and product data."),
+    ("Example 2", Path("example_2"), "Complete second-series input set with the same five upload-field names."),
+    ("Example 3", Path("example_3"), "Complete new-method input set; includes Spectra_source as both folder and zip."),
 )
-STARTER_FILE_RELATIVE_PATHS = tuple(relative_path for _, relative_path, _ in INSTRUCTION_TEMPLATE_FILES)
+STARTER_EXAMPLE_DIRS = (Path("example_1"), Path("example_2"), Path("example_3"))
 
 
 THEME_PALETTES = {
@@ -105,7 +100,6 @@ class SIGeneratorApp:
         self.spectra_source = StringVar()
         self.spectra_zip = self.spectra_source
         self.template_docx = StringVar()
-        self.references_file = StringVar()
         self.loadings_schema_docx = StringVar()
         self.loadings_scope_docx = StringVar()
         self.mnova_exe = StringVar()
@@ -144,10 +138,11 @@ class SIGeneratorApp:
         self.result_overview = StringVar(value="")
         self.existing_manifest = StringVar(value="")
         self.check_support_docx = StringVar(value="")
-        self.patch_output_docx = StringVar(value="")
-        self.patch_renumber = StringVar(value="")
-        self.patch_remove = StringVar(value="")
-        self.patch_reorder = StringVar(value="")
+        self.patch_source_output_dir = StringVar(value="")
+        self.patch_operation = StringVar(value="renumber")
+        self.patch_instruction = StringVar(value="")
+        self.patch_instruction_label = StringVar(value="Number mapping")
+        self.patch_instruction_example = StringVar(value="Example: 2a=3a,2b=3b")
         self.add_previous_output_dir = StringVar(value="")
         self.add_manifest = StringVar(value="")
         self.add_support_docx = StringVar(value="")
@@ -162,6 +157,7 @@ class SIGeneratorApp:
         self.add_method_mode = StringVar(value="same_series")
         self.page_title = StringVar(value="Generate SI")
         self.page_subtitle = StringVar(value="Create formatted Supporting Information from a compound table and spectra.")
+        self._current_page = "generate"
 
         self._is_running = False
         self._last_output_folder: Path | None = None
@@ -179,6 +175,7 @@ class SIGeneratorApp:
         self._logo_mark_image: tk.PhotoImage | None = None
 
         self._load_saved_settings()
+        self._on_patch_operation_changed(clear_instruction=False)
         self._set_default_mngp_profiles_if_empty()
         if self.theme_mode.get() not in THEME_PALETTES:
             self.theme_mode.set("light")
@@ -302,20 +299,6 @@ class SIGeneratorApp:
             button = _PillButton(sidebar, text=text, command=lambda page=page: self._show_page(page), theme=self._theme)
             button.grid(row=index, column=0, sticky="ew", pady=4)
             self._nav_buttons[page] = button
-            self._sidebar_buttons.append(button)
-
-        quick = ttk.Frame(sidebar, style="Sidebar.TFrame")
-        quick.grid(row=9, column=0, sticky="ew", pady=(14, 0))
-        quick.columnconfigure(0, weight=1)
-        for row, (text, command) in enumerate(
-            (
-                ("Example", self._load_examples),
-                ("Starter files", self._copy_starter_files),
-                ("Examples", self._open_examples_folder),
-            )
-        ):
-            button = _PillButton(quick, text=text, command=command, theme=self._theme, subtle=True, height=34)
-            button.grid(row=row, column=0, sticky="ew", pady=(0, 7))
             self._sidebar_buttons.append(button)
 
     def _build_content_shell(self, parent: ttk.Frame) -> None:
@@ -572,12 +555,12 @@ class SIGeneratorApp:
         patch_box = ttk.LabelFrame(patch_tab, text="Patch existing support", padding=12, style="Card.TLabelframe")
         patch_box.grid(row=0, column=0, sticky="ew")
         patch_box.columnconfigure(1, weight=1)
-        self._file_row(
+        self._folder_row(
             patch_box,
             0,
-            "Existing manifest",
-            self.existing_manifest,
-            lambda: self._browse_file(self.existing_manifest, [("Manifest JSON", "*.json"), ("All files", "*.*")]),
+            "Existing output folder",
+            self.patch_source_output_dir,
+            self._browse_patch_source_output,
         )
         self._file_row(
             patch_box,
@@ -587,16 +570,27 @@ class SIGeneratorApp:
             lambda: self._browse_file(self.check_support_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
             optional=True,
         )
-        self._file_row(patch_box, 2, "Patched output .docx", self.patch_output_docx, self._browse_patch_output, optional=True)
-        ttk.Label(patch_box, text="Renumber").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(patch_box, textvariable=self.patch_renumber).grid(row=3, column=1, sticky="ew", pady=4)
-        ttk.Label(patch_box, text="Example: 2a=3a,2b=3b", style="Muted.TLabel").grid(row=3, column=2, sticky="w", padx=(8, 0), pady=4)
-        ttk.Label(patch_box, text="Remove").grid(row=4, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(patch_box, textvariable=self.patch_remove).grid(row=4, column=1, sticky="ew", pady=4)
-        ttk.Label(patch_box, text="Example: 2a,2c", style="Muted.TLabel").grid(row=4, column=2, sticky="w", padx=(8, 0), pady=4)
-        ttk.Label(patch_box, text="Reorder").grid(row=5, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(patch_box, textvariable=self.patch_reorder).grid(row=5, column=1, sticky="ew", pady=4)
-        ttk.Button(patch_box, text="Apply patch", command=self._start_patch).grid(row=5, column=2, sticky="e", padx=(8, 0), pady=4)
+        ttk.Label(patch_box, text="Operation").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
+        operation_frame = ttk.Frame(patch_box)
+        operation_frame.grid(row=2, column=1, columnspan=2, sticky="w", pady=4)
+        for value, label in (
+            ("renumber", "Renumber"),
+            ("remove", "Remove"),
+            ("reorder", "Reorder"),
+            ("swap", "Swap compounds"),
+        ):
+            ttk.Radiobutton(
+                operation_frame,
+                text=label,
+                variable=self.patch_operation,
+                value=value,
+                command=self._on_patch_operation_changed,
+            ).pack(side="left", padx=(0, 14))
+        ttk.Label(patch_box, textvariable=self.patch_instruction_label).grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(patch_box, textvariable=self.patch_instruction).grid(row=3, column=1, sticky="ew", pady=4)
+        ttk.Label(patch_box, textvariable=self.patch_instruction_example, style="Muted.TLabel").grid(
+            row=3, column=2, sticky="w", padx=(8, 0), pady=4
+        )
 
     def _build_add_page(self, parent: ttk.Frame) -> None:
         page = self._make_page(parent, "add")
@@ -645,7 +639,6 @@ class SIGeneratorApp:
         self._file_row(add_box, 9, "New Reaction_schema.docx", self.add_loadings_schema_docx, lambda: self._browse_file(self.add_loadings_schema_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
         self._file_row(add_box, 10, "New Scope.docx", self.add_loadings_scope_docx, lambda: self._browse_file(self.add_loadings_scope_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
         self._folder_row(add_box, 11, "Output folder", self.add_output_folder, self._browse_add_output_folder, optional=True)
-        ttk.Button(add_box, text="Add compounds", command=self._start_add_compounds).grid(row=12, column=2, sticky="e", padx=(8, 0), pady=(8, 0))
 
     def _build_instructions_page(self, parent: ttk.Frame) -> None:
         page = self._make_page(parent, "instructions")
@@ -660,13 +653,13 @@ class SIGeneratorApp:
         ttk.Label(
             quick,
             text=(
-                "1. Prepare example files\n"
+                "1. Copy an example\n"
                 "   - Click Copy all examples.\n"
-                "   - Choose a folder where the editable examples will be copied.\n"
+                "   - Start with example_1 and edit copies of its Word files.\n"
                 "2. Fill Generate\n"
-                "   - Compound table: compound_table_starter.docx.\n"
-                "   - Spectra source: spectra_2.zip or your own spectra folder/zip.\n"
-                "   - Output folder: any folder where a new run folder can be created.\n"
+                "   - Compound table: Compound_table.docx.\n"
+                "   - Spectra source: Spectra_source folder or Spectra_source.zip.\n"
+                "   - Output folder: choose where a separate run folder will be created.\n"
                 "3. Optional settings\n"
                 "   - In Generate, add an SI template, MestReNova path/styles, or reagent-loading files if needed.\n"
                 "   - Open Processing for spectra mode, peak thresholds, ppm ranges, baseline correction, and checks.\n"
@@ -683,7 +676,7 @@ class SIGeneratorApp:
             generate,
             text=(
                 "Required fields\n"
-                "- Compound table: upload the filled Word table (.docx). Recommended starter: compound_table_starter.docx.\n"
+                "- Compound table: upload Compound_table.docx with compound data and ChemDraw OLE structures.\n"
                 "- Spectra source: upload a .zip archive or choose a folder with raw spectra.\n"
                 "- Output folder: choose where the run folder will be created.\n"
                 "- Optional inputs: add SI_template.docx, MestReNova.exe, and separate 1H/13C .mngp files when defaults are not enough.\n"
@@ -760,7 +753,7 @@ class SIGeneratorApp:
             spectra,
             text=(
                 "Accepted input\n"
-                "- A .zip archive, for example spectra_2.zip.\n"
+                "- A .zip archive, for example Spectra_source.zip.\n"
                 "- Or a normal folder with the same internal layout.\n\n"
                 "Required layout\n"
                 "- Top level: one folder per compound number, for example 3a, 3b, 3c.\n"
@@ -786,10 +779,9 @@ class SIGeneratorApp:
                 "- Existing manifest: upload support_information.manifest.json from a previous run.\n"
                 "- Support .docx override: optional. Use only if the support file was moved or renamed.\n\n"
                 "What it checks\n"
-                "- Manifest structure and listed artifacts.\n"
-                "- NMR count mismatches.\n"
-                "- HRMS mismatches.\n"
-                "- Elemental-analysis warnings.\n\n"
+                "- Manifest structure and compound order.\n"
+                "- Support file, bookmarks, linked artifacts and unresolved template aliases.\n"
+                "- Analytical NMR/HRMS/elemental-analysis warnings are calculated during Generate and saved in its reports.\n\n"
                 "Output\n"
                 "- JSON check report.\n"
                 "- Short readable summary in the GUI."
@@ -803,15 +795,18 @@ class SIGeneratorApp:
             patch,
             text=(
                 "Fields\n"
-                "- Existing manifest: upload manifest from the run you want to modify.\n"
+                "- Existing output folder: select the complete folder from the run you want to modify. "
+                "The app finds the manifest and support document automatically.\n"
                 "- Existing support .docx override: optional path if the old support was moved.\n"
-                "- Patched output .docx: optional path for the new file.\n\n"
-                "Patch commands\n"
+                "- The new patch run is created automatically next to the selected run.\n\n"
+                "Choose exactly one operation\n"
                 "- Renumber: comma-separated map, for example 2a=3a,2b=3b.\n"
                 "- Remove: compound numbers to remove, for example 2a,2c.\n"
-                "- Reorder: final compound order.\n\n"
+                "- Reorder: complete final compound order.\n"
+                "- Swap compounds: exchange complete compound assignments while preserving the visible number order. "
+                "Any number of non-overlapping pairs is allowed, for example 2a=3a,2b=3b.\n\n"
                 "Output\n"
-                "- Patch writes a new support file.\n"
+                "- Every patch writes a new run folder with docx, manifest, report, and logs.\n"
                 "- The old support is not edited in place."
             ),
             wraplength=760,
@@ -991,7 +986,7 @@ class SIGeneratorApp:
             "generate": ("Generate SI", "Create formatted Supporting Information from a compound table and spectra."),
             "advanced": ("Processing", "Spectra rendering, peak picking, baseline correction, and validation."),
             "check": ("Check support", "Run validation from an existing manifest and optional support document."),
-            "patch": ("Patch SI", "Create a new support document with renumbered, removed, or reordered compounds."),
+            "patch": ("Patch SI", "Modify an existing generated output without reprocessing spectra."),
             "add": ("Add compounds", "Append new compound blocks and spectra to an existing support document."),
             "instructions": ("Instructions", "Short guide for everyday use of Auto Support Generator."),
         }
@@ -1005,6 +1000,21 @@ class SIGeneratorApp:
         title, subtitle = page_text.get(page, page_text["generate"])
         self.page_title.set(title)
         self.page_subtitle.set(subtitle)
+        self._current_page = page
+        actions = {
+            "generate": ("Generate SI", self._start_generation),
+            "advanced": ("Generate SI", self._start_generation),
+            "check": ("Check support", self._start_manifest_check),
+            "patch": ("Apply patch", self._start_patch),
+            "add": ("Add compounds", self._start_add_compounds),
+        }
+        action = actions.get(page)
+        if action is None:
+            self.run_button.grid_remove()
+        else:
+            label, command = action
+            self.run_button.configure(text=label, command=command)
+            self.run_button.grid()
 
     def _set_theme_mode(self, mode: str) -> None:
         if mode not in THEME_PALETTES:
@@ -1121,19 +1131,30 @@ class SIGeneratorApp:
         if path:
             self._set_output_folder(path)
 
-    def _browse_patch_output(self) -> None:
-        kwargs: dict[str, object] = {
-            "defaultextension": ".docx",
-            "filetypes": [("Word documents", "*.docx"), ("All files", "*.*")],
-            "initialfile": "support_information_patched.docx",
+    def _browse_patch_source_output(self) -> None:
+        before = self.patch_source_output_dir.get()
+        self._browse_folder(self.patch_source_output_dir)
+        selected = self.patch_source_output_dir.get()
+        if selected and selected != before:
+            try:
+                _validate_patch_source_output_folder(Path(selected), require_support=False)
+            except ValueError as exc:
+                self.patch_source_output_dir.set(before)
+                self._save_settings()
+                messagebox.showerror("SI Generator", str(exc))
+
+    def _on_patch_operation_changed(self, *, clear_instruction: bool = True) -> None:
+        labels = {
+            "renumber": ("Number mapping", "Example: 2a=3a,2b=3b"),
+            "remove": ("Compounds", "Example: 2a,2c"),
+            "reorder": ("Final order", "Example: 2b,2a,2c"),
+            "swap": ("Swap pairs", "Example: 2a=3a,2b=3b"),
         }
-        initialdir = _dialog_initialdir(self.patch_output_docx.get(), self.existing_manifest.get(), self.output_folder.get(), self.output_docx.get(), self._last_output_folder)
-        if initialdir:
-            kwargs["initialdir"] = initialdir
-        path = filedialog.asksaveasfilename(**kwargs)
-        if path:
-            self.patch_output_docx.set(path)
-            self._save_settings()
+        label, example = labels.get(self.patch_operation.get(), labels["renumber"])
+        self.patch_instruction_label.set(label)
+        self.patch_instruction_example.set(example)
+        if clear_instruction:
+            self.patch_instruction.set("")
 
     def _browse_add_input(self) -> None:
         self.add_input_kind.set("word")
@@ -1163,8 +1184,9 @@ class SIGeneratorApp:
 
     def _load_examples(self) -> None:
         examples = examples_dir()
-        table = examples / "test_input_2.docx"
-        spectra = examples / "spectra_2.zip"
+        example = examples / "example_1"
+        table = example / "Compound_table.docx"
+        spectra = example / "Spectra_source"
         if not table.exists() or not spectra.exists():
             messagebox.showerror("Auto Support Generator", f"Example files were not found in:\n{examples}")
             return
@@ -1280,12 +1302,10 @@ class SIGeneratorApp:
             return
         try:
             request = _build_patch_request(
-                manifest_text=self.existing_manifest.get(),
+                source_output_folder_text=self.patch_source_output_dir.get(),
                 support_docx_text=self.check_support_docx.get(),
-                renumber_text=self.patch_renumber.get(),
-                remove_text=self.patch_remove.get(),
-                reorder_text=self.patch_reorder.get(),
-                output_docx_text=self.patch_output_docx.get(),
+                operation_text=self.patch_operation.get(),
+                instruction_text=self.patch_instruction.get(),
             )
         except ValueError as exc:
             messagebox.showerror("SI Generator", str(exc))
@@ -1293,7 +1313,7 @@ class SIGeneratorApp:
         self._save_settings()
         self._start_background_operation(
             "Patch SI",
-            f"Manifest: {request.manifest_path}\nOutput: {request.output_docx or 'auto'}\n",
+            f"Source output: {self.patch_source_output_dir.get()}\nNew patch run: auto\n",
             self._run_patch_workflow,
             request,
         )
@@ -1377,7 +1397,7 @@ class SIGeneratorApp:
             output_docx_text=_output_docx_from_folder(self.output_folder.get(), self.output_docx.get()),
             spectra_source_text=self.spectra_source.get(),
             template_docx_text=self.template_docx.get(),
-            references_text=self.references_file.get(),
+            references_text="",
             loadings_schema_text=self.loadings_schema_docx.get(),
             loadings_scope_text=self.loadings_scope_docx.get(),
             mnova_exe_text=self.mnova_exe.get(),
@@ -1556,6 +1576,7 @@ class SIGeneratorApp:
         self.result_output_folder.set(output_folder)
         if output_folder:
             self._last_output_folder = Path(output_folder).expanduser()
+            self.patch_source_output_dir.set(output_folder)
         if summary.get("manifest"):
             self.existing_manifest.set(summary["manifest"])
         self.log.save_to_logs_dir(summary.get("logs_dir", ""))
@@ -1571,6 +1592,11 @@ class SIGeneratorApp:
         self.add_input_kind.set("word")
         if not self.spectra_source.get() and isinstance(settings.get("spectra_zip"), str):
             self.spectra_source.set(str(settings["spectra_zip"]))
+        if not self.patch_source_output_dir.get() and self.existing_manifest.get():
+            manifest_path = Path(self.existing_manifest.get()).expanduser()
+            candidate = manifest_path.parent.parent if manifest_path.parent.name.lower() == "docx" else manifest_path.parent
+            if candidate.exists() and _previous_output_defaults(candidate)[0] is not None:
+                self.patch_source_output_dir.set(str(candidate))
         if isinstance(settings.get("output_folder"), str) and self.output_folder.get():
             self._sync_output_docx_from_folder()
         elif isinstance(settings.get("output_docx"), str) and self.output_docx.get():
@@ -1612,7 +1638,6 @@ class SIGeneratorApp:
             "spectra_source": self.spectra_source,
             "spectra_zip": self.spectra_source,
             "template_docx": self.template_docx,
-            "references_file": self.references_file,
             "loadings_schema_docx": self.loadings_schema_docx,
             "loadings_scope_docx": self.loadings_scope_docx,
             "mnova_exe": self.mnova_exe,
@@ -1636,10 +1661,9 @@ class SIGeneratorApp:
             "insert_spectra_as": self.insert_spectra_as,
             "existing_manifest": self.existing_manifest,
             "check_support_docx": self.check_support_docx,
-            "patch_output_docx": self.patch_output_docx,
-            "patch_renumber": self.patch_renumber,
-            "patch_remove": self.patch_remove,
-            "patch_reorder": self.patch_reorder,
+            "patch_source_output_dir": self.patch_source_output_dir,
+            "patch_operation": self.patch_operation,
+            "patch_instruction": self.patch_instruction,
             "add_previous_output_dir": self.add_previous_output_dir,
             "add_manifest": self.add_manifest,
             "add_support_docx": self.add_support_docx,
@@ -2236,26 +2260,40 @@ def _build_add_compounds_request(
 
 def _build_patch_request(
     *,
-    manifest_text: str,
-    renumber_text: str,
+    source_output_folder_text: str,
+    operation_text: str,
+    instruction_text: str,
     support_docx_text: str = "",
-    remove_text: str = "",
-    reorder_text: str = "",
-    output_docx_text: str = "",
 ) -> PatchSIRequest:
-    manifest_path = _required_existing_file(manifest_text, "Choose an existing manifest JSON.", suffixes=(".json",))
-    renumber = parse_renumber_map(renumber_text) if renumber_text.strip() else {}
-    remove = parse_remove_list(remove_text)
-    reorder = parse_reorder_list(reorder_text)
-    if not renumber and not remove and not reorder:
-        raise ValueError("Enter renumber, remove, or reorder patch instructions.")
+    source_output_folder = _required_existing_folder(
+        source_output_folder_text,
+        "Choose an existing generated output folder.",
+    )
+    support_override = _optional_existing_file(
+        support_docx_text,
+        "Existing support .docx",
+        suffixes=(".docx",),
+    )
+    manifest_path, discovered_support = _validate_patch_source_output_folder(
+        source_output_folder,
+        require_support=support_override is None,
+    )
+    operation = operation_text.strip().lower()
+    if operation not in {"renumber", "remove", "reorder", "swap"}:
+        raise ValueError("Choose one patch operation: renumber, remove, reorder, or swap.")
+    if not instruction_text.strip():
+        raise ValueError(f"Enter instructions for the {operation} operation.")
+    renumber = parse_renumber_map(instruction_text) if operation == "renumber" else {}
+    remove = parse_remove_list(instruction_text) if operation == "remove" else ()
+    reorder = parse_reorder_list(instruction_text) if operation == "reorder" else ()
+    swap = parse_swap_pairs(instruction_text) if operation == "swap" else ()
     return PatchSIRequest(
         manifest_path=manifest_path,
-        support_docx=_optional_existing_file(support_docx_text, "Existing support .docx", suffixes=(".docx",)),
+        support_docx=support_override or discovered_support,
         renumber=renumber,
         remove=remove,
         reorder=reorder,
-        output_docx=_optional_output_docx(output_docx_text),
+        swap=swap,
     )
 
 
@@ -2474,14 +2512,14 @@ def _output_docx_from_folder(output_folder_text: str, fallback_docx_text: str = 
 
 def _default_mngp_profile_text(nucleus: str) -> str:
     filename = "classic_13C.mngp" if nucleus == "13C" else "classic_1H.mngp"
-    path = examples_dir() / "mngp_styles" / filename
+    path = bundled_resource_path(Path("mngp_styles") / filename)
     return str(path) if path.exists() else ""
 
 
 def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) -> dict[str, str]:
-    examples = table.parent
-    classic_1h = examples / "mngp_styles" / "classic_1H.mngp"
-    classic_13c = examples / "mngp_styles" / "classic_13C.mngp"
+    example = table.parent
+    classic_1h = Path(_default_mngp_profile_text("1H"))
+    classic_13c = Path(_default_mngp_profile_text("13C"))
     return {
         "input_kind": "word",
         "input_path": str(table),
@@ -2489,10 +2527,9 @@ def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) ->
         "spectra_zip": str(spectra_zip),
         "output_docx": str(output_docx),
         "output_folder": str(output_docx.parent),
-        "template_docx": "",
-        "references_file": "",
-        "loadings_schema_docx": "",
-        "loadings_scope_docx": "",
+        "template_docx": str(example / "SI_template.docx") if (example / "SI_template.docx").exists() else "",
+        "loadings_schema_docx": str(example / "Reaction_schema.docx") if (example / "Reaction_schema.docx").exists() else "",
+        "loadings_scope_docx": str(example / "Scope.docx") if (example / "Scope.docx").exists() else "",
         "mnova_graphics_profile": "",
         "mnova_graphics_profile_1h": str(classic_1h) if classic_1h.exists() else "",
         "mnova_graphics_profile_13c": str(classic_13c) if classic_13c.exists() else "",
@@ -2502,10 +2539,9 @@ def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) ->
         "c13_ppm_max": f"{DEFAULT_X_RANGES['13C'][1]:g}",
         "existing_manifest": "",
         "check_support_docx": "",
-        "patch_output_docx": "",
-        "patch_renumber": "",
-        "patch_remove": "",
-        "patch_reorder": "",
+        "patch_source_output_dir": "",
+        "patch_operation": "renumber",
+        "patch_instruction": "",
         "add_previous_output_dir": "",
         "add_manifest": "",
         "add_support_docx": "",
@@ -2551,6 +2587,13 @@ def _optional_existing_folder(raw_path: str, label: str) -> Path | None:
     return path
 
 
+def _required_existing_folder(raw_path: str, message: str) -> Path:
+    path = _optional_existing_folder(raw_path, "Selected output folder")
+    if path is None:
+        raise ValueError(message)
+    return path
+
+
 def _previous_output_defaults(output_dir: Path) -> tuple[Path | None, Path | None]:
     root = Path(output_dir).expanduser()
     candidates = [
@@ -2563,6 +2606,21 @@ def _previous_output_defaults(output_dir: Path) -> tuple[Path | None, Path | Non
         root / "support_information.docx",
     ]
     support = next((path for path in support_candidates if path.exists() and path.is_file()), None)
+    return manifest, support
+
+
+def _validate_patch_source_output_folder(output_dir: Path, *, require_support: bool = True) -> tuple[Path, Path | None]:
+    manifest, support = _previous_output_defaults(output_dir)
+    missing: list[str] = []
+    if manifest is None:
+        missing.append("docx/support_information.manifest.json")
+    if support is None and require_support:
+        missing.append("docx/support_information.docx")
+    if missing:
+        raise ValueError(
+            "The selected folder is not a generated Auto Support output. Missing: " + ", ".join(missing)
+        )
+    assert manifest is not None
     return manifest, support
 
 
@@ -2713,15 +2771,15 @@ def _format_fraction_percent(fraction: float) -> str:
 
 def copy_starter_files_to(destination_parent: str | Path, *, examples_root: Path | None = None) -> Path:
     examples = Path(examples_root) if examples_root is not None else examples_dir()
-    sources = [(relative_path, examples / relative_path) for relative_path in STARTER_FILE_RELATIVE_PATHS]
-    missing = [str(path) for _, path in sources if not path.exists()]
+    sources = [(relative_path, examples / relative_path) for relative_path in STARTER_EXAMPLE_DIRS]
+    missing = [str(path) for _, path in sources if not path.is_dir()]
     if missing:
         raise FileNotFoundError("Missing starter files: " + "; ".join(missing))
 
-    destination = _next_available_folder(Path(destination_parent).expanduser() / "AutoSupportGenerator_starter_files")
+    destination = _next_available_folder(Path(destination_parent).expanduser() / "AutoSupportGenerator_examples")
     destination.mkdir(parents=True, exist_ok=False)
     for relative_path, source in sources:
-        shutil.copy2(source, destination / relative_path.name)
+        shutil.copytree(source, destination / relative_path.name)
     return destination
 
 

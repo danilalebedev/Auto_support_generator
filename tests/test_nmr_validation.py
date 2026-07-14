@@ -22,6 +22,32 @@ class NmrValidationTests(unittest.TestCase):
         self.assertIn("HRMS calcd", compound.nmr_check_warning)
         self.assertEqual(compound.validation_issues[0]["code"], "HRMS_MISMATCH")
 
+    def test_hrms_validation_uses_five_ppm_organic_letters_limit(self) -> None:
+        compound = Compound(
+            number="2d",
+            name="Wrong HRMS example",
+            formula="C11H10BrNO4",
+            hrms={"adduct": "[M+H]+", "calculated_mz": 299.9866, "found_text": "299.9900"},
+        )
+
+        validate_hrms([compound])
+
+        self.assertEqual(compound.validation_issues[0]["code"], "HRMS_MISMATCH")
+        self.assertIn("error 11.3 ppm; limit 5 ppm", compound.nmr_check_warning)
+
+    def test_hrms_validation_accepts_value_within_five_ppm(self) -> None:
+        compound = Compound(
+            number="2d",
+            name="Valid HRMS example",
+            formula="C11H10BrNO4",
+            hrms={"adduct": "[M+H]+", "calculated_mz": 299.9866, "found_text": "299.9879"},
+        )
+
+        validate_hrms([compound])
+
+        self.assertEqual(compound.validation_issues, [])
+        self.assertEqual(compound.nmr_check_warning, "")
+
     def test_hrms_validation_uses_structured_block_adduct(self) -> None:
         found = f"{calc_hrms_mz('C2H4O2', '[M+Na]+'):.4f}"
         compound = Compound(number="x", name="X", formula="C2H4O2", hrms={"adduct": "[M+Na]+", "found_text": found})
@@ -146,6 +172,31 @@ class NmrValidationTests(unittest.TestCase):
         self.assertEqual(compound.elemental_analysis["calculated"]["C"], 65.81)
         self.assertEqual(compound.elemental_analysis["found"]["N"], 8.92)
         self.assertEqual(compound.validation_issues, [])
+
+    def test_elemental_analysis_accepts_difference_at_organic_letters_limit(self) -> None:
+        compound = Compound(
+            number="x",
+            name="EA boundary",
+            formula="C17H11FN2O3",
+            elemental_analysis={"found": {"C": 66.21, "H": 3.57, "N": 9.03}},
+        )
+
+        validate_elemental_analysis([compound])
+
+        self.assertEqual(compound.validation_issues, [])
+
+    def test_elemental_analysis_warns_above_organic_letters_limit(self) -> None:
+        compound = Compound(
+            number="x",
+            name="EA outside limit",
+            formula="C17H11FN2O3",
+            elemental_analysis={"found": {"C": 66.22, "H": 3.57, "N": 9.03}},
+        )
+
+        validate_elemental_analysis([compound])
+
+        self.assertEqual(compound.validation_issues[0]["code"], "ELEMENTAL_ANALYSIS_MISMATCH")
+        self.assertIn("EA C calcd 65.81, found 66.22", compound.nmr_check_warning)
 
     def test_elemental_analysis_validation_warns_for_unexpected_element(self) -> None:
         compound = Compound(number="x", name="X", formula="C2H6O", elemental_analysis={"found": {"C": 52.10, "N": 1.25}})

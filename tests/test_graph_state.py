@@ -35,7 +35,7 @@ class GraphStateTests(unittest.TestCase):
 
     def test_initial_state_stores_request_artifacts_and_issues(self) -> None:
         request = GenerateSIRequest(
-            input_path=Path("examples/test_input.docx"),
+            input_path=Path("examples/example_1/Compound_table.docx"),
             input_kind="word",
             output_path=Path("output/support_information.docx"),
         )
@@ -45,7 +45,7 @@ class GraphStateTests(unittest.TestCase):
         self.assertIs(state["request"], request)
         self.assertEqual(state["artifacts"], {})
         self.assertEqual(state["issues"], [])
-        self.assertEqual(request.input_base_dir, Path("examples"))
+        self.assertEqual(request.input_base_dir, Path("examples/example_1"))
         self.assertEqual(request.output_dir, Path("output"))
 
     def test_compound_store_assigns_ids_and_preserves_order(self) -> None:
@@ -60,7 +60,7 @@ class GraphStateTests(unittest.TestCase):
 
     def test_settings_node_builds_generation_and_runtime_configs(self) -> None:
         request = GenerateSIRequest(
-            input_path=Path("examples/test_input.docx"),
+            input_path=Path("examples/example_1/Compound_table.docx"),
             input_kind="word",
             output_path=Path("output/support_information.docx"),
             mnova_exe=Path("C:/Tools/MestReNova.exe"),
@@ -113,7 +113,7 @@ class GraphStateTests(unittest.TestCase):
             references_path = Path(tmp) / "references.yml"
             references_path.write_text("references:\norder: []\n", encoding="utf-8")
             request = GenerateSIRequest(
-                input_path=Path("examples/test_input.docx"),
+                input_path=Path("examples/example_1/Compound_table.docx"),
                 input_kind="word",
                 output_path=Path("output/support_information.docx"),
                 references_path=references_path,
@@ -165,7 +165,7 @@ class GraphStateTests(unittest.TestCase):
 
     def test_nmr_route_skips_when_disabled(self) -> None:
         request = GenerateSIRequest(
-            input_path=Path("examples/test_input.docx"),
+            input_path=Path("examples/example_1/Compound_table.docx"),
             input_kind="word",
             output_path=Path("output/support_information.docx"),
             no_extract_nmr=True,
@@ -178,7 +178,7 @@ class GraphStateTests(unittest.TestCase):
 
     def test_nmr_route_runs_when_spectra_are_assigned(self) -> None:
         request = GenerateSIRequest(
-            input_path=Path("examples/test_input.docx"),
+            input_path=Path("examples/example_1/Compound_table.docx"),
             input_kind="word",
             output_path=Path("output/support_information.docx"),
         )
@@ -217,7 +217,7 @@ class GraphStateTests(unittest.TestCase):
 
     def test_hrms_node_calculates_before_rendering(self) -> None:
         request = GenerateSIRequest(
-            input_path=Path("examples/test_input.docx"),
+            input_path=Path("examples/example_1/Compound_table.docx"),
             input_kind="word",
             output_path=Path("output/support_information.docx"),
         )
@@ -282,7 +282,7 @@ class GraphStateTests(unittest.TestCase):
     def test_input_validation_writes_warning_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             request = GenerateSIRequest(
-                input_path=Path("examples/test_input.docx"),
+                input_path=Path("examples/example_1/Compound_table.docx"),
                 input_kind="csv",
                 output_path=Path(tmp) / "support_information.docx",
             )
@@ -303,7 +303,7 @@ class GraphStateTests(unittest.TestCase):
     def test_support_validation_writes_warning_artifact_and_issues(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             request = GenerateSIRequest(
-                input_path=Path("examples/test_input.docx"),
+                input_path=Path("examples/example_1/Compound_table.docx"),
                 input_kind="word",
                 output_path=Path(tmp) / "support_information.docx",
             )

@@ -1,0 +1,17 @@
+##TITLE= Parameter file, TOPSPIN		Version 2.1
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##NPOINTS= 1	$$ modification sequence number
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= nmr
+$$ 2024-11-04 18:45:45.245 +0300  nmr@AV600
+$$ /data/data/zhokhov/nmr/Winter25/10/pdata/1/outd
+$$ process /opt/topspin218/prog/mod/edparproc
+##$CURPLOT= <hp5000-a4>
+##$CURPRIN= <$hp5000-a4>
+##$DFORMAT= <normdp>
+##$LAYOUT= <+/1D_H.xwp>
+##$LFORMAT= <normlp>
+##$PFORMAT= <normpl>
+##$SURQMSG= 1
+##END=

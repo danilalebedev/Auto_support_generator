@@ -13,7 +13,7 @@ from si_generator.domain.compound import Compound
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 QS_SCRIPT = REPO_ROOT / "src" / "si_generator" / "resources" / "scripts" / "extract_nmr_report.qs"
-MNGP_STYLES = REPO_ROOT / "examples" / "mngp_styles"
+MNGP_STYLES = REPO_ROOT / "src" / "si_generator" / "resources" / "mngp_styles"
 
 
 class MnovaRenderSpecTests(unittest.TestCase):
@@ -65,19 +65,13 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertEqual(_render_spec_arg({}), "{}")
 
     def test_example_mngp_profiles_are_available_per_nucleus(self) -> None:
-        expected = [
-            MNGP_STYLES / "classic_1H.mngp",
-            MNGP_STYLES / "grid_1H.mngp",
-            MNGP_STYLES / "classic_13C.mngp",
-            MNGP_STYLES / "grid_13C.mngp",
-        ]
+        expected = [MNGP_STYLES / "classic_1H.mngp", MNGP_STYLES / "classic_13C.mngp"]
 
         for path in expected:
             self.assertTrue(path.is_file(), str(path))
             self.assertGreater(path.stat().st_size, 0)
 
-        self.assertNotEqual((MNGP_STYLES / "classic_1H.mngp").read_bytes(), (MNGP_STYLES / "grid_1H.mngp").read_bytes())
-        self.assertNotEqual((MNGP_STYLES / "classic_13C.mngp").read_bytes(), (MNGP_STYLES / "grid_13C.mngp").read_bytes())
+        self.assertNotEqual((MNGP_STYLES / "classic_1H.mngp").read_bytes(), (MNGP_STYLES / "classic_13C.mngp").read_bytes())
 
     def test_plan_nmr_processing_carries_custom_render_policy(self) -> None:
         compound = Compound(id="cmp_001", number="2a", name="Example", h1_spectrum_path="1/fid", c13_spectrum_path="2/fid")

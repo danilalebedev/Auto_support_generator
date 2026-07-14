@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -72,12 +72,12 @@ class CheckSIRequest:
 @dataclass(slots=True)
 class PatchSIRequest:
     manifest_path: Path
-    renumber: dict[str, str]
+    renumber: dict[str, str] = field(default_factory=dict)
     remove: tuple[str, ...] = ()
     reorder: tuple[str, ...] = ()
+    swap: tuple[tuple[str, str], ...] = ()
     support_docx: Path | None = None
-    output_docx: Path | None = None
-    output_manifest: Path | None = None
+    output_folder: Path | None = None
     strict_artifacts: bool = True
 
 

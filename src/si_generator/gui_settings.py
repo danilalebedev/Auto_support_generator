@@ -9,13 +9,12 @@ from typing import Any
 from .runtime_paths import gui_settings_path
 
 
-SETTINGS_VERSION = 1
+SETTINGS_VERSION = 2
 STRING_FIELDS = (
     "input_path",
     "spectra_source",
     "spectra_zip",
     "template_docx",
-    "references_file",
     "loadings_schema_docx",
     "loadings_scope_docx",
     "mnova_exe",
@@ -38,10 +37,8 @@ STRING_FIELDS = (
     "whittaker_asymmetry",
     "existing_manifest",
     "check_support_docx",
-    "patch_output_docx",
-    "patch_renumber",
-    "patch_remove",
-    "patch_reorder",
+    "patch_source_output_dir",
+    "patch_instruction",
     "add_previous_output_dir",
     "add_manifest",
     "add_support_docx",
@@ -69,6 +66,7 @@ CHOICE_FIELDS = {
     "insert_spectra_as": {"png", "mnova", "none"},
     "baseline_mode": {"auto", "off", "bernstein", "whittaker"},
     "theme_mode": {"light", "dark"},
+    "patch_operation": {"renumber", "remove", "reorder", "swap"},
 }
 
 
@@ -114,8 +112,23 @@ def normalize_gui_settings(raw: Mapping[str, Any]) -> dict[str, str | bool]:
         value = str(source.get(field, "")).strip().lower()
         if value in allowed:
             settings[field] = value
+    _migrate_legacy_patch_settings(source, settings)
     _migrate_legacy_mngp_settings(settings)
     return settings
+
+
+def _migrate_legacy_patch_settings(source: Mapping[str, Any], settings: dict[str, str | bool]) -> None:
+    if not str(settings.get("patch_instruction", "")).strip():
+        for operation, field in (
+            ("renumber", "patch_renumber"),
+            ("remove", "patch_remove"),
+            ("reorder", "patch_reorder"),
+        ):
+            value = str(source.get(field, "")).strip()
+            if value:
+                settings["patch_operation"] = operation
+                settings["patch_instruction"] = value
+                break
 
 
 def _bool_value(value: Any) -> bool:

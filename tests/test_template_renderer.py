@@ -66,6 +66,47 @@ class TemplateRendererTests(unittest.TestCase):
         self.assertNotIn("{Product.nmr.1h.picture}", text)
         self.assertEqual(len(media_files), 1)
 
+    def test_spectrum_header_structure_anchor_and_picture_have_no_vertical_gap(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "2a_1H.png"
+            image.write_bytes(_tiny_png())
+            template = root / "template.docx"
+            output = root / "support.docx"
+            document = Document()
+            document.add_paragraph("{Product.name} ({Product.number})")
+            document.add_page_break()
+            document.add_paragraph("{Product.name} ({Product.number})")
+            document.add_paragraph("[{spectrum.label}] ({spectrum.conditions})")
+            document.add_paragraph("{Product.structure}")
+            document.add_paragraph("{Product.nmr.1h.picture}")
+            document.save(template)
+
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="Example compound",
+                h1_conditions="CDCl3, 600 MHz",
+                h1_image_path=str(image),
+                h1_spectrum_path="fid",
+            )
+            model = build_si_document_model([compound], spectra_embed_mode="png")
+            build_document_from_model(model, output, template_path=template)
+            rendered = Document(output)
+            header_index = next(index for index, paragraph in enumerate(rendered.paragraphs) if "1H NMR" in paragraph.text)
+            header = rendered.paragraphs[header_index]
+            structure_anchor = rendered.paragraphs[header_index + 1]
+            picture = rendered.paragraphs[header_index + 2]
+
+        self.assertEqual(header.paragraph_format.space_before.pt, 0)
+        self.assertEqual(header.paragraph_format.space_after.pt, 0)
+        self.assertEqual(structure_anchor.paragraph_format.space_before.pt, 0)
+        self.assertEqual(structure_anchor.paragraph_format.space_after.pt, 0)
+        self.assertEqual(structure_anchor.paragraph_format.line_spacing.pt, 1)
+        self.assertEqual(picture.paragraph_format.space_before.pt, 0)
+        self.assertEqual(picture.paragraph_format.space_after.pt, 0)
+        self.assertEqual(len(picture._p.xpath(".//w:drawing")), 1)
+
     def test_13c_label_uses_mnova_13c_nmr_text(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -162,13 +203,15 @@ class TemplateRendererTests(unittest.TestCase):
         self.assertNotIn("Rf =", text)
 
     def test_visual_template_uses_current_aliases(self) -> None:
-        template = Path(__file__).resolve().parents[1] / "examples" / "templates" / "SI_template.docx"
-        document = Document(template)
-        text_parts = [paragraph.text for paragraph in document.paragraphs]
-        for table in document.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    text_parts.extend(paragraph.text for paragraph in cell.paragraphs)
+        examples = Path(__file__).resolve().parents[1] / "examples"
+        text_parts: list[str] = []
+        for template in examples.glob("example_*/SI_template.docx"):
+            document = Document(template)
+            text_parts.extend(paragraph.text for paragraph in document.paragraphs)
+            for table in document.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        text_parts.extend(paragraph.text for paragraph in cell.paragraphs)
         text = "\n".join(text_parts)
 
         legacy_aliases = (
@@ -190,7 +233,6 @@ class TemplateRendererTests(unittest.TestCase):
         current_aliases = (
             "Product.name",
             "Product.number",
-            "Reagent_1.number",
             "Reagent_2.name",
             "AcOH.mmol",
             "AcOH.mcl",
@@ -198,6 +240,7 @@ class TemplateRendererTests(unittest.TestCase):
             "Product.structure",
             "Product.nmr.1h.picture",
             "Product.nmr.13c.picture",
+            "Reagent_1.number",
         )
 
         for alias in legacy_aliases:

@@ -1,5 +1,7 @@
 # Auto Support Generator
 
+[English](README_EN.md) | **Русский**
+
 ## Research status and citation
 
 Auto Support Generator is an early research software project for automated generation of supporting information in organic chemistry.
@@ -8,1000 +10,196 @@ A ChemRxiv preprint describing the method, software architecture, and example wo
 
 Until an open-source license is added, all rights are reserved. You may view and fork this repository under GitHub's Terms of Service, but reuse, redistribution, or derivative works require permission from the author.
 
-Author: Danila Lebedev<br>
+Author: Danila Lebedev  
 Copyright © 2026 Danila Lebedev
 
-Auto Support Generator - Windows-программа для автоматической сборки и проверки
-Supporting Information (SI) в органической химии.
+![Интерфейс Auto Support Generator](docs/assets/gui_overview.png)
 
-Программа берет таблицу с соединениями, структуры ChemDraw, raw-спектры ЯМР,
-HRMS/IR/elemental analysis/физические свойства и собирает готовый
-`support_information.docx` в заданном оформлении. Дополнительно сохраняются
-картинки спектров, обработанные `.mnova` файлы, отчеты проверки и служебные
-логи.
+## Назначение
 
-Короткая инструкция по установке для пользователей без опыта работы с Python и
-GitHub находится в [INSTALL_RU.md](INSTALL_RU.md).
+Auto Support Generator автоматически собирает Supporting Information (SI) для органической химии. Программа переносит структуры ChemDraw, физические свойства и аналитические данные в Word, обрабатывает спектры ЯМР в MestReNova, рассчитывает загрузки и формирует отчеты проверки.
 
-## Быстрый старт
+## Возможности
 
-1. Установите Microsoft Word, ChemDraw и MestReNova.
-2. Скачайте и запустите `installer/AutoSupportGeneratorSetup.exe`.
-3. Откройте ярлык `Auto Support Generator`.
-4. Нажмите `Load example`, чтобы подставить готовый пример, или
-   `Copy starter files`, чтобы скопировать пустые шаблоны для своего проекта.
-5. Нажмите `Generate SI`.
-6. После окончания нажмите `Open output folder` или `Open last output`.
-7. Откройте `docx/support_information.docx`.
+| Раздел | Что делает |
+|---|---|
+| **Generate** | Создает новый SI из таблицы соединений и raw-спектров. |
+| **Processing** | Настраивает обработку ЯМР, вид appendix и проверку данных. |
+| **Check** | Проверяет целостность ранее созданного output: manifest, DOCX, закладки и артефакты. |
+| **Patch** | Создает измененную копию SI без повторной обработки спектров: renumber, remove, reorder или swap. |
+| **Add** | Добавляет новые соединения в существующий SI, не пересобирая старые блоки. |
+| **Instructions** | Содержит встроенную справку, таблицу алиасов и скачиваемые примеры. |
 
-Для своего проекта обычно нужно заполнить только три поля на странице
-`Generate SI`:
+Программа также:
 
-| Поле | Что выбрать |
-| --- | --- |
-| `Compound table` | Word-таблицу `.docx` с соединениями и структурами ChemDraw |
-| `Spectra source` | zip-архив или папку с raw-спектрами |
-| `Output folder` | папку, куда сохранить результат |
-
-Остальные параметры можно оставить по умолчанию.
-
-GUI теперь организован как Fluent-style интерфейс с левой боковой панелью. Через пункты слева можно переключаться между генерацией, настройками обработки, проверкой, патчингом и добавлением соединений. В верхней части боковой панели есть переключатель с солнцем и луной: он включает светлую или темную тему, а выбранный режим сохраняется локально.
-На странице `Instructions` есть короткая встроенная инструкция по основному рабочему процессу.
-
-## Что программа умеет
-
-Основные функции:
-
-- генерирует текстовые блоки описания соединений;
-- копирует структуры из Word-таблицы как OLE-объекты ChemDraw/ChemSketch;
-- получает номенклатурные названия из ChemDraw, если поле `name` пустое;
-- обрабатывает 1H и 13C NMR через MestReNova;
-- калибрует спектры по растворителю;
-- извлекает текстовое описание ЯМР из MestReNova;
-- экспортирует картинки спектров в PNG;
-- сохраняет обработанные `.mnova` файлы;
-- вставляет спектры в SI как PNG или как кликабельные Mnova OLE-объекты;
-- считает расчетный HRMS по молекулярной формуле;
-- форматирует HRMS, NMR, IR, elemental analysis и физические свойства;
-- считает и вставляет расчетный elemental analysis;
-- проверяет соответствие NMR/HRMS/elemental analysis формуле вещества;
-- добавляет предупреждения в отчет и в SI, если данные не сходятся;
-- создает отдельную output-папку для каждого запуска;
-- позволяет проверить уже созданный SI;
-- позволяет перенумеровать, удалить или переставить блоки в существующем SI;
-- позволяет добавить новые соединения к старому SI.
+- сохраняет структуры как редактируемые OLE-объекты ChemDraw;
+- получает номенклатурные названия из ChemDraw;
+- извлекает описания 1H/13C NMR и экспортирует PNG или кликабельные Mnova-объекты;
+- рассчитывает HRMS и элементный анализ по формуле структуры;
+- проверяет количество H/C в NMR, HRMS и элементный анализ;
+- рассчитывает массы, количества, объемы, эквиваленты и выходы реакции;
+- сохраняет обработанные `.mnova`, изображения, manifest, отчеты и логи.
 
 ## Требования
 
-Полный workflow рассчитан на Windows, потому что используются Microsoft Word,
-ChemDraw OLE и MestReNova automation.
-
 | Программа | Для чего нужна | Проверенная версия |
-| --- | --- | --- |
-| Windows | запуск GUI и COM/OLE automation | Windows 10/11 |
-| Microsoft Word desktop | создание `.docx`, вставка OLE-объектов | Microsoft 365 / Word 2019+ |
-| ChemDraw / ChemOffice | структуры и генерация названий | ChemDraw 22.2.0.3300 |
-| MestReNova | обработка и экспорт ЯМР | MestReNova 14.2.0-26256 |
+|---|---|---|
+| Windows 10/11 | запуск приложения | 64-bit |
+| Microsoft Word desktop | создание DOCX и OLE | Microsoft 365 / Word 2021 |
+| ChemDraw | структуры и названия | 22.2.0.3300 |
+| MestReNova | обработка ЯМР | 14.2.0-26256 |
 
-Python пользователю готовой версии не нужен: он упакован внутрь
-`AutoSupportGenerator.exe`. Python нужен только разработчику, если запускать
-проект из исходников или собирать установщик.
+В готовой сборке Python устанавливать не нужно. Перед первым запуском один раз откройте ChemDraw и MestReNova вручную. Если MestReNova не найдена автоматически, укажите ее `.exe` в Generate.
 
-### Важные замечания по внешним программам
+## Установка
 
-- ChemDraw должен быть установлен как desktop-приложение и уметь открывать CDX
-  через OLE/COM.
-- MestReNova должна запускаться на этой машине хотя бы один раз вручную, чтобы
-  лицензия и начальные настройки были активированы.
-- Если MestReNova не найдена автоматически, укажите путь к `MestReNova.exe` в
-  GUI на странице `Processing`.
-- Пути с кириллицей поддерживаются. Для ChemDraw/MestReNova программа временно
-  копирует рабочие файлы в ASCII-папку
-  `C:\Users\Public\AutoSupportGenerator\temp`, потому что внешние программы не
-  всегда корректно работают с Unicode-путями.
+1. Откройте папку `installer` в репозитории.
+2. Скачайте и запустите `AutoSupportGeneratorSetup.exe`.
+3. Разрешите установку только из доверенной копии этого репозитория.
+4. Запустите **Auto Support Generator** с ярлыка.
 
-## Установка готовой версии
+Для запуска из исходного кода используйте Python 3.12, затем выполните `Setup Auto SI Generator.bat` и `Run Auto SI Generator.bat`.
 
-Самый простой способ:
+## Быстрый старт
 
-1. Откройте репозиторий:
+1. Откройте **Instructions → Example files → Copy all examples**.
+2. Возьмите `example_1` и замените данные в его Word-файлах своими.
+3. В **Generate** выберите `Compound_table.docx`, `Spectra_source` и папку результата.
+4. При необходимости выберите шаблон, профили `.mngp`, Reaction schema и Scope.
+5. В **Processing** проверьте настройки спектров.
+6. Вернитесь в Generate и нажмите **Generate SI**.
+7. После завершения нажмите **Open support** или **Open output folder**.
 
-```text
-https://github.com/danilalebedev/Auto_support_generator
-```
+## Поля Generate
 
-2. Откройте папку `installer`.
-3. Скачайте `AutoSupportGeneratorSetup.exe`.
-4. Запустите скачанный файл двойным кликом.
-5. После установки запустите `Auto Support Generator` с рабочего стола или из
-   меню Пуск.
+### Основные
 
-Установщик копирует программу в:
-
-```text
-%LOCALAPPDATA%\AutoSupportGenerator
-```
-
-Туда же кладутся примеры, README и дополнительные файлы.
-
-## Запуск из исходников
-
-Этот вариант нужен разработчику или пользователю, который скачал проект как ZIP
-и хочет запустить его без установщика.
-
-1. Установите Python 3.12.
-2. Скачайте проект с GitHub через `Code -> Download ZIP`.
-3. Распакуйте архив.
-4. Запустите `Setup Auto SI Generator.bat`.
-5. После установки зависимостей запустите `Run Auto SI Generator.bat`.
-
-## Главный сценарий работы
-
-### 1. Подготовьте таблицу соединений
-
-Обычно это Word-файл `.docx` с таблицей. Первая строка - заголовки колонок,
-каждая следующая строка - одно соединение.
-
-В первой колонке обычно находятся:
-
-- номер соединения, например `2a`;
-- структура, вставленная как OLE-объект ChemDraw или ChemSketch.
-
-Если структура вставлена как обычная картинка, программа не сможет перенести ее
-как редактируемый ChemDraw-объект.
-
-### 2. Подготовьте спектры
-
-Спектры можно передать как zip-архив или как обычную папку. Внутри должны быть
-папки с номерами соединений:
-
-```text
-spectra.zip
-  2a/
-    any_name_1H/
-      fid
-      acqus
-      ...
-    any_name_13C/
-      fid
-      acqus
-      ...
-  2b/
-    ...
-```
-
-Номер папки должен совпадать с номером соединения в таблице. Названия
-экспериментов внутри папки могут быть любыми: программа ищет Bruker-файл `fid`
-и читает `acqus`/`acqu`, чтобы понять, где 1H, а где 13C.
-
-### 3. Запустите GUI
-
-На странице `Generate SI` выберите:
-
-- `Compound table`;
-- `Spectra source`;
-- `Output folder`.
-
-После этого нажмите `Generate SI`.
-
-### 4. Проверьте результат
-
-После окончания откройте:
-
-```text
-output/runs/<дата>_<input_name>/docx/support_information.docx
-```
-
-Если есть warnings, откройте `Open report` или папку `logs`.
-
-## GUI: страница Generate SI
-
-Страница `Generate SI` - основной режим генерации нового SI.
-
-### Simple
-
-| Поле | Что означает | Когда заполнять |
-| --- | --- | --- |
-| `Compound table` | Word `.docx`-таблица с данными по соединениям и ChemDraw OLE-структурами | всегда |
-| `Spectra source` | zip-архив или папка с raw-спектрами | если нужно автоматически обработать ЯМР |
-| `Output folder` | папка для результатов | всегда |
-
-Кнопки рядом со `Spectra source`:
-
-- `Zip...` - выбрать zip-архив;
-- `Folder...` - выбрать обычную папку со спектрами.
-
-### Results
-
-После запуска здесь появляются основные файлы:
-
-| Кнопка | Что открывает |
-| --- | --- |
-| `Open support` | итоговый `.docx` |
-| `Open output folder` | папку текущего запуска |
-| `Open logs` | служебные логи и warnings |
-| `Open report` | JSON-отчет запуска |
-
-Строка под кнопками показывает краткий статус: успешно, есть warnings или есть
-ошибки.
-
-### Run Log
-
-Текстовый лог выполнения. Сюда выводятся:
-
-- выбранные входные файлы;
-- preflight checks;
-- предупреждения по input-таблице;
-- сообщения ChemDraw;
-- сообщения MestReNova;
-- путь к итоговым файлам.
-
-Если что-то пошло не так, сначала смотрите `Run Log`.
-
-## GUI: страница Processing
-
-Страница `Processing` нужна для дополнительных файлов и тонкой настройки.
+| Поле программы | Что загрузить |
+|---|---|
+| **Compound table** | `Compound_table.docx`: одна строка на соединение, номер, свойства, HRMS/IR/Anal и OLE-структура ChemDraw. |
+| **Spectra source** | Папку `Spectra_source` или `Spectra_source.zip` с подпапками по номерам соединений. |
+| **Output folder** | Папку, внутри которой программа создаст отдельный каталог текущего запуска. |
 
 ### Optional inputs
 
-| Поле | Что означает |
-| --- | --- |
-| `SI template .docx` | Word-шаблон оформления SI. Если пусто, используется встроенный шаблон |
-| `MestReNova .exe` | путь к `MestReNova.exe`, если автоопределение не сработало |
-| `Mnova graphics .mngp` | профиль отображения спектров MestReNova |
-
-Кнопка `Detect` рядом с `MestReNova .exe` пытается найти MestReNova
-автоматически.
-
-### Processing
-
-| Поле | Значение по умолчанию | Что делает |
-| --- | --- | --- |
-| `Check support` | включено | проверяет NMR, HRMS и elemental analysis |
-| `Calculate elemental analysis` | выключено | добавляет расчетный elemental analysis по формуле |
-| `Spectra appendix` | `png` | выбирает, как вставлять спектры в конец SI |
-| `1H threshold (%)` | `6` | минимальная высота пика для 1H peak picking |
-| `13C threshold (%)` | `4` | минимальная высота пика для 13C peak picking |
-| `Signal height (%)` | `80` | высота самого высокого сигнала на экспортируемой картинке |
-| `1H ppm range` | `-1` to `12` | диапазон шкалы ppm для картинки 1H NMR |
-| `13C ppm range` | `-10` to `210` | диапазон шкалы ppm для картинки 13C NMR |
-
-`Spectra appendix` имеет три режима:
-
-| Режим | Что будет в SI |
-| --- | --- |
-| `png` | обычные картинки спектров |
-| `mnova` | кликабельные Mnova OLE-объекты с картинкой-превью |
-| `none` | спектральное приложение не добавляется |
-
-Режим `mnova` удобен, если нужно открыть спектр прямо из Word и вручную
-подправить его в MestReNova. Для каждого спектра используется отдельный файл:
-`2a_1H.mnova` или `2a_13C.mnova`.
-
-### Baseline correction
-
-| Поле | Значение по умолчанию | Что делает |
-| --- | --- | --- |
-| `Mode` | `auto` | выбирает алгоритм baseline correction |
-| `Apply to 1H` | выключено | применять baseline correction к 1H |
-| `Apply to 13C` | включено | применять baseline correction к 13C |
-| `Bernstein order` | `3` | порядок полинома Bernstein |
-| `Whittaker lambda` | `100000` | параметр сглаживания Whittaker |
-| `Whittaker asymmetry` | `0.001` | асимметрия Whittaker |
-
-Режимы baseline:
-
-- `auto` - использовать стандартную автоматическую обработку;
-- `off` - не делать baseline correction;
-- `bernstein` - использовать Bernstein baseline;
-- `whittaker` - использовать Whittaker baseline.
-
-Для обычной работы лучше оставить значения по умолчанию. Whittaker-настройки -
-expert mode для случаев, где baseline плохо корректируется автоматически.
+| Поле программы | Что загрузить |
+|---|---|
+| **SI template .docx** | `SI_template.docx` с текстом, форматированием и алиасами. |
+| **MestReNova .exe** | Путь к `MestReNova.exe`, если автоматический поиск не сработал. |
+| **1H .mngp** | Пользовательский стиль отображения 1H NMR. Без файла используется встроенный classic. |
+| **13C .mngp** | Пользовательский стиль отображения 13C NMR. Без файла используется встроенный classic. |
 
 ### Reagent Loadings
 
-| Поле | Что означает |
-| --- | --- |
-| `Calculate reagent loadings` | включает расчет загрузок реагентов |
-| `Reaction schema .docx` | схема реакции с placeholders для реагентов |
-| `Scope .docx` | таблица scope/продуктов для расчета загрузок |
+| Поле программы | Что загрузить |
+|---|---|
+| **Reaction schema .docx** | `Reaction_schema.docx`: список `Reagent_1`, `Reagent_2`, именованных реагентов и растворителей, их eq, MW, плотности или концентрации. |
+| **Scope .docx** | `Scope.docx`: данные для каждого продукта, включая массы и структуры переменных реагентов. |
 
-Если загрузки не нужны, этот блок можно не трогать.
+Включите расчет загрузок только при наличии обоих файлов. Номера продуктов в Compound table и Scope должны совпадать.
 
-## GUI: страница Check support
+## Processing
 
-Эта страница проверяет уже созданный SI без повторной генерации.
+| Настройка | Значение |
+|---|---|
+| **Check support** | Проверять NMR, HRMS и элементный анализ во время генерации. |
+| **Calculate elemental analysis** | Рассчитать Anal. по формуле, если поле не отключено знаком `-`. |
+| **Spectra appendix** | `png` — картинки; `mnova` — кликабельные объекты; `none` — не добавлять appendix. |
+| **1H/13C threshold** | Минимальная относительная высота пика. Увеличьте значение, если выбираются шум и примеси. |
+| **Signal height** | Доля высоты страницы, занимаемая самым высоким сигналом. |
+| **1H/13C ppm range** | Диапазон оси X на экспортируемой картинке. |
+| **Highlight solvent peaks** | Показывать или скрывать определенные MestReNova пики растворителя. |
+| **Baseline mode** | `auto`, `off`, `Bernstein` или `Whittaker`. |
+| **Apply to 1H/13C** | Выбрать, для каких ядер выполнять baseline correction. |
+| **Whittaker / polynomial parameters** | Экспертные параметры соответствующего алгоритма baseline. |
 
-| Поле | Что выбрать |
-| --- | --- |
-| `Manifest` | `support_information.manifest.json` из папки `docx/` |
-| `Support .docx override` | другой `.docx`, если нужно проверить не тот файл, который записан в manifest |
-
-Результат проверки сохраняется в `*.check_report.json`.
-
-Этот режим полезен, если вы вручную поправили `support_information.docx` и
-хотите проверить, что manifest, bookmarks и файлы результата все еще
-согласованы.
-
-## GUI: страница Patch SI
-
-Эта страница меняет уже созданный SI без полной регенерации.
-
-| Поле | Что означает |
-| --- | --- |
-| `Existing manifest` | manifest старого SI |
-| `Existing support .docx override` | опционально: другой `.docx`, если он не совпадает с путем из manifest |
-| `Patched output .docx` | куда сохранить новую копию SI |
-| `Renumber` | перенумеровать соединения |
-| `Remove` | удалить соединения |
-| `Reorder` | изменить порядок соединений |
-
-Примеры:
+## Формат Spectra source
 
 ```text
-Renumber: 2a=3a,2b=3b
-Remove:   2a,2c
-Reorder:  2b,2a,2c
-```
-
-В `Remove` и `Reorder` можно указывать номера соединений или внутренние
-`cmp_...` id из manifest.
-
-Patch workflow всегда создает новый `.docx`, новый manifest и report. Старый SI
-не изменяется.
-
-## GUI: страница Add compounds
-
-Эта страница добавляет новые соединения к уже созданному SI и не перегенерирует старые блоки соединений.
-
-| Поле | Что означает |
-| --- | --- |
-| `Previous output folder` | папка старого запуска. Программа пытается автоматически подставить `Existing manifest` и `Existing support .docx` из подпапки `docx/` |
-| `Existing manifest` | manifest старого SI. Заполняется вручную, если не выбран previous output folder |
-| `Existing support .docx` | старый SI `.docx`, optional override если файл был перемещен |
-| `Add mode` | режим `Same series` или `New method` |
-| `New compound table` | Word `.docx`-таблица только с новыми соединениями |
-| `New spectra source` | спектры только для новых соединений |
-| `New SI template .docx` | optional template override. В New method может задавать оформление новой методики |
-| `New Reaction_schema.docx` | схема реакции для новых расчетов загрузок. Same series использует старую schema, если это поле пустое |
-| `New Scope.docx` | scope-таблица для новых соединений. Обязательна, если включены loadings |
-| `Output .docx` | новый объединенный SI |
-
-`Same series` переиспользует старый template, Reaction_schema, Mnova styles, ppm ranges, thresholds, baseline settings и check settings из старого manifest. Старый Scope, compound table и spectra source не переиспользуются.
-
-`New method` может использовать новый template, Reaction_schema и Scope. Настройки отображения и preprocessing спектров остаются едиными с предыдущим запуском, если в старом manifest есть run_config.
-
-Если номер нового соединения уже есть в старом manifest, workflow останавливается с ошибкой `DUPLICATE_COMPOUND_NUMBER`.
-## Кнопки в верхней и нижней части GUI
-
-| Кнопка | Что делает |
-| --- | --- |
-| `Load example` | подставляет пример из папки `examples/` |
-| `Copy starter files` | копирует starter-набор в выбранную папку: Word-таблицу, template `.docx`, примеры loadings и описание структуры spectra source |
-| `Open examples` | открывает папку с примерами |
-| `Generate SI` | запускает генерацию |
-| `Open last output` | открывает последнюю папку результата |
-| `Clear log` | очищает текстовый лог |
-
-## Формат Word-таблицы
-
-Рекомендуемый вариант input - Word-таблица `.docx`, потому что в нее можно
-вставить структуры как OLE-объекты ChemDraw.
-
-Пример starter-таблицы:
-
-![Starter compound table preview](docs/input_table_preview.png)
-
-Минимально нужны:
-
-- номер соединения;
-- структура ChemDraw или название;
-- физические свойства;
-- формула;
-- HRMS found;
-- спектры или готовый NMR-текст.
-
-Поддерживаемые колонки:
-
-| Колонка | Что писать |
-| --- | --- |
-| `number`, `No`, `compound`, `id` | номер соединения, например `2a` |
-| `name`, `title`, `compound name` | название соединения. Если пусто, программа попробует получить название через ChemDraw |
-| `preparation`, `procedure` | текст синтеза/получения |
-| `yield`, `yield_text` | выход, например `492 mg (31%)` |
-| `color` | цвет |
-| `state`, `appearance` | агрегатное состояние или внешний вид |
-| `melting_point`, `mp` | температура плавления, например `81-82 °C` |
-| `rf` | Rf/TLC строка |
-| `formula` | нейтральная молекулярная формула, например `C11H10BrFO2` |
-| `hrms_found` или колонка с `HRMS` в названии | найденная HRMS масса |
-| `hrms_adduct` | аддукт, например `[M+H]+` |
-| `h1_nmr`, `1H NMR` | готовое описание 1H NMR |
-| `c13_nmr`, `13C NMR` | готовое описание 13C NMR |
-| `h1_spectrum_path` | путь к 1H spectrum folder, если не используете общий spectra source |
-| `c13_spectrum_path` | путь к 13C spectrum folder |
-| `extra_nmr` | дополнительные NMR, например 19F NMR |
-| `ir` | IR строка или список пиков |
-| `elemental_analysis`, `anal`, `ea` | найденные значения elemental analysis |
-
-Примеры `elemental_analysis`:
-
-```text
-C, 66.03; H, 3.55; N, 8.92
-C, 30.75; H, 7.74; S, 41.04
-```
-
-Если нужное поле пустое, программа обычно не останавливается, а пишет warning.
-Блокирующие ошибки:
-
-- нет ни одного соединения;
-- пустой номер соединения;
-- повторяющийся номер соединения;
-- выбранный input-файл не существует;
-- output path не является `.docx`.
-
-## Формат spectra source
-
-`Spectra source` может быть:
-
-- zip-архивом;
-- обычной папкой.
-
-Требования:
-
-- папки верхнего уровня называются номерами соединений;
-- внутри каждой папки лежат Bruker experiments;
-- в каждом experiment должен быть файл `fid`;
-- желательно наличие `acqus` или `acqu`, чтобы определить ядро.
-
-Пример:
-
-```text
-spectra/
+Spectra_source/
   2a/
-    da9534_1H/
-      fid
-      acqus
-    da9534_13C/
-      fid
-      acqus
+    experiment_1H/fid
+    experiment_13C/fid
   2b/
-    ...
+    experiment_1H/fid
+    experiment_13C/fid
 ```
 
-Если в spectra source нет папки для какого-то соединения, программа просто не
-извлечет NMR для этого соединения и запишет warning.
+Названия внутренних экспериментов произвольны: тип ядра определяется по acquisition metadata. Набор номеров верхнего уровня должен совпадать с Compound table.
 
-## Как программа обрабатывает NMR
+## Check
 
-Для каждого соединения программа пытается найти 1H и 13C spectra folders.
+1. Загрузите `support_information.manifest.json` из `docx` старого запуска.
+2. При необходимости укажите перемещенный `support_information.docx`.
+3. Нажмите **Check support**.
 
-MestReNova workflow:
+Check проверяет manifest, порядок соединений, существование DOCX/артефактов, закладки и неразрешенные алиасы. Он не запускает MestReNova и не пересчитывает химические данные; аналитическая проверка выполняется в Generate.
 
-1. Открывает raw-спектр.
-2. Калибрует химический сдвиг по растворителю.
-3. Делает обработку и peak picking.
-4. Извлекает текстовое описание спектра.
-5. Экспортирует PNG.
-6. Сохраняет обработанный `.mnova`.
-7. Передает результат в сборку SI.
+## Patch
 
-Калибровка растворителей:
+Выберите **Existing output folder**, одну операцию и нажмите **Apply patch**. Исходный SI не изменяется, результат сохраняется в новой папке.
 
-| Растворитель | 1H | 13C |
-| --- | --- | --- |
-| CDCl3 | 7.26 ppm | 77.16 ppm |
-| DMSO-d6 | 2.50 ppm | 39.52 ppm |
+| Операция | Формат | Результат |
+|---|---|---|
+| **Renumber** | `2a=3a,2b=3b` | Меняет номера соединений и связанные ссылки. |
+| **Remove** | `2a,2c` | Удаляет выбранные соединения и их appendix. |
+| **Reorder** | Полный список, например `2c,2a,2b` | Меняет порядок блоков; нужно указать все номера. |
+| **Swap compounds** | `2a=3a` | Меняет местами полные назначения соединений, сохраняя видимый порядок номеров. |
 
-Диапазоны картинок:
+Patch использует уже обработанные PNG и Mnova OLE и не должен запускать новую обработку спектров.
 
-| Ядро | Диапазон |
-| --- | --- |
-| 1H | от -1 до 12 ppm |
-| 13C | от -10 до 210 ppm |
+## Add
 
-Для 1H программа оставляет интегралы снизу, но убирает верхнюю integral curve.
-Для 13C оставляется peak picking без интегралов и multiplet labels.
+1. Выберите **Previous output folder**: manifest и старый DOCX подставятся автоматически.
+2. Загрузите Compound table и Spectra source только для новых соединений.
+3. Выберите режим и нажмите **Add compounds**.
 
-## Peak picking threshold
+| Режим | Поведение |
+|---|---|
+| **Same series** | Повторно использует старые template, Reaction schema и Processing settings. Новый Scope загружается отдельно. |
+| **New method** | Позволяет задать новые SI template, Reaction schema и Scope; настройки обработки спектров остаются пользовательскими. |
 
-Threshold задает минимальную высоту пика, который будет считаться сигналом.
-Значение указывается в процентах от самого высокого не-solvent пика.
+Старые блоки не пересобираются. Дублирующийся номер или несовпадающие номера во входных файлах останавливают операцию с понятным сообщением.
 
-Примеры:
+## SI template и алиасы
 
-- `6` значит 6%;
-- `0.06` тоже значит 6%.
+Шаблон выглядит как будущий SI. Введите алиас в фигурных скобках и оформите его в Word жирным/курсивом: вставленное значение наследует это оформление.
 
-Рекомендации:
+Основные группы:
 
-- если программа захватывает шум или слабые примеси, увеличьте threshold;
-- если программа пропускает настоящие слабые пики, уменьшите threshold;
-- для 13C обычно нужен threshold ниже, чем для 1H;
-- значения по умолчанию: `1H = 6`, `13C = 4`.
+- `Product.*`: `{Product.name}`, `{Product.number}`, `{Product.structure}`, `{Product.mg}`, `{Product.mmol}`, `{Product.yield.percent}`, `{Product.appearance}`, `{Product.mp}`, `{Product.rf.value}`, `{Product.rf.system}`, `{Product.nmr.1h.picture}`, `{Product.nmr.13c.picture}`.
+- `Reagent_N.*`: `.name`, `.mg`, `.g`, `.kg`, `.mmol`, `.mol`, `.mcl`, `.ml`, `.l`, `.eq`, `.number`.
+- Именованные реагенты и растворители используют те же атрибуты: `{NBS.mg}`, `{AcOH.mcl}`, `{Solvent_MeCN.ml}`.
+- NMR: `{nmr.1h.label}`, `{nmr.1h.conditions}`, `{nmr.1h.peaks}`, аналогично `nmr.13c`, плюс `{nmr.extra}`.
+- HRMS: `{hrms.label}`, `{hrms.adduct}`, `{hrms.formula}`, `{hrms.calculated}`, `{hrms.found}`.
+- Anal: `{anal.label}`, `{anal.formula}`, `{anal.calculated}`, `{anal.found}`.
+- IR: `{ir.label}`, `{ir.method}`, `{ir.peaks}`.
 
-## Signal height
+Полная таблица с пояснением каждого алиаса находится в **Instructions → Template aliases**.
 
-`Signal height (%)` задает, сколько места по вертикали занимает самый высокий
-сигнал на экспортируемой картинке спектра.
+## Примеры
 
-По умолчанию стоит `80`: самый высокий сигнал должен занимать примерно 80%
-доступной высоты и не вылезать за край картинки.
+В репозитории и в **Instructions → Example files** находятся только три согласованных набора:
 
-Допустимый диапазон: от 20 до 95%.
+| Папка | Содержание |
+|---|---|
+| [`examples/example_1`](examples/example_1) | Первая серия, соединения 2a–2d; Spectra source как папка. |
+| [`examples/example_2`](examples/example_2) | Продолжение серии, соединения 2e–2f. |
+| [`examples/example_3`](examples/example_3) | Новая методика, соединения 3a, 3b, 3c, 3d, 3i; Spectra source как папка и zip. |
 
-## Spectrum ppm ranges
+Во всех папках одинаковые имена, совпадающие с полями GUI: `Compound_table.docx`, `Spectra_source`, `SI_template.docx`, `Reaction_schema.docx`, `Scope.docx`.
 
-Поля `1H ppm range` и `13C ppm range` задают горизонтальный диапазон шкалы для
-картинок спектров в SI. Эти настройки не меняют исходные raw-данные, а только
-то, какой участок спектра попадает в экспорт PNG/Mnova preview.
+## Результат
 
-Значения по умолчанию:
+Каждый запуск создает `output/runs/YYYYMMDD_HHMMSS_имя/`:
 
-- `1H`: от `-1` до `12` ppm;
-- `13C`: от `-10` до `210` ppm.
+| Папка | Содержимое |
+|---|---|
+| `docx/` | `support_information.docx` и manifest |
+| `input/` | копии использованных входных файлов |
+| `spectra/` | PNG спектров |
+| `mnova/` | обработанные и одиночные `.mnova` |
+| `logs/` | диагностические логи |
+| `reports/` | отчеты обработки и проверки |
 
-Если нужно показать только ароматическую область, можно сузить диапазон,
-например `1H ppm range = 5.5` to `8.5`. Если нужно показать алифатическую
-область или отрицательные сдвиги, расширьте диапазон.
-
-## Baseline correction
-
-Baseline correction особенно важен для 13C NMR, поэтому по умолчанию он включен
-для 13C и выключен для 1H.
-
-Режимы:
-
-- `auto` - стандартный автоматический режим;
-- `off` - отключить baseline correction;
-- `bernstein` - Bernstein baseline;
-- `whittaker` - Whittaker baseline.
-
-Whittaker-настройки:
-
-- `Whittaker lambda` - сила сглаживания;
-- `Whittaker asymmetry` - асимметрия baseline fitting.
-
-Если вы не уверены, оставьте настройки по умолчанию.
-
-## Spectra appendix: png, mnova, none
-
-Поле `Spectra appendix` управляет приложением спектров в конце SI.
-
-### `png`
-
-Вставляет обычные PNG-картинки спектров. Это самый надежный режим.
-
-### `mnova`
-
-Вставляет кликабельные MestReNova OLE-объекты с картинкой-превью. Пользователь
-видит спектр как картинку, но по клику может открыть его в MestReNova.
-
-Важно:
-
-- для 1H вставляется single-spectrum файл `2a_1H.mnova`;
-- для 13C вставляется single-spectrum файл `2a_13C.mnova`;
-- общий файл `2a.mnova` может храниться в output как набор обработанных
-  спектров, но кликабельные объекты используют именно single-spectrum файлы.
-
-Это нужно, чтобы при ручной правке 13C из Word не открывался общий файл на
-странице 1H.
-
-### `none`
-
-Не добавляет спектральное приложение. Текстовые описания NMR при этом могут
-быть вставлены в блоки соединений, если они есть в input или извлечены из
-MestReNova.
-
-## HRMS
-
-Для HRMS программа использует:
-
-- `formula` - нейтральная формула вещества;
-- `hrms_adduct` - аддукт, например `[M+H]+`;
-- `hrms_found` - найденная масса.
-
-Программа считает расчетную массу и формирует строку вида:
-
-```text
-HRMS (ESI/Q-TOF) m/z: [M+H]+ calcd for C11H11BrFO2+ 272.9921. Found 272.9920.
-```
-
-Для Br/Cl автоматически добавляются моноизотопные подписи в формуле, где это
-нужно для корректного оформления.
-
-## Elemental analysis
-
-Если в таблице указано поле `elemental_analysis`, программа вставляет строку:
-
-```text
-Anal. Calcd for C17H11FN2O3: C, 65.81; H, 3.57; N, 9.03. Found: C, 66.03; H, 3.55; N, 8.92.
-```
-
-Если включить `Calculate elemental analysis`, программа рассчитает
-теоретическую часть по формуле даже без found-значений.
-
-Проверка elemental analysis сравнивает найденные значения с расчетными и пишет
-warning, если расхождение слишком большое или найден элемент, которого нет в
-формуле.
-
-## IR
-
-Поле `ir` можно заполнять кратко:
-
-```text
-3038, 2957, 1711
-```
-
-или полностью:
-
-```text
-IR (ATR, cm-1): 3038, 2957, 1711.
-```
-
-Если указан только список пиков, программа оформит строку по шаблону.
-
-## SI template .docx
-
-Шаблон управляет оформлением итогового SI.
-
-Если поле `SI template .docx` пустое, используется встроенный шаблон. Если вы
-выбрали свой шаблон, программа берет из него:
-
-- поля страницы;
-- шрифт;
-- размер шрифта;
-- интервалы;
-- жирность;
-- курсив;
-- верхние и нижние индексы;
-- расположение блоков;
-- формат заголовков и спектрального приложения.
-
-Пишите шаблон как обычный Word-документ, похожий на будущий SI. Placeholder нужен
-только там, где программа должна вставить значение. Если placeholder выделен
-жирным или курсивом в Word, вставленный текст сохранит это оформление.
-
-Для новых шаблонов используйте порядок `сущность.поле`:
-
-- `compound.*` — текущее соединение;
-- `nmr.1h.*` и `nmr.13c.*` — текст ЯМР;
-- `hrms.*`, `anal.*`, `ir.*` — аналитические строки;
-- `Reagent_1.*`, `Reagent_2.*`, `Solvent_MeCN.*`, `Product.*` — расчет загрузок.
-
-Основные placeholders:
-
-```text
-{compound.name} ({compound.number})
-{compound.number.structure}
-{compound.preparation}
-{compound.support_warning}
-{reaction.loadings}
-{nmr.1h.label} ({nmr.1h.conditions}) δ = {nmr.1h.peaks}.
-{nmr.13c.label} ({nmr.13c.conditions}) δ = {nmr.13c.peaks}.
-{nmr.extra}
-{hrms.label} m/z: {hrms.adduct} calcd for {hrms.formula} {hrms.calculated}. Found {hrms.found}.
-{anal.label} Calcd for {anal.formula}: {anal.calculated}. Found: {anal.found}.
-{ir.label} ({ir.method}, cm-1): {ir.peaks}.
-```
-
-Для приложения со спектрами:
-
-```text
-{compound.name} ({compound.number})
-{spectrum.label} ({spectrum.conditions})
-{compound.number.structure}
-{compound.number.nmr.1h.picture}
-```
-
-На странице 13C используйте `{compound.number.nmr.13c.picture}` вместо `{compound.number.nmr.1h.picture}`.
-
-Для reagent loadings используйте placeholders вида:
-
-```text
-{Product.precursor_number}
-{Product.number}
-{Product.yield.mg}
-{Product.yield.percent}
-{Product.appearance}
-{Product.mp}
-{Product.rf.value}
-{Product.rf.system}
-{Reagent_1.name}
-{Reagent_1.mass.mg}
-{Reagent_1.mmol}
-{Reagent_2.name}
-{Reagent_2.mass.mg}
-{Reagent_2.mmol}
-{Solvent_MeCN.mL}
-```
-
-Старые aliases вроде `{number.Product}` и `{yield.Product.percent}` пока
-поддерживаются для совместимости, но новые шаблоны лучше писать в формате
-`Product.yield.percent`.
-
-Дополнительные placeholders для appendix:
-
-```text
-{spectrum.label}
-{spectrum.conditions}
-{spectrum.structure.marker}
-```
-
-Если placeholder выделен жирным или курсивом в шаблоне, вставленный текст
-сохранит это оформление. Для формул можно вручную поставить нижние индексы в
-шаблоне, например в `K2CO3`.
-
-## Проверка support
-
-Опция `Check support (NMR, HRMS, elemental analysis)` включена по умолчанию.
-
-Проверяются:
-
-1. Количество H по интегралам 1H NMR.
-2. Количество C по 13C NMR.
-3. Совпадение рассчитанного и найденного HRMS.
-4. Совпадение elemental analysis с формулой.
-5. Наличие ключевых входных данных.
-
-Если есть проблема, программа:
-
-- пишет warning в `Run Log`;
-- сохраняет issue в `support_information.run_summary.json`;
-- сохраняет подробности в `logs/support_warnings.txt`;
-- добавляет красную пометку `Support check` в SI, если это применимо.
-
-Проверка не заменяет ручную проверку химика. Она нужна, чтобы быстро найти
-подозрительные места.
-
-## Output folder
-
-Для каждого запуска создается отдельная папка:
-
-```text
-output/
-  runs/
-    20260707_153000_test_input/
-      docx/
-        support_information.docx
-        support_information.manifest.json
-        support_information.run_summary.json
-      input/
-        copied input files
-      spectra/
-        processed_spectra.zip
-        processed_spectra/
-          2a/
-            2a_1H.png
-            2a_13C.png
-            2a_1H.mnova
-            2a_13C.mnova
-      mnova/
-        processed/
-      logs/
-        mnova_reports/
-      reports/
-```
-
-Главные файлы:
-
-| Файл | Для чего нужен |
-| --- | --- |
-| `docx/support_information.docx` | итоговый SI |
-| `docx/support_information.manifest.json` | карта результата для проверки, patch и add workflows |
-| `docx/support_information.run_summary.json` | отчет запуска, warnings/errors, issues по соединениям |
-| `spectra/processed_spectra.zip` | архив обработанных PNG и `.mnova` |
-| `spectra/processed_spectra/` | те же спектры в папках |
-| `logs/` | текстовые warnings и логи MestReNova |
-
-Старые файлы в корне `output/`, созданные предыдущими версиями программы,
-удаляются только если это известные generated-файлы. Пользовательские файлы в
-`output/` программа не должна удалять.
-
-## Примеры в репозитории
-
-В папке `examples/` лежат входные данные и пример результата.
-
-Preview стандартного Word-шаблона:
-
-![SI template preview](examples/templates/SI_template_visual_current_preview.png)
-
-| Файл или папка | Что это |
-| --- | --- |
-| `examples/test_input.docx` | Word-таблица с соединениями и ChemDraw/ChemSketch OLE-структурами |
-| `examples/test_input.zip` | zip-архив со спектрами для `test_input.docx` |
-| `examples/test_input_2.docx` | дополнительный пример input-таблицы |
-| `examples/spectra_2/` | пример spectra source как обычной папки |
-| `examples/starter/compound_table_starter.docx` | starter Word-таблица: все основные поля и 3 строки-примера |
-| `examples/starter/spectra_source_layout.txt` | пример структуры папки или zip со спектрами |
-| `examples/starter/README_starter_files.md` | короткая инструкция к starter-файлам |
-| `examples/templates/SI_template_visual_current.docx` | пример Word-шаблона оформления |
-| `examples/templates/SI_template_visual_current_preview.png` | preview шаблона |
-| `examples/loadings/Reaction_schema.docx` | пример схемы для reagent loadings |
-| `examples/loadings/Scope.docx` | пример scope-таблицы для reagent loadings |
-| `examples/example_output/support_information.docx` | пример готового SI |
-| `examples/example_output/processed_spectra.zip` | пример архива обработанных спектров |
-
-Если вы начинаете новый проект, нажмите в GUI `Copy starter files`. Программа
-создаст папку `AutoSupportGenerator_starter_files` в выбранном месте и скопирует
-туда файлы, которые можно сразу редактировать.
-
-Чтобы проверить программу на примере:
-
-1. Нажмите `Load example` в GUI.
-2. Проверьте, что подставились `examples/test_input.docx` и
-   `examples/test_input.zip`.
-3. Нажмите `Generate SI`.
-4. Сравните результат с `examples/example_output/support_information.docx`.
-
-## CLI
-
-Обычному пользователю удобнее GUI. CLI нужен для автоматизации или отладки.
-
-Генерация SI:
-
-```powershell
-AutoSupportGenerator.exe ^
-  --word-input examples\test_input.docx ^
-  --spectra-source examples\test_input.zip ^
-  --output output\support_information.docx
-```
-
-С указанием MestReNova и шаблона:
-
-```powershell
-AutoSupportGenerator.exe ^
-  --word-input C:\data\input.docx ^
-  --spectra-source C:\data\spectra.zip ^
-  --template-docx C:\data\SI_template.docx ^
-  --mnova-exe "C:\Program Files\Mestrelab Research S.L\MestReNova\MestReNova.exe" ^
-  --h1-ppm-range -1 12 ^
-  --c13-ppm-range -10 210 ^
-  --insert-spectra-as png ^
-  --output C:\data\output\support_information.docx
-```
-
-Проверить существующий manifest:
-
-```powershell
-AutoSupportGenerator.exe ^
-  --check-manifest output\runs\run_name\docx\support_information.manifest.json
-```
-
-Patch SI:
-
-```powershell
-AutoSupportGenerator.exe ^
-  --patch-manifest output\runs\run_name\docx\support_information.manifest.json ^
-  --renumber 2a=3a,2b=3b ^
-  --patched-output output\support_information_renumbered.docx
-```
-
-Add compounds:
-
-```powershell
-AutoSupportGenerator.exe ^
-  --add-compounds-manifest output\runs\run_name\docx\support_information.manifest.json ^
-  --support-docx output\runs\run_name\docx\support_information.docx ^
-  --add-word-input C:\data\new_compounds.docx ^
-  --spectra-source C:\data\new_spectra.zip ^
-  --add-output C:\data\output\support_information_extended.docx
-```
-
-Часто используемые CLI-параметры:
-
-| Параметр | Что делает |
-| --- | --- |
-| `--word-input` | Word-таблица с ChemDraw OLE-структурами |
-| `--spectra-source` | zip или папка со спектрами |
-| `--output` | путь к итоговому `.docx` |
-| `--template-docx` | Word-шаблон SI |
-| `--mnova-exe` | путь к MestReNova |
-| `--mnova-graphics-profile` | `.mngp` профиль отображения спектров |
-| `--insert-spectra-as` | `png`, `mnova` или `none` |
-| `--target-signal-height` | высота сигналов, например `80` |
-| `--h1-ppm-range` | диапазон ppm для картинки 1H, например `-1 12` |
-| `--c13-ppm-range` | диапазон ppm для картинки 13C, например `-10 210` |
-| `--peak-threshold-1h` | threshold для 1H |
-| `--peak-threshold-13c` | threshold для 13C |
-| `--baseline-mode` | `auto`, `off`, `bernstein`, `whittaker` |
-| `--baseline-apply-1h` | включить baseline correction для 1H |
-| `--no-baseline-13c` | выключить baseline correction для 13C |
-| `--generate-loadings` | считать reagent loadings |
-| `--calculate-elemental-analysis` | считать elemental analysis |
-| `--no-check-support` | отключить проверку NMR/HRMS/elemental analysis |
-
-## Типичные проблемы
-
-### MestReNova не найдена
-
-Что сделать:
-
-1. Откройте `Processing`.
-2. Нажмите `Detect` рядом с `MestReNova .exe`.
-3. Если не помогло, выберите `MestReNova.exe` вручную.
-
-Типовой путь:
-
-```text
-C:\Program Files\Mestrelab Research S.L\MestReNova\MestReNova.exe
-```
-
-### Не генерируются названия соединений
-
-Проверьте:
-
-- ChemDraw установлен;
-- структуры в Word вставлены как OLE-объекты, а не как PNG;
-- Word и ChemDraw не показывают модальные окна;
-- файл не открыт в защищенном режиме.
-
-### Output DOCX не записывается
-
-Чаще всего файл открыт в Word. Закройте `support_information.docx` и запустите
-генерацию снова.
-
-### В спектрах лишние пики
-
-Увеличьте:
-
-- `1H threshold (%)` для 1H;
-- `13C threshold (%)` для 13C.
-
-### Пропадают настоящие слабые пики
-
-Уменьшите threshold для соответствующего ядра.
-
-### 13C baseline выглядит плохо
-
-Попробуйте в `Processing -> Baseline correction`:
-
-- `Mode = whittaker`;
-- изменить `Whittaker lambda`;
-- изменить `Whittaker asymmetry`.
-
-### В отчете NMR count mismatch
-
-Откройте single-spectrum `.mnova` файл из output:
-
-```text
-spectra/processed_spectra/2a/2a_1H.mnova
-spectra/processed_spectra/2a/2a_13C.mnova
-```
-
-Проверьте auto integration, multiplet analysis, peak picking threshold и
-baseline correction.
-
-## Для разработчиков
-
-Запуск тестов:
-
-```powershell
-$env:PYTHONPATH='src'
-python -m pytest tests
-```
-
-Основные папки кода:
-
-```text
-src/si_generator/domain/      доменные модели и расчеты
-src/si_generator/graph/       LangGraph-style workflow nodes
-src/si_generator/workflows/   entrypoints generate/check/patch/add
-src/si_generator/render/      модель SI-документа
-src/si_generator/resources/   MestReNova scripts и ресурсы
-```
-
-Сборка установщика:
-
-```text
-Build Auto Support Generator Installer.bat
-```
-
-Не добавляйте в GitHub:
-
-- `output/`;
-- временные папки MestReNova;
-- `__pycache__/`;
-- локальные run artifacts;
-- пользовательские `.mnova` batch-файлы.
+При ошибке сначала откройте `logs/` последнего запуска. Не редактируйте выходной DOCX во время повторной генерации: Word блокирует открытый файл.

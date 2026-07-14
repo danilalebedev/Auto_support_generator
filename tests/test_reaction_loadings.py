@@ -22,7 +22,7 @@ from si_generator.workflows.generate_si import request_from_args
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES_DIR = REPO_ROOT / "examples"
-LOADINGS_DIR = EXAMPLES_DIR / "loadings"
+LOADINGS_DIR = EXAMPLES_DIR / "example_3"
 
 
 class ReactionLoadingsTests(unittest.TestCase):
@@ -231,7 +231,14 @@ class ReactionLoadingsTests(unittest.TestCase):
             rf="0.38 (petroleum ether : ethyl acetate = 7 : 1)",
         )
 
-        issues = apply_loadings_workflow([compound], EXAMPLES_DIR)
+        issues = apply_loadings_workflow(
+            [compound],
+            EXAMPLES_DIR,
+            paths=LoadingsWorkflowPaths(
+                LOADINGS_DIR / "Reaction_schema.docx",
+                LOADINGS_DIR / "Scope.docx",
+            ),
+        )
 
         issue_codes = [issue["code"] for issue in issues]
         self.assertIn("LOADINGS_SCOPE_INPUT_MISMATCH", issue_codes)
@@ -479,7 +486,11 @@ class ReactionLoadingsTests(unittest.TestCase):
                 Compound(number="3i", name="Example", color="Green oil", melting_point="98", rf="0.55 (petroleum ether : ethyl acetate = 7 : 1)"),
             ]
         )
-        request = GenerateSIRequest(input_path=EXAMPLES_DIR / "test_input_2.docx", input_kind="word", output_path=Path("out.docx"))
+        request = GenerateSIRequest(
+            input_path=EXAMPLES_DIR / "example_3" / "Compound_table.docx",
+            input_kind="word",
+            output_path=Path("out.docx"),
+        )
 
         result = calculate_loadings_node(
             {

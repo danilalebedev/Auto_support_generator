@@ -28,6 +28,9 @@ class GuiSettingsTests(unittest.TestCase):
                     "loadings_schema_docx": Path("Reaction_schema.docx"),
                     "loadings_scope_docx": Path("Scope.docx"),
                     "add_output_folder": Path("add/output"),
+                    "patch_source_output_dir": Path("output/runs/previous"),
+                    "patch_operation": "SWAP",
+                    "patch_instruction": "2a=3a,2b=3b",
                     "mnova_graphics_profile": Path("default.mngp"),
                     "mnova_graphics_profile_1h": Path("h1.mngp"),
                     "mnova_graphics_profile_13c": Path("c13.mngp"),
@@ -52,6 +55,9 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(settings["loadings_schema_docx"], "Reaction_schema.docx")
         self.assertEqual(settings["loadings_scope_docx"], "Scope.docx")
         self.assertEqual(settings["add_output_folder"], str(Path("add/output")))
+        self.assertEqual(settings["patch_source_output_dir"], str(Path("output/runs/previous")))
+        self.assertEqual(settings["patch_operation"], "swap")
+        self.assertEqual(settings["patch_instruction"], "2a=3a,2b=3b")
         self.assertEqual(settings["mnova_graphics_profile"], "default.mngp")
         self.assertEqual(settings["mnova_graphics_profile_1h"], "h1.mngp")
         self.assertEqual(settings["mnova_graphics_profile_13c"], "c13.mngp")
@@ -83,6 +89,9 @@ class GuiSettingsTests(unittest.TestCase):
                     "loadings_schema_docx": "C:/data/loadings/Reaction_schema.docx",
                     "loadings_scope_docx": "C:/data/loadings/Scope.docx",
                     "add_output_folder": "C:/data/add_output",
+                    "patch_source_output_dir": "C:/data/output/runs/previous",
+                    "patch_operation": "swap",
+                    "patch_instruction": "2a=3a,2b=3b",
                     "mnova_graphics_profile": "C:/data/profiles/default.mngp",
                     "mnova_graphics_profile_1h": "C:/data/profiles/h1.mngp",
                     "mnova_graphics_profile_13c": "C:/data/profiles/c13.mngp",
@@ -111,6 +120,9 @@ class GuiSettingsTests(unittest.TestCase):
         self.assertEqual(loaded["loadings_schema_docx"], "C:/data/loadings/Reaction_schema.docx")
         self.assertEqual(loaded["loadings_scope_docx"], "C:/data/loadings/Scope.docx")
         self.assertEqual(loaded["add_output_folder"], "C:/data/add_output")
+        self.assertEqual(loaded["patch_source_output_dir"], "C:/data/output/runs/previous")
+        self.assertEqual(loaded["patch_operation"], "swap")
+        self.assertEqual(loaded["patch_instruction"], "2a=3a,2b=3b")
         self.assertEqual(loaded["mnova_graphics_profile"], "C:/data/profiles/default.mngp")
         self.assertEqual(loaded["mnova_graphics_profile_1h"], "C:/data/profiles/h1.mngp")
         self.assertEqual(loaded["mnova_graphics_profile_13c"], "C:/data/profiles/c13.mngp")
@@ -126,6 +138,20 @@ class GuiSettingsTests(unittest.TestCase):
             loaded = load_gui_settings(path)
 
         self.assertEqual(loaded, {})
+
+    def test_migrates_legacy_patch_fields(self) -> None:
+        settings = normalize_gui_settings(
+            {
+                "settings": {
+                    "patch_output_docx": "C:/data/patched.docx",
+                    "patch_remove": "2a,2c",
+                }
+            }
+        )
+
+        self.assertNotIn("patch_source_output_dir", settings)
+        self.assertEqual(settings["patch_operation"], "remove")
+        self.assertEqual(settings["patch_instruction"], "2a,2c")
 
 
 if __name__ == "__main__":

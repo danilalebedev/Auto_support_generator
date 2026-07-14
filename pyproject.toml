@@ -1,6 +1,6 @@
 [project]
 name = "si-generator"
-version = "0.1.0"
+version = "0.1.2"
 description = "Generate organic chemistry Supporting Information DOCX files from tabular compound data."
 requires-python = ">=3.10"
 dependencies = [
@@ -21,7 +21,7 @@ si-generator = "si_generator.cli:main"
 si-generator-gui = "si_generator.gui:main"
 
 [tool.setuptools.package-data]
-"si_generator" = ["resources/scripts/*.qs", "resources/assets/*.png", "templates/*.docx"]
+"si_generator" = ["resources/scripts/*.qs", "resources/assets/*.png", "resources/mngp_styles/*.mngp", "templates/*.docx"]
 
 [build-system]
 requires = ["setuptools>=68"]

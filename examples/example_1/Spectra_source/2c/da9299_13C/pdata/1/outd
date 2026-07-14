@@ -1,0 +1,17 @@
+##TITLE= Parameter file, TOPSPIN		Version 2.1
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##NPOINTS= 1	$$ modification sequence number
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= nmr
+$$ 2024-09-12 15:45:23.182 +0300  nmr@AV600
+$$ /data/data/zhokhov/nmr/Summer24/719/pdata/1/outd
+$$ process /opt/topspin218/prog/mod/dirdata
+##$CURPLOT= <HP LaserJet 1200 Series PCL 6>
+##$CURPRIN= <$HP LaserJet 1200 Series PCL 6>
+##$DFORMAT= <normdp>
+##$LAYOUT= <+/1D_H.xwp>
+##$LFORMAT= <normlp>
+##$PFORMAT= <normpl>
+##$SURQMSG= 1
+##END=

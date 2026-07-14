@@ -61,11 +61,15 @@ def _build_parser() -> argparse.ArgumentParser:
     input_group.add_argument("--add-compounds-manifest", help="Append new compounds to an existing SI manifest.")
     parser.add_argument("--output", "-o", help="Path to output DOCX.")
     parser.add_argument("--support-docx", help="Optional DOCX path override for --check-manifest.")
-    parser.add_argument("--renumber", help="For --patch-manifest, comma-separated OLD=NEW pairs, e.g. 2a=3a,2b=3b.")
-    parser.add_argument("--remove", help="For --patch-manifest, comma-separated compound ids or numbers to remove.")
-    parser.add_argument("--reorder", help="For --patch-manifest, comma-separated compound ids or numbers in the desired order.")
-    parser.add_argument("--patched-output", help="For --patch-manifest, output path for the patched DOCX.")
-    parser.add_argument("--patched-manifest-output", help="For --patch-manifest, output path for the patched manifest JSON.")
+    patch_operation = parser.add_mutually_exclusive_group()
+    patch_operation.add_argument("--renumber", help="For --patch-manifest, comma-separated OLD=NEW pairs, e.g. 2a=3a,2b=3b.")
+    patch_operation.add_argument("--remove", help="For --patch-manifest, comma-separated compound ids or numbers to remove.")
+    patch_operation.add_argument("--reorder", help="For --patch-manifest, comma-separated compound ids or numbers in the desired order.")
+    patch_operation.add_argument(
+        "--swap",
+        help="For --patch-manifest, comma-separated non-overlapping compound pairs, e.g. 2a=3a,2b=3b.",
+    )
+    parser.add_argument("--patch-output-folder", help="For --patch-manifest, base folder where a unique patch run is created.")
     parser.add_argument("--add-word-input", help="For --add-compounds-manifest, path to new compounds Word table.")
     parser.add_argument("--add-output", help="For --add-compounds-manifest, output path for the new combined DOCX.")
     parser.add_argument("--add-output-folder", help="For --add-compounds-manifest, output folder where a new run folder will be created.")

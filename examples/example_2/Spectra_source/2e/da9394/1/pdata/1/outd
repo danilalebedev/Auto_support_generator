@@ -1,0 +1,15 @@
+##TITLE= Parameter file, XWIN-NMR		Version 3.6
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##ORIGIN= UXNMR, Bruker Analytische Messtechnik GmbH
+##OWNER= root
+$$ Tue Nov 26 14:21:37 2019 MSK (UT+3h)  petrol-2@Avance-400
+$$ /u/data/petrol-2/nmr/1H/1/pdata/1//outd
+##$CURPLOT= <HP Business Inkjet 2230/2280>
+##$CURPRIN= <$HP Business Inkjet 2230/2280>
+##$DFORMAT= <normdp>
+##$LAYOUT= <+/1D_H.xwp>
+##$LFORMAT= <normlp>
+##$PFORMAT= <normpl>
+##$SURQMSG= 1
+##END=

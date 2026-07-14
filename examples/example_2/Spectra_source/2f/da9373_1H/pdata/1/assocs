@@ -1,0 +1,11 @@
+##TITLE= Parameter file, TOPSPIN		Version 2.1
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##NPOINTS= 1	$$ modification sequence number
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= nmr
+$$ 2024-09-30 14:06:52.008 +0300  nmr@AV600
+$$ /data/data/zhokhov/nmr/Summer24/781/pdata/1/assocs
+$$ process /opt/topspin218/prog/mod/dirdata
+##$MULTDISP= </data/data/zhokhov/nmr/Summer24/705/pdata/1>
+##END=

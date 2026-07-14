@@ -19,9 +19,9 @@ class GenerateWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             requested_output_path = Path(tmp) / "support_information.docx"
             request = GenerateSIRequest(
-                input_path=REPO_ROOT / "examples" / "test_input.docx",
+                input_path=REPO_ROOT / "examples" / "example_1" / "Compound_table.docx",
                 input_kind="word",
-                spectra_zip=REPO_ROOT / "examples" / "test_input.zip",
+                spectra_zip=REPO_ROOT / "examples" / "example_1" / "Spectra_source",
                 output_path=requested_output_path,
                 no_extract_nmr=True,
                 no_check_support=True,
@@ -32,7 +32,7 @@ class GenerateWorkflowTests(unittest.TestCase):
             output_path = output_path_from_state(state)
             self.assertEqual(output_path.parent.name, "docx")
             self.assertEqual(output_path.parent.parent.parent, Path(tmp) / "runs")
-            self.assertTrue(output_path.parent.parent.name.endswith("_test_input"))
+            self.assertTrue(output_path.parent.parent.name.endswith("_Compound_table"))
             self.assertEqual(output_path_from_state(state), output_path)
             self.assertTrue(output_path.exists())
             manifest_path = output_path.with_suffix(".manifest.json")

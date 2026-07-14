@@ -7,6 +7,9 @@ $setupBat = Join-Path $root "Setup Auto SI Generator.bat"
 if (-not (Test-Path -LiteralPath $venvPython)) {
     Write-Host "Local .venv was not found. Running setup first..."
     & $setupBat
+    if ($LASTEXITCODE -ne 0) {
+        throw "Environment setup failed with exit code $LASTEXITCODE."
+    }
 }
 if (-not (Test-Path -LiteralPath $venvPython)) {
     throw "Python virtual environment was not created. Run Setup Auto SI Generator.bat manually and try again."
@@ -14,6 +17,9 @@ if (-not (Test-Path -LiteralPath $venvPython)) {
 
 Write-Host "Installing PyInstaller..."
 & $venvPython -m pip install --upgrade pyinstaller
+if ($LASTEXITCODE -ne 0) {
+    throw "PyInstaller installation failed with exit code $LASTEXITCODE."
+}
 
 $distDir = Join-Path $root "dist"
 $buildDir = Join-Path $root "build\pyinstaller"
@@ -23,6 +29,7 @@ $entryPoint = Join-Path $root "scripts\auto_support_generator_app.py"
 $installerEntryPoint = Join-Path $root "scripts\auto_support_generator_installer.py"
 $mnovaScript = Join-Path $root "src\si_generator\resources\scripts\extract_nmr_report.qs"
 $assets = Join-Path $root "src\si_generator\resources\assets"
+$mngpStyles = Join-Path $root "src\si_generator\resources\mngp_styles"
 $templates = Join-Path $root "src\si_generator\templates"
 $setupExe = Join-Path $distDir "AutoSupportGeneratorSetup.exe"
 $sedPath = Join-Path $distDir "AutoSupportGeneratorSetup.sed"
@@ -44,11 +51,15 @@ Write-Host "Building AutoSupportGenerator.exe..."
     --paths (Join-Path $root "src") `
     --add-data "$mnovaScript;scripts" `
     --add-data "$assets;assets" `
+    --add-data "$mngpStyles;mngp_styles" `
     --add-data "$templates;si_generator/templates" `
     --distpath $distDir `
     --workpath $buildDir `
     --specpath $specDir `
     $entryPoint
+if ($LASTEXITCODE -ne 0) {
+    throw "AutoSupportGenerator.exe build failed with exit code $LASTEXITCODE."
+}
 
 $appExe = Join-Path $distDir "AutoSupportGenerator.exe"
 if (-not (Test-Path -LiteralPath $appExe)) {
@@ -68,13 +79,13 @@ Copy-Item -LiteralPath (Join-Path $root "README.md") -Destination (Join-Path $pa
 Copy-Item -LiteralPath (Join-Path $root "README_RU.md") -Destination (Join-Path $payloadDir "README_RU.md")
 Copy-Item -LiteralPath (Join-Path $root "README_EN.md") -Destination (Join-Path $payloadDir "README_EN.md")
 Copy-Item -LiteralPath (Join-Path $root "INSTALL_RU.md") -Destination (Join-Path $payloadDir "INSTALL_RU.md")
-Copy-Item -LiteralPath (Join-Path $root "examples\test_input.docx") -Destination (Join-Path $payloadExamplesDir "test_input.docx")
-Copy-Item -LiteralPath (Join-Path $root "examples\test_input.zip") -Destination (Join-Path $payloadExamplesDir "test_input.zip")
-Copy-Item -LiteralPath (Join-Path $root "examples\example_output") -Destination (Join-Path $payloadExamplesDir "example_output") -Recurse
-Copy-Item -LiteralPath (Join-Path $root "examples\starter") -Destination (Join-Path $payloadExamplesDir "starter") -Recurse
-Copy-Item -LiteralPath (Join-Path $root "examples\templates") -Destination (Join-Path $payloadExamplesDir "templates") -Recurse
-Copy-Item -LiteralPath (Join-Path $root "examples\loadings") -Destination (Join-Path $payloadExamplesDir "loadings") -Recurse
-Copy-Item -LiteralPath (Join-Path $root "examples\mngp_styles") -Destination (Join-Path $payloadExamplesDir "mngp_styles") -Recurse
+Copy-Item -LiteralPath (Join-Path $root "RELEASE_BETA_1_2.md") -Destination (Join-Path $payloadDir "RELEASE_BETA_1_2.md")
+Copy-Item -LiteralPath (Join-Path $root "examples\example_1") -Destination (Join-Path $payloadExamplesDir "example_1") -Recurse
+Copy-Item -LiteralPath (Join-Path $root "examples\example_2") -Destination (Join-Path $payloadExamplesDir "example_2") -Recurse
+Copy-Item -LiteralPath (Join-Path $root "examples\example_3") -Destination (Join-Path $payloadExamplesDir "example_3") -Recurse
+$payloadDocsAssets = Join-Path $payloadDir "docs\assets"
+New-Item -ItemType Directory -Force -Path $payloadDocsAssets | Out-Null
+Copy-Item -LiteralPath (Join-Path $root "docs\assets\gui_overview.png") -Destination (Join-Path $payloadDocsAssets "gui_overview.png")
 
 Write-Host "Building AutoSupportGeneratorSetup.exe..."
 & $venvPython -m PyInstaller `
@@ -89,6 +100,9 @@ Write-Host "Building AutoSupportGeneratorSetup.exe..."
     --workpath $setupBuildDir `
     --specpath $specDir `
     $installerEntryPoint
+if ($LASTEXITCODE -ne 0) {
+    throw "AutoSupportGeneratorSetup.exe build failed with exit code $LASTEXITCODE."
+}
 
 if (-not (Test-Path -LiteralPath $setupExe)) {
     throw "PyInstaller did not create $setupExe"

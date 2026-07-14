@@ -5,7 +5,6 @@ import unittest
 from pathlib import Path
 
 from si_generator.gui import (
-    INSTRUCTION_TEMPLATE_FILES,
     _build_add_compounds_request,
     _build_add_compounds_summary,
     _build_check_summary,
@@ -350,37 +349,102 @@ class GuiWorkflowTests(unittest.TestCase):
             root = Path(tmp)
             manifest = root / "support_information.manifest.json"
             support = root / "support_information.docx"
-            output = root / "patched.docx"
             manifest.write_text("{}", encoding="utf-8")
             support.write_text("placeholder", encoding="utf-8")
 
             request = _build_patch_request(
-                manifest_text=str(manifest),
-                renumber_text="2a=3a,2b=3b",
+                source_output_folder_text=str(root),
+                operation_text="renumber",
+                instruction_text="2a=3a,2b=3b",
                 support_docx_text=str(support),
-                remove_text="2c",
-                reorder_text="2b,2a",
-                output_docx_text=str(output),
             )
 
         self.assertEqual(request.manifest_path, manifest)
         self.assertEqual(request.support_docx, support)
         self.assertEqual(request.renumber, {"2a": "3a", "2b": "3b"})
-        self.assertEqual(request.remove, ("2c",))
-        self.assertEqual(request.reorder, ("2b", "2a"))
-        self.assertEqual(request.output_docx, output)
+        self.assertEqual(request.remove, ())
+        self.assertEqual(request.reorder, ())
+        self.assertEqual(request.swap, ())
+        self.assertIsNone(request.output_folder)
+
+    def test_builds_multi_pair_swap_request_from_gui_values(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = Path(tmp) / "support_information.manifest.json"
+            support = Path(tmp) / "support_information.docx"
+            manifest.write_text("{}", encoding="utf-8")
+            support.write_text("placeholder", encoding="utf-8")
+
+            request = _build_patch_request(
+                source_output_folder_text=str(Path(tmp)),
+                operation_text="swap",
+                instruction_text="2a=3a,2b=3b",
+            )
+
+        self.assertEqual(request.swap, (("2a", "3a"), ("2b", "3b")))
+        self.assertEqual(request.renumber, {})
+
+    def test_patch_request_resolves_manifest_and_support_from_run_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_root = Path(tmp) / "output" / "runs" / "demo"
+            docx_dir = run_root / "docx"
+            docx_dir.mkdir(parents=True)
+            manifest = docx_dir / "support_information.manifest.json"
+            support = docx_dir / "support_information.docx"
+            manifest.write_text("{}", encoding="utf-8")
+            support.write_text("placeholder", encoding="utf-8")
+
+            request = _build_patch_request(
+                source_output_folder_text=str(run_root),
+                operation_text="remove",
+                instruction_text="2a,2c",
+            )
+
+        self.assertEqual(request.manifest_path, manifest)
+        self.assertEqual(request.support_docx, support)
+        self.assertEqual(request.remove, ("2a", "2c"))
+
+    def test_patch_request_rejects_folder_without_generated_output_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError, "not a generated Auto Support output"):
+                _build_patch_request(
+                    source_output_folder_text=tmp,
+                    operation_text="renumber",
+                    instruction_text="2a=3a",
+                )
+
+    def test_patch_request_allows_support_override_when_original_docx_was_moved(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_root = root / "output" / "runs" / "demo"
+            docx_dir = run_root / "docx"
+            docx_dir.mkdir(parents=True)
+            manifest = docx_dir / "support_information.manifest.json"
+            override = root / "moved_support.docx"
+            manifest.write_text("{}", encoding="utf-8")
+            override.write_text("placeholder", encoding="utf-8")
+
+            request = _build_patch_request(
+                source_output_folder_text=str(run_root),
+                support_docx_text=str(override),
+                operation_text="renumber",
+                instruction_text="2a=3a",
+            )
+
+        self.assertEqual(request.manifest_path, manifest)
+        self.assertEqual(request.support_docx, override)
 
     def test_patch_request_requires_operation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             manifest = Path(tmp) / "support_information.manifest.json"
+            support = Path(tmp) / "support_information.docx"
             manifest.write_text("{}", encoding="utf-8")
+            support.write_text("placeholder", encoding="utf-8")
 
-            with self.assertRaisesRegex(ValueError, "renumber, remove, or reorder"):
+            with self.assertRaisesRegex(ValueError, "instructions for the renumber"):
                 _build_patch_request(
-                    manifest_text=str(manifest),
-                    renumber_text="",
-                    remove_text="",
-                    reorder_text="",
+                    source_output_folder_text=str(Path(tmp)),
+                    operation_text="renumber",
+                    instruction_text="",
                 )
 
     def test_builds_patch_summary_from_artifacts(self) -> None:
@@ -645,29 +709,30 @@ class GuiWorkflowTests(unittest.TestCase):
 
     def test_example_field_updates_clear_project_specific_paths(self) -> None:
         updates = _example_field_updates(
-            Path("examples/test_input_2.docx"),
-            Path("examples/spectra_2.zip"),
+            Path("examples/example_1/Compound_table.docx"),
+            Path("examples/example_1/Spectra_source"),
             Path("output/docx/support_information.docx"),
         )
 
         self.assertEqual(updates["input_kind"], "word")
-        self.assertEqual(updates["input_path"], str(Path("examples/test_input_2.docx")))
-        self.assertEqual(updates["spectra_zip"], str(Path("examples/spectra_2.zip")))
+        self.assertEqual(updates["input_path"], str(Path("examples/example_1/Compound_table.docx")))
+        self.assertEqual(updates["spectra_zip"], str(Path("examples/example_1/Spectra_source")))
         self.assertEqual(updates["output_docx"], str(Path("output/docx/support_information.docx")))
         self.assertEqual(updates["output_folder"], str(Path("output/docx")))
-        self.assertEqual(updates["template_docx"], "")
-        self.assertEqual(updates["references_file"], "")
-        self.assertEqual(updates["loadings_schema_docx"], "")
-        self.assertEqual(updates["loadings_scope_docx"], "")
+        self.assertEqual(updates["template_docx"], str(Path("examples/example_1/SI_template.docx")))
+        self.assertEqual(updates["loadings_schema_docx"], str(Path("examples/example_1/Reaction_schema.docx")))
+        self.assertEqual(updates["loadings_scope_docx"], str(Path("examples/example_1/Scope.docx")))
         self.assertEqual(updates["mnova_graphics_profile"], "")
-        self.assertEqual(updates["mnova_graphics_profile_1h"], str(Path("examples/mngp_styles/classic_1H.mngp")))
-        self.assertEqual(updates["mnova_graphics_profile_13c"], str(Path("examples/mngp_styles/classic_13C.mngp")))
+        self.assertTrue(Path(updates["mnova_graphics_profile_1h"]).name == "classic_1H.mngp")
+        self.assertTrue(Path(updates["mnova_graphics_profile_13c"]).name == "classic_13C.mngp")
         self.assertEqual(updates["h1_ppm_min"], "-1")
         self.assertEqual(updates["h1_ppm_max"], "12")
         self.assertEqual(updates["c13_ppm_min"], "-10")
         self.assertEqual(updates["c13_ppm_max"], "210")
         self.assertEqual(updates["existing_manifest"], "")
-        self.assertEqual(updates["patch_renumber"], "")
+        self.assertEqual(updates["patch_operation"], "renumber")
+        self.assertEqual(updates["patch_instruction"], "")
+        self.assertEqual(updates["patch_source_output_dir"], "")
         self.assertEqual(updates["add_output_folder"], str(Path("output/docx")))
         self.assertNotIn("mnova_exe", updates)
 
@@ -675,28 +740,17 @@ class GuiWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             examples_root = root / "examples"
-            for _label, relative_path, _description in INSTRUCTION_TEMPLATE_FILES:
-                path = examples_root / relative_path
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text("placeholder", encoding="utf-8")
+            for example_name in ("example_1", "example_2", "example_3"):
+                example = examples_root / example_name
+                example.mkdir(parents=True)
+                (example / "Compound_table.docx").write_text("placeholder", encoding="utf-8")
 
             first = copy_starter_files_to(root, examples_root=examples_root)
             second = copy_starter_files_to(root, examples_root=examples_root)
 
-            self.assertTrue((first / "compound_table_starter.docx").exists())
-            self.assertFalse((first / "compound_table_starter.csv").exists())
-            self.assertTrue((first / "spectra_2.zip").exists())
-            self.assertTrue((first / "spectra_source_layout.txt").exists())
-            self.assertTrue((first / "README_starter_files.md").exists())
-            self.assertTrue((first / "SI_template.docx").exists())
-            self.assertTrue((first / "Reaction_schema.docx").exists())
-            self.assertTrue((first / "Scope.docx").exists())
-            self.assertTrue((first / "classic_1H.mngp").exists())
-            self.assertTrue((first / "classic_13C.mngp").exists())
-            self.assertTrue((first / "grid_1H.mngp").exists())
-            self.assertTrue((first / "grid_13C.mngp").exists())
-            self.assertTrue((first / "support_information.docx").exists())
-            self.assertEqual(second.name, "AutoSupportGenerator_starter_files_2")
+            for example_name in ("example_1", "example_2", "example_3"):
+                self.assertTrue((first / example_name / "Compound_table.docx").exists())
+            self.assertEqual(second.name, "AutoSupportGenerator_examples_2")
 
     def test_mousewheel_units_scroll_in_platform_direction(self) -> None:
         self.assertEqual(_mousewheel_units(120), -1)
