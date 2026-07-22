@@ -2,11 +2,11 @@ $ErrorActionPreference = "Stop"
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $venvPython = Join-Path $root ".venv\Scripts\python.exe"
-$setupBat = Join-Path $root "Setup Auto SI Generator.bat"
+$setupScript = Join-Path $root "Setup Auto SI Generator.ps1"
 
 if (-not (Test-Path -LiteralPath $venvPython)) {
     Write-Host "Local .venv was not found. Running setup first..."
-    & $setupBat
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setupScript -NoPause
     if ($LASTEXITCODE -ne 0) {
         throw "Environment setup failed with exit code $LASTEXITCODE."
     }
@@ -16,7 +16,7 @@ if (-not (Test-Path -LiteralPath $venvPython)) {
 }
 
 Write-Host "Installing PyInstaller..."
-& $venvPython -m pip install --upgrade pyinstaller
+& $venvPython -m pip install --upgrade --prefer-binary pyinstaller
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller installation failed with exit code $LASTEXITCODE."
 }
