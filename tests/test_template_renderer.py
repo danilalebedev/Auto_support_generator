@@ -10,10 +10,44 @@ from docx import Document
 
 from si_generator.docx_builder import build_document_from_model
 from si_generator.domain.compound import Compound
+from si_generator.journal_profiles import get_journal_profile
 from si_generator.render.document_model import build_si_document_model
 
 
 class TemplateRendererTests(unittest.TestCase):
+    def test_journal_template_renders_prepared_method_without_hardcoded_reagents(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "support.docx"
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="Example compound",
+                preparation=(
+                    "Bromide 2a was obtained from precursor 1a (600 mg, 3.40 mmol), "
+                    "NBS (606 mg, 3.40 mmol) and DBP (41 mg, 0.17 mmol) according to GP1"
+                ),
+                reaction={
+                    "source": "loadings_workflow",
+                    "template_values": {"reagent.1.mg": "600"},
+                    "preparation_includes_summary": True,
+                    "hide_loadings_line": True,
+                },
+            )
+            profile = get_journal_profile("acs.joc")
+
+            build_document_from_model(
+                build_si_document_model([compound], spectra_embed_mode="none"),
+                output,
+                template_path=profile.template_path,
+                render_options=profile.data,
+            )
+            text = "\n".join(paragraph.text for paragraph in Document(output).paragraphs)
+
+        self.assertIn("precursor 1a (600 mg, 3.40 mmol)", text)
+        self.assertIn("NBS (606 mg, 3.40 mmol)", text)
+        self.assertNotIn("K2CO3 ( mg", text)
+        self.assertNotIn("according to GP2", text)
+
     def test_replaces_split_placeholder_and_preserves_template_run_style(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

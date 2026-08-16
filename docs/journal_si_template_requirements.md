@@ -46,7 +46,23 @@ Primary sources used:
 | Springer Nature / Chemical Papers | Manuscript in journal template; checklist for compound characterization required. | Novel compounds: `1H` and `13C NMR` obligatory. | Novel compounds: elemental analysis or HRMS obligatory; melting point and Rf where appropriate. EA submitted separately. | Checklist plus physical data for known compounds where missing in literature. | Chemical drawing template/configuration supplied by journal; instructions say do not change settings. | Профиль `springer.chemical_papers`: mandatory checklist export, chemical drawing template path, EA separate-sheet option. |
 | Beilstein Journal of Organic Chemistry | New compounds should be fully characterized; spectra may be reproduced as figures in SI. | No strict ppm window found in core instructions; use standard organic NMR baseline and let journal override later. | EA whenever possible; sufficient evidence for identity and purity. | Identity and degree of purity must be established. | General style guide; less prescriptive than Nature/ACS. | Профиль `beilstein.bjoc`: full characterization completeness, optional spectra-in-SI, EA recommendation. |
 
-## Унифицированная модель профиля журнала
+## Реализованная модель профиля журнала
+
+Профили реализованы в `src/si_generator/templates/journals/profiles.json`; загрузчик находится в `src/si_generator/journal_profiles.py`. JSON выбран как встроенный проверяемый формат, не требующий дополнительной YAML-зависимости в установленном приложении. Профили поддерживают наследование `publisher.base -> journal.override`.
+
+Встроено 18 пользовательских профилей: General Organic SI; ACS JOC, Organic Letters, Journal of Medicinal Chemistry и JACS; RSC Organic Chemistry; Wiley Angewandte, Chemistry Europe/EurJOC и Archiv der Pharmazie; Elsevier Tetrahedron, Tetrahedron Letters, European Journal of Medicinal Chemistry и Bioorganic & Medicinal Chemistry; Nature Chemistry и Communications Chemistry; Molecules; BJOC; Chemical Papers.
+
+Профиль применяется в трех сценариях:
+
+- `Generate`: задает DOCX-шаблон, MNGP, ppm-окна, appendix layout и профильные проверки; ручные изменения записываются как overrides.
+- `Add`: Same Series наследует старый профиль, New Method принимает новый.
+- `Patch -> Reformat`: пересобирает существующий SI под другой профиль из manifest и готовых артефактов, не запуская Mnova повторно.
+
+Выбранный ID, версия, дата проверки и официальные URL сохраняются в manifest. DOCX-файлы в каталоге профилей имеют статус `house_default`: это шаблоны программы по опубликованным требованиям, а не официальные publisher templates.
+
+### Исходный проектный эскиз
+
+Ниже сохранен ранний пример схемы как справочный материал. Он не является фактическим файловым API текущей версии.
 
 Предлагаем добавить ресурсы:
 
@@ -126,43 +142,41 @@ graphics:
   min_bitmap_dpi: 300
 ```
 
-## Что менять в программе
+## Исходный чек-лист реализации
 
 ### 1. Loader профилей
 
-Добавить модуль `journal_profiles.py`, который:
+Реализованный модуль `journal_profiles.py`:
 
-- читает YAML из `resources/journal_profiles`;
+- читает встроенный JSON-каталог из `templates/journals`;
 - поддерживает `inherits`;
 - валидирует схему профиля;
 - возвращает resolved settings для генератора, GUI и check_support.
 
 ### 2. GUI
 
-В GUI добавить поле `Journal template`:
+В GUI добавлено поле `Publication preset`:
 
 - dropdown с журналами;
 - кнопка `Apply`;
-- индикатор источника/даты профиля;
-- режим `Custom YAML...` для лабораторных/внутренних шаблонов.
+- ручные overrides через существующие поля template/MNGP/Processing.
 
-При применении профиль должен заполнять:
+При применении профиль заполняет:
 
 - `template_docx`;
-- `style_config`;
 - `mnova_graphics_profile_1h` и `mnova_graphics_profile_13c`;
 - `x_range_ppm_1h`, `x_range_ppm_13c`;
-- требования по HRMS/EA/purity;
-- правила дополнительных ядер `19F`, `31P`, `11B`, `29Si` и т.д.;
-- правила экспорта SI: один PDF или отдельный Supplementary Data.
+- требования по HRMS/EA и доступные правила дополнительных ядер;
+- ориентацию страниц appendix.
+
+Официальные URL и дата проверки доступны в сгенерированном manifest. Отдельный экспорт Supplementary Data остается последующим расширением для журналов, которые требуют отдельный файл со спектрами.
 
 ### 3. Генератор и manifest
 
-В `GenerateSIRequest` добавить:
+В `GenerateSIRequest` добавлено:
 
 ```python
-journal_profile_id: str | None = None
-journal_profile_path: Path | None = None
+journal_profile_id: str = "organic.default"
 ```
 
 В manifest сохранять:
@@ -213,14 +227,14 @@ journal_profile:
 - экспортировать предупреждение: "Apply ACS 1996/Wiley/Nature ChemDraw template before final submission";
 - позже добавить `cdxml` normalizer для bond length/font/line width, если структура приходит в CDXML.
 
-## MVP-приоритет
+## Статус первой волны
 
-1. `journal_profiles.yml` + dropdown в GUI.
-2. Применение профиля к существующим настройкам NMR windows, template_docx и `.mngp`.
-3. Manifest с выбранным профилем.
-4. Profile-aware `check_support`: HRMS/EA/NMR/purity warnings.
-5. Первый набор профилей: `acs.joc`, `rsc.base`, `wiley.chemistry_europe`, `elsevier.tetrahedron`, `mdpi.molecules`, `nature.commschem`.
-6. Тесты на loader, GUI settings roundtrip, request mapping, validator warnings.
+1. Реализованы каталог, наследование и dropdown в GUI.
+2. Профиль применяется к NMR windows, `template_docx`, `.mngp` и appendix layout.
+3. Manifest хранит выбранный профиль, источники, версию и overrides.
+4. `check_support` выполняет доступные profile-aware проверки NMR, HRMS и EA.
+5. Все журналы из первой и второй запланированных волн включены сразу.
+6. Добавлены тесты loader, ресурсов, request mapping, validation и Patch Reformat.
 
 ## Практический дефолт, если журнал не выбран
 

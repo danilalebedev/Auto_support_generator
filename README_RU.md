@@ -23,10 +23,10 @@ Auto Support Generator автоматически собирает Supporting In
 
 | Раздел | Что делает |
 |---|---|
-| **Generate** | Создает новый SI из таблицы соединений и raw-спектров. |
+| **Generate** | Создает новый SI из таблицы соединений и raw-спектров; применяет профиль выбранного журнала. |
 | **Processing** | Настраивает обработку ЯМР, вид appendix и проверку данных. |
 | **Check** | Проверяет целостность ранее созданного output: manifest, DOCX, закладки и артефакты. |
-| **Patch** | Создает измененную копию SI без повторной обработки спектров: renumber, remove, reorder или swap. |
+| **Patch** | Создает измененную копию SI без повторной обработки спектров: renumber, remove, reorder, swap или переоформление под другой журнал. |
 | **Add** | Добавляет новые соединения в существующий SI, не пересобирая старые блоки. |
 | **Instructions** | Содержит встроенную справку, таблицу алиасов и скачиваемые примеры. |
 
@@ -64,8 +64,8 @@ Auto Support Generator автоматически собирает Supporting In
 
 1. Откройте **Instructions → Example files → Copy all examples**.
 2. Возьмите `example_1` и замените данные в его Word-файлах своими.
-3. В **Generate** выберите `Compound_table.docx`, `Spectra_source` и папку результата.
-4. При необходимости выберите шаблон, профили `.mngp`, Reaction schema и Scope.
+3. В **Generate** выберите журнал, `Compound_table.docx`, `Spectra_source` и папку результата.
+4. При необходимости измените примененные настройки, шаблон, профили `.mngp`, Reaction schema и Scope.
 5. В **Processing** проверьте настройки спектров.
 6. Вернитесь в Generate и нажмите **Generate SI**.
 7. После завершения нажмите **Open support** или **Open output folder**.
@@ -76,6 +76,7 @@ Auto Support Generator автоматически собирает Supporting In
 
 | Поле программы | Что загрузить |
 |---|---|
+| **Publication preset** | Целевой журнал. Выбор применяет встроенный Word-шаблон, MNGP, диапазоны ppm и правила appendix; **Apply** возвращает значения профиля после ручных изменений. |
 | **Compound table** | `Compound_table.docx`: одна строка на соединение, номер, свойства, HRMS/IR/Anal и OLE-структура ChemDraw. |
 | **Spectra source** | Папку `Spectra_source` или `Spectra_source.zip` с подпапками по номерам соединений. |
 | **Output folder** | Папку, внутри которой программа создаст отдельный каталог текущего запуска. |
@@ -145,8 +146,9 @@ Check проверяет manifest, порядок соединений, суще
 | **Remove** | `2a,2c` | Удаляет выбранные соединения и их appendix. |
 | **Reorder** | Полный список, например `2c,2a,2b` | Меняет порядок блоков; нужно указать все номера. |
 | **Swap compounds** | `2a=3a` | Меняет местами полные назначения соединений, сохраняя видимый порядок номеров. |
+| **Reformat existing SI** | Выбрать целевой Publication preset | Пересобирает оформление из manifest, повторно используя готовые данные, спектры и ChemDraw OLE. |
 
-Patch использует уже обработанные PNG и Mnova OLE и не должен запускать новую обработку спектров.
+Patch использует уже обработанные PNG и Mnova OLE и не запускает новую обработку спектров. Каждая операция создает новый run и не изменяет исходный SI.
 
 ## Add
 
@@ -156,10 +158,25 @@ Patch использует уже обработанные PNG и Mnova OLE и �
 
 | Режим | Поведение |
 |---|---|
-| **Same series** | Повторно использует старые template, Reaction schema и Processing settings. Новый Scope загружается отдельно. |
-| **New method** | Позволяет задать новые SI template, Reaction schema и Scope; настройки обработки спектров остаются пользовательскими. |
+| **Same series** | Повторно использует старые publication preset, template, Reaction schema и Processing settings. Новый Scope загружается отдельно. |
+| **New method** | Позволяет выбрать новый publication preset и задать новые SI template, Reaction schema и Scope; настройки можно уточнить в Processing. |
 
 Старые блоки не пересобираются. Дублирующийся номер или несовпадающие номера во входных файлах останавливают операцию с понятным сообщением.
+
+## Профили журналов
+
+В Generate доступен **Publication preset**. Профиль задает встроенный Word-шаблон, поля и шрифт документа, диапазоны спектров, MNGP по умолчанию, ориентацию appendix и дополнительные предупреждения проверки. Настройки Processing, измененные после применения профиля, считаются пользовательскими переопределениями и сохраняются в manifest.
+
+| Издательство | Доступные профили |
+|---|---|
+| **ACS** | The Journal of Organic Chemistry (JOC), Organic Letters (Org. Lett.), Journal of Medicinal Chemistry, JACS |
+| **RSC** | Organic Chemistry |
+| **Wiley** | Angewandte Chemie, Chemistry Europe / EurJOC, Archiv der Pharmazie |
+| **Elsevier** | Tetrahedron, Tetrahedron Letters, European Journal of Medicinal Chemistry, Bioorganic & Medicinal Chemistry |
+| **Nature Portfolio** | Nature Chemistry, Communications Chemistry |
+| **Другие** | Molecules, Beilstein Journal of Organic Chemistry, Chemical Papers, General Organic SI |
+
+Профили построены как общее правило издательства плюс уточнение конкретного журнала. Встроенные DOCX являются воспроизводимыми шаблонами программы на основе действующих author guidelines, а не официальными файлами издательств. Перед подачей сверяйтесь с сайтом журнала. Источники и дата проверки сохраняются в `support_information.manifest.json`; подробная матрица находится в [`docs/journal_si_template_requirements.md`](docs/journal_si_template_requirements.md).
 
 ## SI template и алиасы
 

@@ -8,15 +8,26 @@ from docx import Document
 
 from si_generator.cli import _build_parser
 from si_generator.docx_builder import build_document_from_model
-from si_generator.domain.loadings_workflow import LoadingsWorkflowPaths, apply_loadings_workflow, read_reaction_schema, read_scope
+from si_generator.domain.loadings_workflow import (
+    LoadingsWorkflowPaths,
+    apply_loadings_workflow,
+    read_characterization_template,
+    read_reaction_schema,
+    read_scope,
+)
 from si_generator.domain.requests import GenerateSIRequest
 from si_generator.domain.reactions import calculate_reaction_loadings, format_reagent_amount, reaction_from_fields
 from si_generator.graph.compound_store import make_compound_store
-from si_generator.graph.nodes.loadings import calculate_loadings_node
+from si_generator.graph.nodes.loadings import (
+    _loadings_paths_from_request,
+    _method_template_from_request,
+    calculate_loadings_node,
+)
 from si_generator.input_table import read_compounds
 from si_generator.domain.compound import Compound
 from si_generator.render.document_model import build_si_document_model
 from si_generator.structure_metadata import extract_structure_metadata_by_cell
+from si_generator.journal_profiles import get_journal_profile
 from si_generator.workflows.generate_si import request_from_args
 
 
@@ -545,6 +556,45 @@ class ReactionLoadingsTests(unittest.TestCase):
         prepared = result["compounds"]["cmp_001"]
         self.assertIn("bromide 2a (400 mg, 1.57 mmol)", prepared.preparation)
         self.assertEqual(prepared.reaction["source"], "loadings_workflow")
+
+    def test_journal_layout_uses_adjacent_method_template_for_loadings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            schema = root / "Reaction_schema_1.docx"
+            scope = root / "Scope_1.docx"
+            method_template = root / "SI_template_1.docx"
+            for path in (schema, scope, method_template):
+                path.touch()
+            request = GenerateSIRequest(
+                input_path=root / "Compound_table.docx",
+                input_kind="word",
+                output_path=root / "support.docx",
+                template_docx=get_journal_profile("acs.joc").template_path,
+                loadings_schema_docx=schema,
+                loadings_scope_docx=scope,
+            )
+
+            paths, issues = _loadings_paths_from_request(request)
+
+        self.assertEqual(issues, [])
+        self.assertIsNotNone(paths)
+        self.assertEqual(paths.template_docx, method_template)
+        self.assertIsNone(_method_template_from_request(request))
+
+    def test_characterization_template_does_not_treat_compound_name_as_loadings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "SI_template_1.docx"
+            document = Document()
+            document.add_paragraph("{compound.name} ({compound.number})")
+            document.add_paragraph(
+                "Bromide {Product.number} used NBS ({NBS.mass.mg} mg, {NBS.mmol} mmol)."
+            )
+            document.save(path)
+            template = read_characterization_template(path)
+
+        self.assertTrue(template.startswith("Bromide {Product.number}"))
+        self.assertIn("{NBS.mass.mg}", template)
+        self.assertNotIn("{compound.name}", template)
 
     def test_loadings_workflow_does_not_depend_on_render_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

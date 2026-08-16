@@ -24,6 +24,9 @@ STRING_FIELDS = (
     "output_docx",
     "output_folder",
     "theme_mode",
+    "journal_profile_label",
+    "patch_journal_profile_label",
+    "add_journal_profile_label",
     "peak_threshold_percent",
     "peak_threshold_1h_percent",
     "peak_threshold_13c_percent",
@@ -66,7 +69,7 @@ CHOICE_FIELDS = {
     "insert_spectra_as": {"png", "mnova", "none"},
     "baseline_mode": {"auto", "off", "bernstein", "whittaker"},
     "theme_mode": {"light", "dark"},
-    "patch_operation": {"renumber", "remove", "reorder", "swap"},
+    "patch_operation": {"renumber", "remove", "reorder", "swap", "reformat"},
 }
 
 

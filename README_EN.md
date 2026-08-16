@@ -23,10 +23,10 @@ Auto Support Generator builds organic-chemistry Supporting Information (SI). It 
 
 | Page | What it does |
 |---|---|
-| **Generate** | Creates a new SI from a compound table and raw spectra. |
+| **Generate** | Creates a new SI from a compound table and raw spectra and applies a publication preset. |
 | **Processing** | Controls NMR processing, appendix type and analytical validation. |
 | **Check** | Checks the integrity of a previous output: manifest, DOCX, bookmarks and artifacts. |
-| **Patch** | Creates a modified SI copy without reprocessing spectra: renumber, remove, reorder or swap. |
+| **Patch** | Creates a modified SI copy without reprocessing spectra: renumber, remove, reorder, swap or journal reformatting. |
 | **Add** | Appends new compounds without rebuilding old compound blocks. |
 | **Instructions** | Provides built-in help, alias tables and downloadable examples. |
 
@@ -56,8 +56,8 @@ For source use, install Python 3.12, run `Setup Auto SI Generator.bat`, then `Ru
 
 1. Open **Instructions → Example files → Copy all examples**.
 2. Start with `example_1` and replace the values in copies of its Word files.
-3. On **Generate**, select `Compound_table.docx`, `Spectra_source` and an output folder.
-4. Optionally select the SI template, `.mngp` profiles, Reaction schema and Scope.
+3. On **Generate**, select a publication preset, `Compound_table.docx`, `Spectra_source` and an output folder.
+4. Optionally adjust the applied settings, SI template, `.mngp` profiles, Reaction schema and Scope.
 5. Review spectrum settings on **Processing**.
 6. Click **Generate SI**.
 7. When complete, click **Open support** or **Open output folder**.
@@ -68,6 +68,7 @@ For source use, install Python 3.12, run `Setup Auto SI Generator.bat`, then `Ru
 
 | GUI field | Input |
 |---|---|
+| **Publication preset** | Target journal. Selection applies its Word template, MNGP profiles, ppm windows and appendix rules; **Apply** restores preset values after manual edits. |
 | **Compound table** | `Compound_table.docx`: one row per compound with number, properties, HRMS/IR/Anal and a ChemDraw OLE structure. |
 | **Spectra source** | A `Spectra_source` folder or `Spectra_source.zip`, organized by compound number. |
 | **Output folder** | Parent folder in which the app creates a separate run directory. |
@@ -133,8 +134,9 @@ Choose **Existing output folder**, select exactly one operation and click **Appl
 | **Remove** | `2a,2c` | Removes compounds and their appendix pages. |
 | **Reorder** | Full list such as `2c,2a,2b` | Reorders blocks; every existing number is required. |
 | **Swap compounds** | `2a=3a` | Exchanges complete compound assignments while preserving visible number order. |
+| **Reformat existing SI** | Select a target Publication preset | Rebuilds formatting from the manifest while reusing existing data, spectra and ChemDraw OLE. |
 
-Patch reuses processed PNG and Mnova OLE artifacts and does not start new spectrum processing.
+Patch reuses processed PNG and Mnova OLE artifacts and does not start new spectrum processing. Every operation creates a new run and leaves the source SI unchanged.
 
 ## Add
 
@@ -144,10 +146,25 @@ Patch reuses processed PNG and Mnova OLE artifacts and does not start new spectr
 
 | Mode | Behavior |
 |---|---|
-| **Same series** | Reuses the old template, Reaction schema and Processing settings. Supply a new Scope. |
-| **New method** | Accepts a new SI template, Reaction schema and Scope while retaining the user's spectrum-processing settings. |
+| **Same series** | Reuses the old publication preset, template, Reaction schema and Processing settings. Supply a new Scope. |
+| **New method** | Accepts a new publication preset, SI template, Reaction schema and Scope; Processing settings can be adjusted. |
 
 Old blocks are not rebuilt. Duplicate numbers or mismatched numbers across input files stop the operation with an error message.
+
+## Publication presets
+
+**Publication preset** on Generate controls the built-in Word template, page/font settings, spectrum windows, default MNGP files, appendix layout and journal-specific validation warnings. Processing values changed after applying a preset are treated as user overrides and recorded in the manifest.
+
+| Publisher | Available profiles |
+|---|---|
+| **ACS** | The Journal of Organic Chemistry (JOC), Organic Letters (Org. Lett.), Journal of Medicinal Chemistry, JACS |
+| **RSC** | Organic Chemistry |
+| **Wiley** | Angewandte Chemie, Chemistry Europe / EurJOC, Archiv der Pharmazie |
+| **Elsevier** | Tetrahedron, Tetrahedron Letters, European Journal of Medicinal Chemistry, Bioorganic & Medicinal Chemistry |
+| **Nature Portfolio** | Nature Chemistry, Communications Chemistry |
+| **Other** | Molecules, Beilstein Journal of Organic Chemistry, Chemical Papers, General Organic SI |
+
+Profiles use a publisher base plus journal-specific overrides. Bundled DOCX files are reproducible application templates derived from current author guidance, not official publisher templates. Always check the target journal before submission. Source URLs and review dates are written to `support_information.manifest.json`; see [`docs/journal_si_template_requirements.md`](docs/journal_si_template_requirements.md) for the requirements matrix.
 
 ## SI template aliases
 

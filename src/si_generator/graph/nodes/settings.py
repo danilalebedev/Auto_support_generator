@@ -1,15 +1,28 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from ..state import GenerateSIState
 from ...domain.generation_config import build_generation_config
 from ...domain.references import load_reference_store
 from ...domain.runtime_config import build_runtime_config
 from ...domain.spectra_config import build_spectra_config
+from ...journal_profiles import get_journal_profile, journal_profile_defaults, journal_profile_manifest_block
 
 
 def load_settings_node(state: GenerateSIState) -> dict:
     request = state["request"]
+    profile = get_journal_profile(request.journal_profile_id)
+    defaults = journal_profile_defaults(profile.id)
+    if request.template_docx is None:
+        request.template_docx = defaults["template_docx"]
+    if request.mnova_graphics_profile_1h is None:
+        request.mnova_graphics_profile_1h = defaults["mnova_graphics_profile_1h"]
+    if request.mnova_graphics_profile_13c is None:
+        request.mnova_graphics_profile_13c = defaults["mnova_graphics_profile_13c"]
+    user_overrides = _journal_user_overrides(request, defaults)
     return {
+        "journal_profile": journal_profile_manifest_block(profile.id, user_overrides=user_overrides),
         "reference_store": load_reference_store(request.references_path),
         "spectra_config": build_spectra_config(
             extract_nmr=not request.no_extract_nmr,
@@ -40,4 +53,31 @@ def load_settings_node(state: GenerateSIState) -> dict:
         ),
         "runtime_config": build_runtime_config(),
     }
+
+
+def _journal_user_overrides(request, defaults: dict) -> list[str]:
+    overrides: list[str] = []
+    for field in ("template_docx", "mnova_graphics_profile_1h", "mnova_graphics_profile_13c"):
+        selected = getattr(request, field, None)
+        default = defaults.get(field)
+        if selected and default and _normalized_path(selected) != _normalized_path(default):
+            overrides.append(field)
+    comparisons = (
+        ("x_range_ppm_1h", tuple(request.x_range_ppm_1h), tuple(defaults["x_range_ppm_1h"])),
+        ("x_range_ppm_13c", tuple(request.x_range_ppm_13c), tuple(defaults["x_range_ppm_13c"])),
+        ("insert_spectra_as", request.insert_spectra_as, defaults["insert_spectra_as"]),
+        (
+            "target_signal_height_fraction",
+            float(request.target_signal_height_fraction),
+            float(defaults["target_signal_height_fraction"]),
+        ),
+    )
+    for field, selected, default in comparisons:
+        if selected != default:
+            overrides.append(field)
+    return overrides
+
+
+def _normalized_path(value) -> str:
+    return str(Path(value).resolve()).casefold()
 

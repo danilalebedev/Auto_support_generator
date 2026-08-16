@@ -69,11 +69,12 @@ def selected_patch_operation(request: Any) -> str:
         "remove": bool(request.remove),
         "reorder": bool(request.reorder),
         "swap": bool(request.swap),
+        "reformat": bool(getattr(request, "journal_profile_id", None)),
     }
     selected = [name for name, enabled in operations.items() if enabled]
     if len(selected) != 1:
         raise ValueError(
-            "PATCH_OPERATION_COUNT_INVALID: select exactly one operation: renumber, remove, reorder, or swap."
+            "PATCH_OPERATION_COUNT_INVALID: select exactly one operation: renumber, remove, reorder, swap, or reformat."
         )
     return selected[0]
 

@@ -59,6 +59,7 @@ class AddCompoundsWorkflowTests(unittest.TestCase):
                     input_kind="csv",
                     output_docx=output_docx,
                     method_mode="new_method",
+                    journal_profile_id="nature.chemistry",
                     no_extract_nmr=True,
                     no_check_support=True,
                 )
@@ -79,6 +80,7 @@ class AddCompoundsWorkflowTests(unittest.TestCase):
         self.assertEqual(report["status"], "pass")
         self.assertNotIn("ADD_COMPOUNDS_TEXT_ONLY_MERGE", {issue["code"] for issue in report["issues"]})
         self.assertEqual(report["method_mode"], "new_method")
+        self.assertEqual(report["method_config"]["journal_profile_id"], "nature.chemistry")
 
     def test_output_folder_creates_per_run_add_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -142,6 +144,7 @@ class AddCompoundsWorkflowTests(unittest.TestCase):
                 valid_docx=True,
                 run_config={
                     "version": 1,
+                    "journal_profile_id": "acs.joc",
                     "no_extract_nmr": True,
                     "insert_spectra_as": "none",
                     "no_check_support": True,
@@ -166,6 +169,7 @@ class AddCompoundsWorkflowTests(unittest.TestCase):
         self.assertEqual(report["method_mode"], "same_series")
         self.assertEqual(report["method_config"]["source"], "manifest")
         self.assertTrue(report["method_config"]["no_extract_nmr"])
+        self.assertEqual(report["method_config"]["journal_profile_id"], "acs.joc")
         self.assertEqual(merged_manifest["add_compounds_history"][-1]["method_mode"], "same_series")
         self.assertEqual(merged_manifest["compounds"]["added_cmp_001_1"]["add_method_mode"], "same_series")
 

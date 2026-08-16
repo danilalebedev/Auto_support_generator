@@ -30,6 +30,14 @@ from .domain.spectra_config import (
 from .domain.types import SpectrumEmbedMode
 from .external_tools import find_mnova_executable
 from .gui_settings import load_gui_settings, save_gui_settings
+from .journal_profiles import (
+    DEFAULT_JOURNAL_PROFILE_ID,
+    get_journal_profile,
+    journal_profile_defaults,
+    journal_profile_label,
+    journal_profile_labels,
+    resolve_journal_profile_id,
+)
 from .runtime_diagnostics import format_preflight_issues, issue_has_errors, preflight_generate_request
 from .runtime_paths import bundled_resource_path, default_output_path, examples_dir
 from .workflows.check_si import run_check_si
@@ -108,6 +116,11 @@ class SIGeneratorApp:
         self.mnova_graphics_profile_13c = StringVar()
         self.output_docx = StringVar(value=str(default_output_path()))
         self.output_folder = StringVar(value=str(default_output_path().parent))
+        self._journal_profile_ids_by_label = journal_profile_labels()
+        default_profile_label = journal_profile_label(DEFAULT_JOURNAL_PROFILE_ID)
+        self.journal_profile_label = StringVar(value=default_profile_label)
+        self.patch_journal_profile_label = StringVar(value=default_profile_label)
+        self.add_journal_profile_label = StringVar(value=default_profile_label)
         self.theme_mode = StringVar(value="light")
         self.dark_theme = BooleanVar(value=False)
         self.input_kind = StringVar(value="word")
@@ -175,6 +188,7 @@ class SIGeneratorApp:
         self._logo_mark_image: tk.PhotoImage | None = None
 
         self._load_saved_settings()
+        self._normalize_journal_profile_labels()
         self._on_patch_operation_changed(clear_instruction=False)
         self._set_default_mngp_profiles_if_empty()
         if self.theme_mode.get() not in THEME_PALETTES:
@@ -354,9 +368,19 @@ class SIGeneratorApp:
         simple = ttk.LabelFrame(content, text="Simple", padding=12, style="Card.TLabelframe")
         simple.grid(row=0, column=0, sticky="ew")
         simple.columnconfigure(1, weight=1)
-        self._file_row(simple, 0, "Compound table", self.input_path, self._browse_input)
-        self._source_row(simple, 1, "Spectra source", self.spectra_source, self._browse_spectra_source, self._browse_spectra_folder)
-        self._folder_row(simple, 2, "Output folder", self.output_folder, self._browse_output_folder)
+        ttk.Label(simple, text="Publication preset").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        profile_combo = ttk.Combobox(
+            simple,
+            textvariable=self.journal_profile_label,
+            values=tuple(self._journal_profile_ids_by_label),
+            state="readonly",
+        )
+        profile_combo.grid(row=0, column=1, sticky="ew", pady=4)
+        profile_combo.bind("<<ComboboxSelected>>", lambda _event: self._apply_journal_profile())
+        ttk.Button(simple, text="Apply", command=self._apply_journal_profile).grid(row=0, column=2, sticky="e", padx=(8, 0), pady=4)
+        self._file_row(simple, 1, "Compound table", self.input_path, self._browse_input)
+        self._source_row(simple, 2, "Spectra source", self.spectra_source, self._browse_spectra_source, self._browse_spectra_folder)
+        self._folder_row(simple, 3, "Output folder", self.output_folder, self._browse_output_folder)
 
         self._build_optional_inputs_block(content, 1)
         self._build_loadings_block(content, 2)
@@ -592,6 +616,29 @@ class SIGeneratorApp:
             row=3, column=2, sticky="w", padx=(8, 0), pady=4
         )
 
+        reformat_box = ttk.LabelFrame(patch_tab, text="Reformat for another journal", padding=12, style="Card.TLabelframe")
+        reformat_box.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        reformat_box.columnconfigure(1, weight=1)
+        ttk.Radiobutton(
+            reformat_box,
+            text="Reformat existing SI",
+            variable=self.patch_operation,
+            value="reformat",
+            command=self._on_patch_operation_changed,
+        ).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        patch_profile_combo = ttk.Combobox(
+            reformat_box,
+            textvariable=self.patch_journal_profile_label,
+            values=tuple(self._journal_profile_ids_by_label),
+            state="readonly",
+        )
+        patch_profile_combo.grid(row=0, column=1, sticky="ew", pady=4)
+        ttk.Label(
+            reformat_box,
+            text="Rebuilds formatting from saved data and artifacts; spectra are not reprocessed.",
+            style="Muted.TLabel",
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, 0))
+
     def _build_add_page(self, parent: ttk.Frame) -> None:
         page = self._make_page(parent, "add")
         page.rowconfigure(0, weight=1)
@@ -617,28 +664,38 @@ class SIGeneratorApp:
             text="Same series reuses old template/reaction schema. New method can use new template/schema/scope; spectra settings stay from Processing.",
             foreground=self._theme["muted"],
         ).grid(row=4, column=1, columnspan=2, sticky="w", pady=(0, 4))
-        ttk.Label(add_box, text="New compound table").grid(row=5, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Label(add_box, text="Publication preset").grid(row=5, column=0, sticky="w", padx=(0, 8), pady=4)
+        add_profile_combo = ttk.Combobox(
+            add_box,
+            textvariable=self.add_journal_profile_label,
+            values=tuple(self._journal_profile_ids_by_label),
+            state="readonly",
+        )
+        add_profile_combo.grid(row=5, column=1, sticky="ew", pady=4)
+        add_profile_combo.bind("<<ComboboxSelected>>", lambda _event: self._apply_add_journal_profile())
+        ttk.Button(add_box, text="Apply", command=self._apply_add_journal_profile).grid(row=5, column=2, sticky="e", padx=(8, 0), pady=4)
+        ttk.Label(add_box, text="New compound table").grid(row=6, column=0, sticky="w", padx=(0, 8), pady=4)
         ttk.Label(add_box, text="Word table with ChemDraw OLE structures (.docx)", style="Muted.TLabel").grid(
-            row=5,
+            row=6,
             column=1,
             columnspan=2,
             sticky="w",
             pady=4,
         )
-        self._file_row(add_box, 6, "New compound table", self.add_input_path, self._browse_add_input, optional=True)
+        self._file_row(add_box, 7, "New compound table", self.add_input_path, self._browse_add_input, optional=True)
         self._source_row(
             add_box,
-            7,
+            8,
             "New spectra source",
             self.add_spectra_source,
             lambda: self._browse_file(self.add_spectra_source, [("Zip archives", "*.zip"), ("All files", "*.*")]),
             lambda: self._browse_folder(self.add_spectra_source),
             optional=True,
         )
-        self._file_row(add_box, 8, "New SI template .docx", self.add_template_docx, lambda: self._browse_file(self.add_template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
-        self._file_row(add_box, 9, "New Reaction_schema.docx", self.add_loadings_schema_docx, lambda: self._browse_file(self.add_loadings_schema_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
-        self._file_row(add_box, 10, "New Scope.docx", self.add_loadings_scope_docx, lambda: self._browse_file(self.add_loadings_scope_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
-        self._folder_row(add_box, 11, "Output folder", self.add_output_folder, self._browse_add_output_folder, optional=True)
+        self._file_row(add_box, 9, "New SI template .docx", self.add_template_docx, lambda: self._browse_file(self.add_template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
+        self._file_row(add_box, 10, "New Reaction_schema.docx", self.add_loadings_schema_docx, lambda: self._browse_file(self.add_loadings_schema_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
+        self._file_row(add_box, 11, "New Scope.docx", self.add_loadings_scope_docx, lambda: self._browse_file(self.add_loadings_scope_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
+        self._folder_row(add_box, 12, "Output folder", self.add_output_folder, self._browse_add_output_folder, optional=True)
 
     def _build_instructions_page(self, parent: ttk.Frame) -> None:
         page = self._make_page(parent, "instructions")
@@ -657,6 +714,7 @@ class SIGeneratorApp:
                 "   - Click Copy all examples.\n"
                 "   - Start with example_1 and edit copies of its Word files.\n"
                 "2. Fill Generate\n"
+                "   - Publication preset: choose the target journal; the app applies its Word and spectrum defaults.\n"
                 "   - Compound table: Compound_table.docx.\n"
                 "   - Spectra source: Spectra_source folder or Spectra_source.zip.\n"
                 "   - Output folder: choose where a separate run folder will be created.\n"
@@ -676,6 +734,8 @@ class SIGeneratorApp:
             generate,
             text=(
                 "Required fields\n"
+                "- Publication preset: select a journal or General Organic SI. Selection applies the built-in Word template, MNGP profiles, ppm windows and appendix rules.\n"
+                "- Apply: restores the selected preset after manual Processing edits. Manual edits made afterward are treated as user overrides.\n"
                 "- Compound table: upload Compound_table.docx with compound data and ChemDraw OLE structures.\n"
                 "- Spectra source: upload a .zip archive or choose a folder with raw spectra.\n"
                 "- Output folder: choose where the run folder will be created.\n"
@@ -805,6 +865,8 @@ class SIGeneratorApp:
                 "- Reorder: complete final compound order.\n"
                 "- Swap compounds: exchange complete compound assignments while preserving the visible number order. "
                 "Any number of non-overlapping pairs is allowed, for example 2a=3a,2b=3b.\n\n"
+                "- Reformat existing SI: choose a publication preset and rebuild the document layout from the old manifest. "
+                "Existing characterization data, processed spectra and ChemDraw structures are reused; Mnova preprocessing is not run again.\n\n"
                 "Output\n"
                 "- Every patch writes a new run folder with docx, manifest, report, and logs.\n"
                 "- The old support is not edited in place."
@@ -822,6 +884,7 @@ class SIGeneratorApp:
                 "- Existing manifest: upload manifest from the old run when no previous output folder is selected.\n"
                 "- Existing support .docx: optional override if the old support file was moved.\n"
                 "- Add mode: choose how formatting and processing settings are selected.\n"
+                "- Publication preset: used by New method. Same series keeps the old run's publication preset.\n"
                 "- New compound table: upload a Word table containing only new compounds.\n"
                 "- New spectra source: optional folder or zip with spectra only for the new compounds.\n"
                 "- New SI template: optional. In Same series it overrides the old template; in New method it defines the new method layout.\n"
@@ -844,6 +907,27 @@ class SIGeneratorApp:
                 "Limitations\n"
                 "- Old compound blocks are not regenerated.\n"
                 "- The old support file is never edited in place."
+            ),
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+
+        profiles = self._instruction_block(content, 10, "Publication presets", "Built-in journal formatting and validation profiles.")
+        ttk.Label(
+            profiles,
+            text=(
+                "How presets work\n"
+                "- Generate: select a preset, then optionally change individual fields in Processing. Overrides are recorded in the manifest.\n"
+                "- Add / Same series: inherits the old preset. Add / New method: uses the selected preset.\n"
+                "- Patch / Reformat: rebuilds an existing SI for another journal without reprocessing spectra.\n"
+                "- Built-in DOCX files are reproducible house templates based on current author guidance, not official publisher templates. Always check the journal website before submission.\n\n"
+                "Available profiles\n"
+                "- ACS: The Journal of Organic Chemistry (JOC), Organic Letters (Org. Lett.), Journal of Medicinal Chemistry, JACS.\n"
+                "- RSC: Organic Chemistry.\n"
+                "- Wiley: Angewandte Chemie, Chemistry Europe / EurJOC, Archiv der Pharmazie.\n"
+                "- Elsevier: Tetrahedron, Tetrahedron Letters, European Journal of Medicinal Chemistry, Bioorganic & Medicinal Chemistry.\n"
+                "- Nature Portfolio: Nature Chemistry, Communications Chemistry.\n"
+                "- Other: Molecules, Beilstein Journal of Organic Chemistry, Chemical Papers, and General Organic SI."
             ),
             wraplength=760,
             justify="left",
@@ -1149,12 +1233,62 @@ class SIGeneratorApp:
             "remove": ("Compounds", "Example: 2a,2c"),
             "reorder": ("Final order", "Example: 2b,2a,2c"),
             "swap": ("Swap pairs", "Example: 2a=3a,2b=3b"),
+            "reformat": ("Instructions", "No mapping is needed; choose a journal below."),
         }
         label, example = labels.get(self.patch_operation.get(), labels["renumber"])
         self.patch_instruction_label.set(label)
         self.patch_instruction_example.set(example)
         if clear_instruction:
             self.patch_instruction.set("")
+
+    def _journal_profile_id(self, label_or_id: str) -> str:
+        return get_journal_profile(resolve_journal_profile_id(label_or_id)).id
+
+    def _normalize_journal_profile_labels(self) -> None:
+        default_label = journal_profile_label(DEFAULT_JOURNAL_PROFILE_ID)
+        for variable in (
+            self.journal_profile_label,
+            self.patch_journal_profile_label,
+            self.add_journal_profile_label,
+        ):
+            try:
+                variable.set(journal_profile_label(self._journal_profile_id(variable.get())))
+            except ValueError:
+                variable.set(default_label)
+
+    def _apply_journal_profile(self) -> None:
+        self._apply_profile_defaults(
+            self._journal_profile_id(self.journal_profile_label.get()),
+            template_variable=self.template_docx,
+        )
+
+    def _apply_add_journal_profile(self) -> None:
+        self._apply_profile_defaults(
+            self._journal_profile_id(self.add_journal_profile_label.get()),
+            template_variable=self.add_template_docx,
+        )
+
+    def _apply_profile_defaults(self, profile_id: str, *, template_variable: StringVar) -> None:
+        defaults = journal_profile_defaults(profile_id)
+        template_variable.set(str(defaults["template_docx"]))
+        profile_1h = defaults.get("mnova_graphics_profile_1h")
+        profile_13c = defaults.get("mnova_graphics_profile_13c")
+        if profile_1h:
+            self.mnova_graphics_profile_1h.set(str(profile_1h))
+        if profile_13c:
+            self.mnova_graphics_profile_13c.set(str(profile_13c))
+        h1_min, h1_max = defaults["x_range_ppm_1h"]
+        c13_min, c13_max = defaults["x_range_ppm_13c"]
+        self.h1_ppm_min.set(f"{h1_min:g}")
+        self.h1_ppm_max.set(f"{h1_max:g}")
+        self.c13_ppm_min.set(f"{c13_min:g}")
+        self.c13_ppm_max.set(f"{c13_max:g}")
+        self.insert_spectra_as.set(str(defaults["insert_spectra_as"]))
+        self.target_signal_height_percent.set(
+            _format_fraction_percent(float(defaults["target_signal_height_fraction"]))
+        )
+        self.status_text.set(f"Applied {journal_profile_label(profile_id)}")
+        self._save_settings()
 
     def _browse_add_input(self) -> None:
         self.add_input_kind.set("word")
@@ -1306,6 +1440,7 @@ class SIGeneratorApp:
                 support_docx_text=self.check_support_docx.get(),
                 operation_text=self.patch_operation.get(),
                 instruction_text=self.patch_instruction.get(),
+                journal_profile_text=self.patch_journal_profile_label.get(),
             )
         except ValueError as exc:
             messagebox.showerror("SI Generator", str(exc))
@@ -1359,6 +1494,7 @@ class SIGeneratorApp:
                 generate_loadings=self.generate_loadings.get(),
                 calculate_elemental_analysis=self.calculate_elemental_analysis.get(),
                 check_support=self.check_support.get(),
+                journal_profile_text=self.add_journal_profile_label.get(),
             )
         except ValueError as exc:
             messagebox.showerror("SI Generator", str(exc))
@@ -1422,6 +1558,7 @@ class SIGeneratorApp:
             generate_loadings=self.generate_loadings.get(),
             calculate_elemental_analysis=self.calculate_elemental_analysis.get(),
             check_support=self.check_support.get(),
+            journal_profile_text=self.journal_profile_label.get(),
         )
 
     def _run_workflow(self, request: GenerateSIRequest) -> None:
@@ -1645,6 +1782,7 @@ class SIGeneratorApp:
             "mnova_graphics_profile_13c": self.mnova_graphics_profile_13c,
             "output_docx": self.output_docx,
             "output_folder": self.output_folder,
+            "journal_profile_label": self.journal_profile_label,
             "theme_mode": self.theme_mode,
             "peak_threshold_1h_percent": self.peak_threshold_1h_percent,
             "peak_threshold_13c_percent": self.peak_threshold_13c_percent,
@@ -1664,6 +1802,7 @@ class SIGeneratorApp:
             "patch_source_output_dir": self.patch_source_output_dir,
             "patch_operation": self.patch_operation,
             "patch_instruction": self.patch_instruction,
+            "patch_journal_profile_label": self.patch_journal_profile_label,
             "add_previous_output_dir": self.add_previous_output_dir,
             "add_manifest": self.add_manifest,
             "add_support_docx": self.add_support_docx,
@@ -1676,6 +1815,7 @@ class SIGeneratorApp:
             "add_output_folder": self.add_output_folder,
             "add_input_kind": self.add_input_kind,
             "add_method_mode": self.add_method_mode,
+            "add_journal_profile_label": self.add_journal_profile_label,
         }
 
     def _set_output_folder(self, folder: str, *, save: bool = True) -> None:
@@ -2071,6 +2211,7 @@ def _build_generate_request(
     generate_loadings: bool = False,
     calculate_elemental_analysis: bool = False,
     check_support: bool = True,
+    journal_profile_text: str = DEFAULT_JOURNAL_PROFILE_ID,
 ) -> GenerateSIRequest:
     input_path = _required_existing_file(input_path_text, "Choose an existing compound table.", suffixes=(".docx",))
     output_docx = Path(output_docx_text.strip().strip('"')).expanduser()
@@ -2132,6 +2273,7 @@ def _build_generate_request(
         generate_loadings=generate_loadings,
         calculate_elemental_analysis=calculate_elemental_analysis,
         no_check_support=not check_support,
+        journal_profile_id=_journal_profile_id_from_text(journal_profile_text),
     )
 
 
@@ -2181,6 +2323,7 @@ def _build_add_compounds_request(
     calculate_elemental_analysis: bool = False,
     check_support: bool = True,
     previous_output_dir_text: str = "",
+    journal_profile_text: str = "",
 ) -> AddCompoundsRequest:
     input_path = _required_existing_file(input_path_text, "Choose an existing new compound table.", suffixes=(".docx",))
     output_docx = _optional_output_docx(output_docx_text)
@@ -2255,6 +2398,11 @@ def _build_add_compounds_request(
         generate_loadings=add_loadings_requested,
         calculate_elemental_analysis=calculate_elemental_analysis,
         no_check_support=not check_support,
+        journal_profile_id=(
+            _journal_profile_id_from_text(journal_profile_text)
+            if str(journal_profile_text or "").strip()
+            else None
+        ),
     )
 
 
@@ -2264,6 +2412,7 @@ def _build_patch_request(
     operation_text: str,
     instruction_text: str,
     support_docx_text: str = "",
+    journal_profile_text: str = "",
 ) -> PatchSIRequest:
     source_output_folder = _required_existing_folder(
         source_output_folder_text,
@@ -2279,14 +2428,15 @@ def _build_patch_request(
         require_support=support_override is None,
     )
     operation = operation_text.strip().lower()
-    if operation not in {"renumber", "remove", "reorder", "swap"}:
-        raise ValueError("Choose one patch operation: renumber, remove, reorder, or swap.")
-    if not instruction_text.strip():
+    if operation not in {"renumber", "remove", "reorder", "swap", "reformat"}:
+        raise ValueError("Choose one patch operation: renumber, remove, reorder, swap, or reformat.")
+    if operation != "reformat" and not instruction_text.strip():
         raise ValueError(f"Enter instructions for the {operation} operation.")
     renumber = parse_renumber_map(instruction_text) if operation == "renumber" else {}
     remove = parse_remove_list(instruction_text) if operation == "remove" else ()
     reorder = parse_reorder_list(instruction_text) if operation == "reorder" else ()
     swap = parse_swap_pairs(instruction_text) if operation == "swap" else ()
+    journal_profile_id = _journal_profile_id_from_text(journal_profile_text) if operation == "reformat" else None
     return PatchSIRequest(
         manifest_path=manifest_path,
         support_docx=support_override or discovered_support,
@@ -2294,7 +2444,12 @@ def _build_patch_request(
         remove=remove,
         reorder=reorder,
         swap=swap,
+        journal_profile_id=journal_profile_id,
     )
+
+
+def _journal_profile_id_from_text(label_or_id: str) -> str:
+    return get_journal_profile(resolve_journal_profile_id(label_or_id)).id
 
 
 def _build_patch_summary(state: dict[str, Any]) -> dict[str, str]:

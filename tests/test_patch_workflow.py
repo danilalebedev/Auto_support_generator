@@ -146,6 +146,30 @@ class PatchWorkflowTests(unittest.TestCase):
         self.assertNotIn("Example A (2a)", text)
         self.assertIn("Example B (2b)", text)
 
+    def test_cli_patch_manifest_reformats_for_journal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, source_manifest = _write_source_support(root)
+            stdout = StringIO()
+
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                exit_code = cli_main(
+                    [
+                        "--patch-manifest",
+                        str(source_manifest),
+                        "--reformat-journal",
+                        "acs.joc",
+                        "--patch-output-folder",
+                        str(root / "patches"),
+                    ]
+                )
+            manifest_path = next((root / "patches" / "runs").glob("*/docx/support_information.manifest.json"))
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(manifest["journal_profile"]["id"], "acs.joc")
+        self.assertIn("Patch check passed", stdout.getvalue())
+
     def test_cli_patch_manifest_supports_multiple_swap_pairs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -538,6 +562,41 @@ class PatchWorkflowTests(unittest.TestCase):
             second = run_patch_si(request)
 
         self.assertNotEqual(first["artifacts"]["output_root"], second["artifacts"]["output_root"])
+
+    def test_patch_reformats_for_journal_without_reprocessing_spectra(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="Example",
+                formula="C8H8",
+                h1_nmr="1H NMR",
+                c13_nmr="13C NMR",
+                hrms_found="104.0621",
+            )
+            _, source_manifest = _write_source_support(root, [compound])
+            source_artifact = root / "spectra" / "processed_spectra" / "2a" / "2a_1H.png"
+            source_artifact.parent.mkdir(parents=True)
+            source_artifact.write_bytes(b"png")
+
+            state = run_patch_si(
+                PatchSIRequest(
+                    manifest_path=source_manifest,
+                    journal_profile_id="acs.joc",
+                    output_folder=root / "patches",
+                )
+            )
+            manifest = json.loads(Path(state["artifacts"]["manifest"]).read_text(encoding="utf-8"))
+            copied_artifact = Path(state["artifacts"]["output_root"]) / "spectra" / "processed_spectra" / "2a" / "2a_1H.png"
+            copied_artifact_exists = copied_artifact.exists()
+
+        self.assertEqual(state["status"], "pass")
+        self.assertEqual(state["patch_result"]["operation"], "reformat")
+        self.assertEqual(state["patch_result"]["journal_profile_id"], "acs.joc")
+        self.assertEqual(manifest["journal_profile"]["id"], "acs.joc")
+        self.assertTrue(Path(state["artifacts"]["journal_template"]).name.endswith("acs.joc.docx"))
+        self.assertTrue(copied_artifact_exists)
 
     def test_a_new_patch_can_use_the_previous_patch_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

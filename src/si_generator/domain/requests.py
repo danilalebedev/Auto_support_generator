@@ -48,6 +48,7 @@ class GenerateSIRequest:
     only: tuple[str, ...] = ()
     insert_chemdraw: bool = False
     no_check_support: bool = False
+    journal_profile_id: str = "organic.default"
 
     @property
     def input_base_dir(self) -> Path:
@@ -79,6 +80,7 @@ class PatchSIRequest:
     support_docx: Path | None = None
     output_folder: Path | None = None
     strict_artifacts: bool = True
+    journal_profile_id: str | None = None
 
 
 @dataclass(slots=True)
@@ -120,6 +122,7 @@ class AddCompoundsRequest:
     calculate_elemental_analysis: bool = False
     no_check_support: bool = False
     strict_artifacts: bool = True
+    journal_profile_id: str | None = None
 
     @property
     def resolved_spectra_source(self) -> Path | None:

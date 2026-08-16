@@ -3,6 +3,7 @@ from __future__ import annotations
 from ..compound_store import ordered_compounds
 from ..state import GenerateSIState, Issue
 from ...domain.input_validation import validate_compound_inputs
+from ...domain.journal_validation import validate_compounds_for_journal
 from ...nmr_validation import validate_support
 from ...output_layout import output_root_for
 
@@ -69,6 +70,8 @@ def validate_support_node(state: GenerateSIState) -> dict:
     if check_support:
         validate_support(compounds)
     issues: list[Issue] = list(state.get("issues", []))
+    if check_support:
+        issues.extend(validate_compounds_for_journal(compounds, request.journal_profile_id))
     warnings = []
     for compound in compounds:
         if compound.nmr_check_warning:

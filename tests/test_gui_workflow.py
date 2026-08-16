@@ -124,6 +124,21 @@ class GuiWorkflowTests(unittest.TestCase):
         self.assertEqual(request.spectra_source, spectra_folder)
         self.assertEqual(request.resolved_spectra_source, spectra_folder)
 
+    def test_generate_request_accepts_journal_label(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            table = root / "input.docx"
+            table.write_text("placeholder", encoding="utf-8")
+
+            request = _build_generate_request(
+                input_kind="word",
+                input_path_text=str(table),
+                output_docx_text=str(root / "support.docx"),
+                journal_profile_text="Nature - Communications Chemistry",
+            )
+
+        self.assertEqual(request.journal_profile_id, "nature.commschem")
+
     def test_shared_peak_threshold_populates_both_nuclei(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -411,6 +426,23 @@ class GuiWorkflowTests(unittest.TestCase):
                     operation_text="renumber",
                     instruction_text="2a=3a",
                 )
+
+    def test_patch_request_builds_journal_reformat_without_mapping(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "support_information.manifest.json").write_text("{}", encoding="utf-8")
+            (root / "support_information.docx").write_text("placeholder", encoding="utf-8")
+
+            request = _build_patch_request(
+                source_output_folder_text=str(root),
+                operation_text="reformat",
+                instruction_text="",
+                journal_profile_text="ACS - Journal of Organic Chemistry",
+            )
+
+        self.assertEqual(request.journal_profile_id, "acs.joc")
+        self.assertFalse(request.renumber)
+        self.assertFalse(request.remove)
 
     def test_patch_request_allows_support_override_when_original_docx_was_moved(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

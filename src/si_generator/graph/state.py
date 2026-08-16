@@ -34,6 +34,7 @@ class GenerateSIState(TypedDict, total=False):
     issues: list[Issue]
     manifest: dict[str, Any]
     status: Literal["pass", "fail"]
+    journal_profile: dict[str, Any]
 
 
 class CheckSIState(TypedDict, total=False):

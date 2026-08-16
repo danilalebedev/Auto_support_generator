@@ -21,7 +21,14 @@ si-generator = "si_generator.cli:main"
 si-generator-gui = "si_generator.gui:main"
 
 [tool.setuptools.package-data]
-"si_generator" = ["resources/scripts/*.qs", "resources/assets/*.png", "resources/mngp_styles/*.mngp", "templates/*.docx"]
+"si_generator" = [
+    "resources/scripts/*.qs",
+    "resources/assets/*.png",
+    "resources/mngp_styles/*.mngp",
+    "templates/*.docx",
+    "templates/journals/*.docx",
+    "templates/journals/*.json",
+]
 
 [build-system]
 requires = ["setuptools>=68"]

@@ -66,6 +66,7 @@ def add_compounds_request_from_args(args: Namespace) -> AddCompoundsRequest:
         calculate_elemental_analysis=bool(getattr(args, "calculate_elemental_analysis", False)),
         no_check_support=bool(getattr(args, "no_check_support", False)),
         strict_artifacts=not bool(getattr(args, "no_strict_artifacts", False)),
+        journal_profile_id=getattr(args, "journal_profile", None) or None,
     )
 
 

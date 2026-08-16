@@ -10,6 +10,7 @@ from .workflows.add_compounds import add_compounds_request_from_args, run_add_co
 from .workflows.check_si import check_request_from_args, run_check_si
 from .workflows.generate_si import output_path_from_state, request_from_args, run_generate_si
 from .workflows.patch_si import patch_request_from_args, run_patch_si
+from .journal_profiles import list_journal_profiles
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -69,6 +70,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--swap",
         help="For --patch-manifest, comma-separated non-overlapping compound pairs, e.g. 2a=3a,2b=3b.",
     )
+    patch_operation.add_argument(
+        "--reformat-journal",
+        choices=[profile.id for profile in list_journal_profiles()],
+        help="For --patch-manifest, rebuild the existing SI with a journal preset without rerunning Mnova preprocessing.",
+    )
     parser.add_argument("--patch-output-folder", help="For --patch-manifest, base folder where a unique patch run is created.")
     parser.add_argument("--add-word-input", help="For --add-compounds-manifest, path to new compounds Word table.")
     parser.add_argument("--add-output", help="For --add-compounds-manifest, output path for the new combined DOCX.")
@@ -114,6 +120,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mnova-graphics-profile",
         help="Optional .mngp MestReNova NMR graphic properties file used for spectrum display/export formatting.",
+    )
+    parser.add_argument(
+        "--journal-profile",
+        choices=[profile.id for profile in list_journal_profiles()],
+        default="organic.default",
+        help="Publication preset used for the Word template, spectrum defaults, manifest, and preflight checks.",
     )
     parser.add_argument(
         "--mnova-graphics-profile-1h",

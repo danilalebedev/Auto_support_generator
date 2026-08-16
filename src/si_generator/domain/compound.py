@@ -78,6 +78,57 @@ def compound_to_domain_dict(compound: Compound) -> CompoundSnapshot:
     return data
 
 
+def compound_from_domain_dict(data: dict[str, Any]) -> Compound:
+    physical = dict(data.get("physical", {}) or {})
+    structure = dict(data.get("structure", {}) or {})
+    spectra = dict(data.get("spectra", {}) or {})
+    h1_artifacts = dict(spectra.get("1H", {}) or {})
+    c13_artifacts = dict(spectra.get("13C", {}) or {})
+    nmr = dict(data.get("nmr", {}) or {})
+    nmr_spectra = dict(nmr.get("spectra", {}) or {})
+    h1 = dict(nmr_spectra.get("1H", {}) or {})
+    c13 = dict(nmr_spectra.get("13C", {}) or {})
+    hrms = dict(data.get("hrms", {}) or {})
+    reaction = dict(data.get("reaction", {}) or {})
+    return Compound(
+        id=str(data.get("id") or ""),
+        number=str(data.get("number") or ""),
+        name=str(data.get("name") or ""),
+        formula=str(data.get("formula") or structure.get("formula") or ""),
+        preparation=str(reaction.get("preparation") or ""),
+        yield_text=str(physical.get("yield_text") or ""),
+        color=str(physical.get("color") or ""),
+        state=str(physical.get("state") or ""),
+        melting_point=str(physical.get("melting_point") or ""),
+        rf=str(physical.get("rf") or ""),
+        structure_path=str(structure.get("path") or ""),
+        has_word_structure=bool(structure.get("has_word_structure")),
+        h1_spectrum_path=str(h1_artifacts.get("source_path") or ""),
+        h1_image_path=str(h1_artifacts.get("image_path") or ""),
+        h1_mnova_path=str(h1_artifacts.get("mnova_path") or ""),
+        c13_spectrum_path=str(c13_artifacts.get("source_path") or ""),
+        c13_image_path=str(c13_artifacts.get("image_path") or ""),
+        c13_mnova_path=str(c13_artifacts.get("mnova_path") or ""),
+        h1_nmr=str(h1.get("formatted_text") or ""),
+        h1_conditions=str(h1.get("conditions") or ""),
+        c13_nmr=str(c13.get("formatted_text") or ""),
+        c13_conditions=str(c13.get("conditions") or ""),
+        nmr_spectra=nmr_spectra,
+        extra_nmr=str(nmr.get("extra_text") or ""),
+        hrms_label=str(hrms.get("label") or "HRMS (ESI-TOF) m/z"),
+        hrms_adduct=str(hrms.get("adduct") or "[M+H]+"),
+        hrms_found=str(hrms.get("found_text") or ""),
+        hrms_calculated=float(hrms.get("calculated_mz") or 0.0),
+        hrms_ion_formula=str(hrms.get("ion_formula") or ""),
+        hrms=hrms,
+        ir=data.get("ir", ""),
+        elemental_analysis=dict(data.get("elemental_analysis", {}) or {}),
+        reaction=reaction,
+        references=[str(item) for item in data.get("references", [])],
+        validation_issues=list(data.get("issues", []) or []),
+    )
+
+
 def _physical_block(compound: Compound) -> dict[str, str]:
     return _compact(
         {

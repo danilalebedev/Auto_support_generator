@@ -6,6 +6,7 @@ from pathlib import Path
 from ..domain.requests import GenerateSIRequest
 from ..domain.spectra_config import DEFAULT_X_RANGES
 from ..domain.types import SpectrumEmbedMode
+from ..journal_profiles import DEFAULT_JOURNAL_PROFILE_ID, journal_profile_defaults
 from ..graph.graphs import build_generate_si_graph
 from ..graph.state import GenerateSIState, make_run_id
 
@@ -27,11 +28,13 @@ def output_path_from_state(state: GenerateSIState) -> Path:
 
 
 def request_from_args(args: Namespace) -> GenerateSIRequest:
+    profile_id = str(getattr(args, "journal_profile", None) or DEFAULT_JOURNAL_PROFILE_ID)
+    profile_defaults = journal_profile_defaults(profile_id)
     return GenerateSIRequest(
         input_path=Path(args.word_input),
         input_kind="word",
         output_path=Path(args.output),
-        template_docx=Path(args.template_docx) if args.template_docx else None,
+        template_docx=Path(args.template_docx) if args.template_docx else profile_defaults["template_docx"],
         references_path=Path(args.references) if args.references else None,
         spectra_source=Path(args.spectra_source) if getattr(args, "spectra_source", None) else None,
         spectra_zip=Path(args.spectra_zip) if args.spectra_zip else None,
@@ -39,8 +42,8 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
         loadings_scope_docx=Path(args.loadings_scope_docx) if getattr(args, "loadings_scope_docx", None) else None,
         mnova_exe=Path(args.mnova_exe) if args.mnova_exe else None,
         mnova_graphics_profile=Path(args.mnova_graphics_profile) if getattr(args, "mnova_graphics_profile", None) else None,
-        mnova_graphics_profile_1h=Path(args.mnova_graphics_profile_1h) if getattr(args, "mnova_graphics_profile_1h", None) else None,
-        mnova_graphics_profile_13c=Path(args.mnova_graphics_profile_13c) if getattr(args, "mnova_graphics_profile_13c", None) else None,
+        mnova_graphics_profile_1h=Path(args.mnova_graphics_profile_1h) if getattr(args, "mnova_graphics_profile_1h", None) else profile_defaults["mnova_graphics_profile_1h"],
+        mnova_graphics_profile_13c=Path(args.mnova_graphics_profile_13c) if getattr(args, "mnova_graphics_profile_13c", None) else profile_defaults["mnova_graphics_profile_13c"],
         no_extract_nmr=bool(args.no_extract_nmr),
         insert_spectra_as=_spectrum_embed_mode(getattr(args, "insert_spectra_as", "png")),
         target_signal_height_fraction=_fraction_arg(
@@ -50,8 +53,8 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
         peak_threshold_fraction=_peak_threshold_arg(getattr(args, "peak_threshold", None)),
         peak_threshold_fraction_1h=_peak_threshold_arg(getattr(args, "peak_threshold_1h", None)),
         peak_threshold_fraction_13c=_peak_threshold_arg(getattr(args, "peak_threshold_13c", None)),
-        x_range_ppm_1h=_range_arg(getattr(args, "h1_ppm_range", None), DEFAULT_X_RANGES["1H"]),
-        x_range_ppm_13c=_range_arg(getattr(args, "c13_ppm_range", None), DEFAULT_X_RANGES["13C"]),
+        x_range_ppm_1h=_range_arg(getattr(args, "h1_ppm_range", None), profile_defaults["x_range_ppm_1h"]),
+        x_range_ppm_13c=_range_arg(getattr(args, "c13_ppm_range", None), profile_defaults["x_range_ppm_13c"]),
         baseline_mode=getattr(args, "baseline_mode", "auto"),
         baseline_apply_1h=bool(getattr(args, "baseline_apply_1h", False)),
         baseline_apply_13c=not bool(getattr(args, "no_baseline_13c", False)),
@@ -65,6 +68,7 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
         only=tuple(item.strip() for item in (args.only or "").split(",") if item.strip()),
         insert_chemdraw=bool(args.insert_chemdraw),
         no_check_support=bool(args.no_check_support),
+        journal_profile_id=profile_id,
     )
 
 

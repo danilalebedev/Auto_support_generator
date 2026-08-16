@@ -11,6 +11,7 @@ from docx.document import Document as DocumentObject
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor
+from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
@@ -53,6 +54,8 @@ def render_document_from_template(
     document_model: SIDocument,
     output_path: str | Path,
     template_path: str | Path | None = None,
+    *,
+    render_options: dict | None = None,
 ) -> Path:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -69,9 +72,9 @@ def render_document_from_template(
         if section.get("id") == "compound_descriptions":
             _render_compound_blocks(output_document, segments["compound"], blocks)
         elif section.get("id") == "spectra_appendix" and blocks:
-            _render_spectrum_blocks(output_document, segments, blocks, mnova_ole_targets)
+            _render_spectrum_blocks(output_document, segments, blocks, mnova_ole_targets, render_options or {})
         elif section.get("id") == "references" and blocks:
-            _render_reference_blocks(output_document, blocks)
+            _render_reference_blocks(output_document, blocks, render_options or {})
 
     output_document.save(output_path)
     if mnova_ole_targets:
@@ -99,12 +102,16 @@ def _paragraph_has_page_break(paragraph: Paragraph) -> bool:
 
 
 def _render_compound_blocks(document: DocumentObject, template_paragraphs: list[Paragraph], blocks: list[DocumentBlock]) -> None:
+    template_uses_explicit_loadings = _template_uses_explicit_loading_fields(template_paragraphs)
     for index, block in enumerate(blocks):
         if index:
             document.add_paragraph()
         first_index = len(document.paragraphs)
         compound: Compound = block["content"]
-        values = _compound_values(compound)
+        include_preparation = not (
+            template_uses_explicit_loadings and bool(compound.reaction.get("template_values"))
+        )
+        values = _compound_values(compound, include_preparation=include_preparation)
         _render_template_paragraphs(document, template_paragraphs, values, compound=compound)
         _add_bookmark_range(document.paragraphs[first_index], document.paragraphs[-1], block.get("bookmark", ""))
 
@@ -114,11 +121,16 @@ def _render_spectrum_blocks(
     segments: dict[str, list[Paragraph]],
     blocks: list[DocumentBlock],
     mnova_ole_targets: list[MnovaOleTarget],
+    render_options: dict,
 ) -> None:
     first = True
+    spectrum_orientation = str(render_options.get("spectra", {}).get("page_orientation") or "").lower()
     for block in blocks:
         if first:
-            document.add_page_break()
+            if spectrum_orientation == "landscape":
+                _add_oriented_section(document, "landscape")
+            else:
+                document.add_page_break()
             first = False
         else:
             document.add_page_break()
@@ -139,8 +151,12 @@ def _render_spectrum_blocks(
         _add_bookmark_range(document.paragraphs[first_index], document.paragraphs[-1], block.get("bookmark", ""))
 
 
-def _render_reference_blocks(document: DocumentObject, blocks: list[DocumentBlock]) -> None:
-    document.add_page_break()
+def _render_reference_blocks(document: DocumentObject, blocks: list[DocumentBlock], render_options: dict) -> None:
+    spectrum_orientation = str(render_options.get("spectra", {}).get("page_orientation") or "").lower()
+    if spectrum_orientation == "landscape":
+        _add_oriented_section(document, "portrait")
+    else:
+        document.add_page_break()
     title = document.add_paragraph()
     title.paragraph_format.space_after = Pt(0)
     title.add_run("References").bold = True
@@ -150,6 +166,17 @@ def _render_reference_blocks(document: DocumentObject, blocks: list[DocumentBloc
         paragraph.paragraph_format.space_after = Pt(0)
         _add_bookmark_range(paragraph, paragraph, block.get("bookmark", ""))
         paragraph.add_run(format_reference(content["reference"], int(content["index"])))
+
+
+def _add_oriented_section(document: DocumentObject, orientation: str) -> None:
+    section = document.add_section(WD_SECTION.NEW_PAGE)
+    wants_landscape = orientation == "landscape"
+    section.orientation = WD_ORIENT.LANDSCAPE if wants_landscape else WD_ORIENT.PORTRAIT
+    width, height = section.page_width, section.page_height
+    if wants_landscape and width < height:
+        section.page_width, section.page_height = height, width
+    elif not wants_landscape and width > height:
+        section.page_width, section.page_height = height, width
 
 
 def _render_template_paragraphs(
@@ -615,7 +642,7 @@ def _should_skip_paragraph(text: str, values: dict[str, str]) -> bool:
         return True
     if "reaction.loadings" in keys and not values.get("reaction.loadings"):
         return True
-    if _has_loadings_placeholders(keys) and not values.get("product.number"):
+    if _has_reagent_loading_placeholders(keys) and not values.get("reaction.template.values.available"):
         return True
     if ("compound.support_warning" in keys or "product.support.warning" in keys) and not values.get("product.support.warning"):
         return True
@@ -626,7 +653,7 @@ def _emu_to_pt(value: int) -> float:
     return float(value) / 12700
 
 
-def _compound_values(compound: Compound) -> dict[str, str]:
+def _compound_values(compound: Compound, *, include_preparation: bool = True) -> dict[str, str]:
     loadings_values = {str(key): str(value) for key, value in compound.reaction.get("template_values", {}).items()}
     product_values = _product_values(compound)
     values = {
@@ -637,11 +664,12 @@ def _compound_values(compound: Compound) -> dict[str, str]:
         "product.name": compound.name,
         "product.number": compound.number,
         "product.structure": f"[[STRUCTURE:{compound.number}]]",
-        "compound.preparation": "" if loadings_values else _summary_text(compound),
-        "product.preparation": "" if loadings_values else _summary_text(compound),
+        "compound.preparation": _summary_text(compound) if include_preparation else "",
+        "product.preparation": _summary_text(compound) if include_preparation else "",
         "compound.support_warning": f"(Support check: {compound.nmr_check_warning})" if compound.nmr_check_warning else "",
         "product.support.warning": f"(Support check: {compound.nmr_check_warning})" if compound.nmr_check_warning else "",
         "reaction.loadings": _reaction_loadings_text(compound),
+        "reaction.template.values.available": "1" if loadings_values else "",
         "nmr.1h.label": _nmr_label_from_text(compound.h1_nmr, "1H NMR"),
         "nmr.1h.conditions": compound.h1_conditions,
         "nmr.1h.peaks": _nmr_peaks_text(compound.h1_nmr),
@@ -907,6 +935,36 @@ def _has_loadings_placeholders(keys: set[str]) -> bool:
         re.match(r"^[a-z0-9]+(?:_[a-z0-9]+)?\.(?:name|mg|g|kg|mmol|mol|mcl|ml|l|eq)$", key)
         for key in keys
     )
+
+
+def _has_reagent_loading_placeholders(keys: set[str]) -> bool:
+    if any(key.startswith(("reagent.", "solvent.")) for key in keys):
+        return True
+    excluded_roots = {"product", "compound", "nmr", "hrms", "anal", "ir", "reaction"}
+    return any(
+        key.split(".", 1)[0] not in excluded_roots
+        and re.match(r"^[a-z0-9]+(?:_[a-z0-9]+)?\.(?:name|mg|g|kg|mmol|mol|mcl|ml|l|eq)$", key)
+        for key in keys
+    )
+
+
+def _template_uses_explicit_loading_fields(paragraphs: list[Paragraph]) -> bool:
+    generic_product_keys = {
+        "product.name",
+        "product.number",
+        "product.structure",
+        "product.preparation",
+        "product.support.warning",
+    }
+    for paragraph in paragraphs:
+        keys = {
+            key
+            for key in _placeholder_keys(paragraph.text)
+            if key not in generic_product_keys and not key.startswith("product.nmr.")
+        }
+        if _has_reagent_loading_placeholders(keys):
+            return True
+    return False
 
 
 def _add_bookmark_range(start_paragraph: Paragraph, end_paragraph: Paragraph, name: str) -> None:

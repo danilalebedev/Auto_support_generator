@@ -72,7 +72,7 @@ def discover_loadings_workflow(base_dir: str | Path) -> LoadingsWorkflowPaths | 
         schema = _find_docx(directory, "Reaction_schema.docx")
         scope = _find_docx(directory, "Scope.docx")
         if schema and scope:
-            return LoadingsWorkflowPaths(schema, scope)
+            return LoadingsWorkflowPaths(schema, scope, _find_docx(directory, "SI_template.docx"))
     return None
 
 
@@ -628,7 +628,18 @@ def _paragraph_has_loadings_placeholders(text: str) -> bool:
 
 
 def _is_named_loading_alias(key: str) -> bool:
-    if key.split(".", 1)[0] in {"product", "reagent", "solvent"}:
+    if key.split(".", 1)[0] in {
+        "product",
+        "compound",
+        "reagent",
+        "solvent",
+        "nmr",
+        "hrms",
+        "anal",
+        "ir",
+        "spectrum",
+        "reaction",
+    }:
         return False
     return bool(re.match(r"^[a-z0-9]+(?:\.[a-z0-9]+)?\.(?:name|mg|g|kg|mmol|mol|mcl|ml|l|eq)$", key))
 

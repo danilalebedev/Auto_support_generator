@@ -14,11 +14,13 @@ def build_document(
     output_path: str | Path,
     template_path: str | Path | None = None,
     reference_store: ReferenceStore | None = None,
+    render_options: dict | None = None,
 ) -> Path:
     return build_document_from_model(
         build_si_document_model(compounds, reference_store=reference_store),
         output_path,
         template_path=template_path,
+        render_options=render_options,
     )
 
 
@@ -26,5 +28,6 @@ def build_document_from_model(
     document_model: SIDocument,
     output_path: str | Path,
     template_path: str | Path | None = None,
+    render_options: dict | None = None,
 ) -> Path:
-    return render_document_from_template(document_model, output_path, template_path)
+    return render_document_from_template(document_model, output_path, template_path, render_options=render_options)

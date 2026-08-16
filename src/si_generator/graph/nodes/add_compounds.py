@@ -249,6 +249,7 @@ def generate_new_support_node(state: AddCompoundsState) -> dict:
         generate_loadings=bool(method_config.get("generate_loadings", False)),
         calculate_elemental_analysis=bool(method_config.get("calculate_elemental_analysis", False)),
         no_check_support=bool(method_config.get("no_check_support", False)),
+        journal_profile_id=str(method_config.get("journal_profile_id") or "organic.default"),
     )
 
     from ...workflows.generate_si import output_path_from_state, run_generate_si
@@ -457,6 +458,7 @@ def _method_config_from_request(request) -> dict[str, Any]:
     return {
         "version": 1,
         "source": "request",
+        "journal_profile_id": request.journal_profile_id or "organic.default",
         "template_docx": request.template_docx,
         "references_path": request.references_path,
         "loadings_schema_docx": request.loadings_schema_docx,
@@ -489,6 +491,8 @@ def _method_config_from_request(request) -> dict[str, Any]:
 def _overlay_request_method_config(config: dict[str, Any], request) -> None:
     request_config = _method_config_from_request(request)
     config["source"] = "manifest+request"
+    if request.journal_profile_id:
+        config["journal_profile_id"] = request.journal_profile_id
     for key in (
         "template_docx",
         "references_path",
@@ -520,6 +524,7 @@ def _method_config_from_manifest(
     config = {
         "version": _int_value(run_config.get("version"), 1),
         "source": "manifest",
+        "journal_profile_id": str(run_config.get("journal_profile_id") or manifest.get("journal_profile", {}).get("id") or "organic.default"),
         "mnova_exe": None,
         "no_extract_nmr": bool(run_config.get("no_extract_nmr", False)),
         "insert_spectra_as": _spectrum_embed_mode(run_config.get("insert_spectra_as", "png")),

@@ -28,4 +28,5 @@ def patch_request_from_args(args: Namespace) -> PatchSIRequest:
         support_docx=Path(args.support_docx) if getattr(args, "support_docx", None) else None,
         output_folder=Path(args.patch_output_folder) if getattr(args, "patch_output_folder", None) else None,
         strict_artifacts=not bool(getattr(args, "no_strict_artifacts", False)),
+        journal_profile_id=getattr(args, "reformat_journal", None) or None,
     )

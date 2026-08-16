@@ -9,6 +9,7 @@ from ...docx_builder import build_document_from_model
 from ...output_layout import support_docx_path
 from ...render.document_model import build_si_document_model
 from ...word_input import paste_word_structures
+from ...journal_profiles import get_journal_profile
 
 
 def build_document_model_node(state: GenerateSIState) -> dict:
@@ -23,6 +24,7 @@ def render_docx_node(state: GenerateSIState) -> dict:
         document_model,
         target_path,
         template_path=request.template_docx,
+        render_options=get_journal_profile(request.journal_profile_id).data,
     )
     artifacts = {**state.get("artifacts", {}), "support_docx": str(output_path)}
     return {"output_path": output_path, "artifacts": artifacts}

@@ -1,0 +1,311 @@
+{
+  "catalog_version": "2026.08",
+  "checked_date": "2026-08-05",
+  "profiles": {
+    "organic.default": {
+      "label": "General Organic SI",
+      "publisher": "General",
+      "visible": true,
+      "document": {
+        "template_docx": "organic.default.docx",
+        "visual_style_status": "house_default",
+        "font_name": "Times New Roman",
+        "font_size_pt": 12,
+        "margins_cm": [2.5, 2.5, 2.5, 2.5]
+      },
+      "spectra": {
+        "mngp_1h": "classic_1H.mngp",
+        "mngp_13c": "classic_13C.mngp",
+        "x_range_ppm_1h": [-1.0, 12.0],
+        "x_range_ppm_13c": [-10.0, 210.0],
+        "insert_spectra_as": "png",
+        "target_signal_height_fraction": 0.8,
+        "one_spectrum_per_page": true
+      },
+      "validation": {
+        "required_nuclei": ["1H", "13C"],
+        "formula_evidence": {"any_of": ["HRMS", "elemental_analysis"], "enforcement": "recommended"},
+        "hrms_counts_as_purity": false,
+        "enforcement": "preflight_warning"
+      },
+      "packaging": {"spectra_output": "main_si_appendix"},
+      "source_urls": []
+    },
+    "acs.base": {
+      "inherits": "organic.default",
+      "label": "ACS base",
+      "publisher": "ACS Publications",
+      "visible": false,
+      "document": {
+        "template_docx": "acs.base.docx",
+        "font_name": "Arial",
+        "font_size_pt": 10.5,
+        "margins_cm": [2.54, 2.54, 2.54, 2.54]
+      },
+      "spectra": {
+        "x_range_ppm_1h": [-1.0, 10.0],
+        "x_range_ppm_13c": [-10.0, 200.0]
+      },
+      "validation": {
+        "elemental_analysis_tolerance_percent": 0.4,
+        "nmr_shift_decimals": {"1H": 2, "13C": 1}
+      },
+      "source_urls": [
+        "https://researcher-resources.acs.org/publish/data_guidelines",
+        "https://pubsapp.acs.org/paragonplus/submission/acs_nmr_guidelines.pdf"
+      ]
+    },
+    "acs.joc": {
+      "inherits": "acs.base",
+      "label": "ACS - The Journal of Organic Chemistry (JOC)",
+      "visible": true,
+      "document": {"template_docx": "acs.joc.docx"},
+      "validation": {
+        "formula_evidence": {"any_of": ["HRMS", "elemental_analysis"], "enforcement": "required_for_new_compounds"},
+        "purity_min_percent_for_bioassay": 95,
+        "hrms_tolerance_absolute_da_below_1000": 0.003,
+        "require_melting_point_for_crystalline": true
+      },
+      "source_urls": ["https://researcher-resources.acs.org/publish/author_guidelines?coden=joceah"]
+    },
+    "acs.orglett": {
+      "inherits": "acs.base",
+      "label": "ACS - Organic Letters (Org. Lett.)",
+      "visible": true,
+      "document": {"template_docx": "acs.orglett.docx"},
+      "validation": {
+        "formula_evidence": {"any_of": ["HRMS", "elemental_analysis"], "enforcement": "required_for_new_compounds"},
+        "hrms_tolerance_ppm": 5,
+        "require_melting_point_for_crystalline": true,
+        "require_important_ir": true
+      },
+      "source_urls": ["https://researcher-resources.acs.org/publish/author_guidelines?coden=orlef7"]
+    },
+    "acs.jmedchem": {
+      "inherits": "acs.base",
+      "label": "ACS - Journal of Medicinal Chemistry",
+      "visible": true,
+      "document": {"template_docx": "acs.jmedchem.docx"},
+      "validation": {
+        "purity_min_percent": 95,
+        "purity_evidence": ["HPLC", "elemental_analysis", "qNMR"],
+        "hplc_traces_for_in_vivo": "required"
+      },
+      "source_urls": ["https://researcher-resources.acs.org/publish/author_guidelines?coden=jmcmar"]
+    },
+    "acs.jacs": {
+      "inherits": "acs.base",
+      "label": "ACS - Journal of the American Chemical Society",
+      "visible": true,
+      "document": {"template_docx": "acs.jacs.docx"},
+      "source_urls": ["https://researcher-resources.acs.org/publish/author_guidelines?coden=jacsat"]
+    },
+    "rsc.base": {
+      "inherits": "organic.default",
+      "label": "RSC base",
+      "publisher": "Royal Society of Chemistry",
+      "visible": false,
+      "document": {
+        "template_docx": "rsc.base.docx",
+        "font_name": "Arial",
+        "font_size_pt": 10,
+        "margins_cm": [2.0, 2.0, 2.0, 2.0]
+      },
+      "spectra": {"x_range_ppm_1h": [-1.0, 10.0], "x_range_ppm_13c": [-10.0, 200.0]},
+      "validation": {
+        "formula_evidence": {"any_of": ["elemental_analysis", "HRMS_with_purity_evidence"], "enforcement": "recommended"},
+        "hrms_counts_as_purity": false
+      },
+      "source_urls": ["https://www.rsc.org/publishing/publish-with-us/publish-a-journal-article/experimental-reporting"]
+    },
+    "rsc.organic": {
+      "inherits": "rsc.base",
+      "label": "RSC - Organic Chemistry",
+      "visible": true,
+      "document": {"template_docx": "rsc.organic.docx"}
+    },
+    "wiley.base": {
+      "inherits": "organic.default",
+      "label": "Wiley chemistry base",
+      "publisher": "Wiley",
+      "visible": false,
+      "document": {
+        "template_docx": "wiley.base.docx",
+        "font_name": "Arial",
+        "font_size_pt": 10,
+        "margins_cm": [2.0, 2.0, 2.0, 2.0]
+      },
+      "spectra": {"x_range_ppm_1h": [-1.0, 10.0], "x_range_ppm_13c": [-10.0, 200.0]},
+      "validation": {
+        "required_nuclei_by_element": {"F": ["19F"], "P": ["31P"], "Si": ["29Si"]},
+        "require_compound_number_and_structure_on_spectrum": true
+      }
+    },
+    "wiley.chemistry_europe": {
+      "inherits": "wiley.base",
+      "label": "Wiley - Chemistry Europe / EurJOC",
+      "visible": true,
+      "document": {"template_docx": "wiley.chemistry_europe.docx"},
+      "source_urls": ["https://chemistry-europe.onlinelibrary.wiley.com/hub/journal/15213765/notice-to-authors"]
+    },
+    "wiley.angew": {
+      "inherits": "wiley.base",
+      "label": "Wiley - Angewandte Chemie",
+      "visible": true,
+      "document": {"template_docx": "wiley.angew.docx"},
+      "source_urls": ["https://onlinelibrary.wiley.com/page/journal/15213773/homepage/notice-to-authors"]
+    },
+    "wiley.arch_pharm": {
+      "inherits": "wiley.base",
+      "label": "Wiley - Archiv der Pharmazie",
+      "visible": true,
+      "document": {"template_docx": "wiley.arch_pharm.docx"},
+      "validation": {
+        "purity_min_percent": 95,
+        "purity_evidence": ["HPLC", "UPLC", "elemental_analysis", "qNMR"]
+      },
+      "source_urls": ["https://onlinelibrary.wiley.com/pb-assets/assets/15214184/ArchPharm-Author-Guidelines-February-2024-1708440550533.pdf"]
+    },
+    "elsevier.base": {
+      "inherits": "organic.default",
+      "label": "Elsevier chemistry base",
+      "publisher": "Elsevier",
+      "visible": false,
+      "document": {
+        "template_docx": "elsevier.base.docx",
+        "font_name": "Times New Roman",
+        "font_size_pt": 11,
+        "margins_cm": [2.5, 2.5, 2.5, 2.5]
+      },
+      "spectra": {"x_range_ppm_1h": [-1.0, 11.0], "x_range_ppm_13c": [-10.0, 210.0]},
+      "validation": {"require_compound_number_and_structure_on_spectrum": true}
+    },
+    "elsevier.tetrahedron": {
+      "inherits": "elsevier.base",
+      "label": "Elsevier - Tetrahedron",
+      "visible": true,
+      "document": {"template_docx": "elsevier.tetrahedron.docx"},
+      "validation": {"require_ir_when_indicative": true, "require_melting_point_when_applicable": true},
+      "source_urls": ["https://www.sciencedirect.com/journal/tetrahedron/publish/guide-for-authors"]
+    },
+    "elsevier.tetrahedron_letters": {
+      "inherits": "elsevier.base",
+      "label": "Elsevier - Tetrahedron Letters",
+      "visible": true,
+      "document": {"template_docx": "elsevier.tetrahedron_letters.docx"},
+      "source_urls": ["https://www.sciencedirect.com/journal/tetrahedron-letters/publish/guide-for-authors"]
+    },
+    "elsevier.eurjmedchem": {
+      "inherits": "elsevier.base",
+      "label": "Elsevier - European Journal of Medicinal Chemistry",
+      "visible": true,
+      "document": {"template_docx": "elsevier.eurjmedchem.docx"},
+      "validation": {"purity_min_percent": 95, "purity_evidence": ["HPLC", "UPLC", "elemental_analysis", "qNMR"]},
+      "source_urls": ["https://www.sciencedirect.com/journal/european-journal-of-medicinal-chemistry/publish/guide-for-authors"]
+    },
+    "elsevier.bioorganic_medicinal_chemistry": {
+      "inherits": "elsevier.base",
+      "label": "Elsevier - Bioorganic & Medicinal Chemistry",
+      "visible": true,
+      "document": {"template_docx": "elsevier.bioorganic_medicinal_chemistry.docx"},
+      "validation": {"purity_min_percent": 95, "purity_evidence": ["HPLC", "UPLC", "elemental_analysis", "qNMR"]},
+      "source_urls": ["https://www.sciencedirect.com/journal/bioorganic-and-medicinal-chemistry/publish/guide-for-authors"]
+    },
+    "nature.base": {
+      "inherits": "organic.default",
+      "label": "Nature Portfolio chemistry base",
+      "publisher": "Nature Portfolio",
+      "visible": false,
+      "document": {
+        "template_docx": "nature.base.docx",
+        "font_name": "Arial",
+        "font_size_pt": 10,
+        "margins_cm": [2.0, 2.0, 2.0, 2.0]
+      },
+      "spectra": {"x_range_ppm_1h": [-1.0, 10.0], "x_range_ppm_13c": [-10.0, 200.0]},
+      "validation": {
+        "elemental_analysis_tolerance_percent": 0.4,
+        "formula_evidence": {"any_of": ["HRMS", "elemental_analysis"], "enforcement": "required_for_new_compounds"},
+        "hrms_counts_as_purity": false
+      },
+      "source_urls": ["https://www.nature.com/documents/nature_chemical_characterization_guidelines.pdf"]
+    },
+    "nature.commschem": {
+      "inherits": "nature.base",
+      "label": "Nature - Communications Chemistry",
+      "visible": true,
+      "document": {"template_docx": "nature.commschem.docx", "page_size": "A4"},
+      "spectra": {
+        "x_range_ppm_1h": [-1.0, 10.0],
+        "x_range_ppm_13c": [-10.0, 200.0],
+        "one_spectrum_per_page": true,
+        "page_orientation": "landscape"
+      },
+      "validation": {
+        "required_nuclei_by_element": {"F": ["19F"], "P": ["31P"]},
+        "hrms_tolerance_absolute_da_below_1000": 0.003,
+        "hrms_tolerance_ppm_at_or_above_1000": 1,
+        "require_all_1h_integrals": true,
+        "require_all_peak_labels": true
+      },
+      "packaging": {"spectra_output": "separate_supplementary_data"},
+      "source_urls": ["https://www.nature.com/commschem/submit/submission-guidelines"]
+    },
+    "nature.chemistry": {
+      "inherits": "nature.base",
+      "label": "Nature - Nature Chemistry",
+      "visible": true,
+      "document": {"template_docx": "nature.chemistry.docx"},
+      "source_urls": ["https://www.nature.com/nchem/submission-guidelines"]
+    },
+    "mdpi.molecules": {
+      "inherits": "organic.default",
+      "label": "MDPI - Molecules",
+      "publisher": "MDPI",
+      "visible": true,
+      "document": {
+        "template_docx": "mdpi.molecules.docx",
+        "font_name": "Times New Roman",
+        "font_size_pt": 10,
+        "margins_cm": [2.5, 2.5, 2.5, 2.5]
+      },
+      "validation": {
+        "formula_evidence": {"any_of": ["HRMS", "elemental_analysis"], "enforcement": "required_for_new_compounds"},
+        "purity_min_percent_for_bioactivity": 95
+      },
+      "source_urls": ["https://www.mdpi.com/journal/molecules/instructions"]
+    },
+    "beilstein.bjoc": {
+      "inherits": "organic.default",
+      "label": "Beilstein - BJOC",
+      "publisher": "Beilstein-Institut",
+      "visible": true,
+      "document": {
+        "template_docx": "beilstein.bjoc.docx",
+        "font_name": "Arial",
+        "font_size_pt": 10,
+        "margins_cm": [2.5, 2.5, 2.5, 2.5]
+      },
+      "validation": {"require_identity_and_purity_evidence": true},
+      "source_urls": ["https://www.beilstein-journals.org/bjoc/authorInstructions"]
+    },
+    "springer.chemical_papers": {
+      "inherits": "organic.default",
+      "label": "Springer - Chemical Papers",
+      "publisher": "Springer Nature",
+      "visible": true,
+      "document": {
+        "template_docx": "springer.chemical_papers.docx",
+        "font_name": "Times New Roman",
+        "font_size_pt": 10,
+        "margins_cm": [2.5, 2.5, 2.5, 2.5]
+      },
+      "validation": {
+        "formula_evidence": {"any_of": ["HRMS", "elemental_analysis"], "enforcement": "required_for_new_compounds"},
+        "require_melting_point_when_applicable": true,
+        "require_rf_when_applicable": true
+      },
+      "source_urls": ["https://link.springer.com/journal/11696/submission-guidelines"]
+    }
+  }
+}

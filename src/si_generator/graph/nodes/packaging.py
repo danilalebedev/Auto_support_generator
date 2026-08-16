@@ -63,6 +63,7 @@ def build_manifest(state: GenerateSIState) -> dict:
             "runtime": state.get("runtime_config", {}),
         },
         "run_config": _run_config(request, artifacts, output_root),
+        "journal_profile": state.get("journal_profile", {}),
         "artifacts": artifacts,
         "order": order,
         "compounds": {},
@@ -117,6 +118,7 @@ def build_run_summary(state: GenerateSIState, manifest: dict | None = None) -> d
         "relative_paths": manifest.get("relative_paths", {}),
         "configs": manifest.get("configs", {}),
         "run_config": manifest.get("run_config", {}),
+        "journal_profile": manifest.get("journal_profile", {}),
         "compounds": [
             {
                 "id": compound_id,
@@ -235,6 +237,7 @@ def _compound_artifacts(compound) -> dict[str, str]:
 def _run_config(request, artifacts: dict[str, str], output_root: Path) -> dict:
     return {
         "version": 1,
+        "journal_profile_id": request.journal_profile_id,
         "input_kind": request.input_kind,
         "template_docx": _artifact_or_request_path("template_docx_copy", request.template_docx, artifacts, output_root),
         "references_path": _artifact_or_request_path("references_copy", request.references_path, artifacts, output_root),

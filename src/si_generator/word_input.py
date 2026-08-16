@@ -19,6 +19,7 @@ from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
 
 from .domain.massspec import extract_mz_text
+from .domain.bookmarks import bookmark_name_for_block_id
 from .domain.references import parse_reference_keys
 from .domain.reactions import reaction_from_fields
 from .domain.compound import Compound
@@ -231,6 +232,31 @@ def paste_word_structures(
         appendix_top_offset_pt=appendix_top_offset_pt,
     )
     trace_word_ole_event(output_docx, "word_structures.package_insert.end", input_docx=input_docx, output_docx=output_docx)
+
+
+def paste_support_structures(
+    source_support_docx: str | Path,
+    output_docx: str | Path,
+    compounds: list[Compound],
+    *,
+    main_top_offset_pt: float = 12,
+    appendix_top_offset_pt: float = 0,
+) -> int:
+    """Copy ChemDraw OLE structures from bookmarked blocks in an existing generated SI."""
+    source_path = Path(source_support_docx)
+    target_path = Path(output_docx)
+    source_objects = _source_support_structure_objects(source_path, compounds)
+    if not source_objects:
+        return 0
+    _paste_structure_objects_in_package(
+        source_path,
+        target_path,
+        compounds,
+        source_objects,
+        main_top_offset_pt=main_top_offset_pt,
+        appendix_top_offset_pt=appendix_top_offset_pt,
+    )
+    return len(source_objects)
 
 
 def _paste_word_structures_with_word(input_docx: str | Path, output_docx: str | Path, compounds: list[Compound]) -> None:
@@ -512,6 +538,26 @@ def _paste_word_structures_in_package(
     if not source_objects:
         return
 
+    _paste_structure_objects_in_package(
+        input_docx,
+        output_docx,
+        compounds,
+        source_objects,
+        main_top_offset_pt=main_top_offset_pt,
+        appendix_top_offset_pt=appendix_top_offset_pt,
+    )
+
+
+def _paste_structure_objects_in_package(
+    input_docx: Path,
+    output_docx: Path,
+    compounds: list[Compound],
+    source_objects: dict[str, dict],
+    *,
+    main_top_offset_pt: float,
+    appendix_top_offset_pt: float,
+) -> None:
+
     compound_numbers = [compound.number for compound in compounds]
     fd, tmp_name = mkstemp(suffix=".docx")
     os.close(fd)
@@ -647,6 +693,66 @@ def _source_structure_objects(input_docx: Path) -> dict[str, dict]:
                 "height": height,
             }
         return objects
+
+
+def _source_support_structure_objects(input_docx: Path, compounds: list[Compound]) -> dict[str, dict]:
+    with zipfile.ZipFile(input_docx, "r") as archive:
+        document = ET.fromstring(archive.read("word/document.xml"))
+        rels = _rels_map(archive.read("word/_rels/document.xml.rels"))
+        body = document.find("w:body", NS)
+        if body is None:
+            return {}
+        children = list(body)
+        name_attr = f"{{{NS['w']}}}name"
+        id_attr = f"{{{NS['w']}}}id"
+        starts: dict[str, tuple[int, str]] = {}
+        for index, child in enumerate(children):
+            for bookmark in child.findall(".//w:bookmarkStart", NS):
+                name = str(bookmark.attrib.get(name_attr) or "")
+                bookmark_id = str(bookmark.attrib.get(id_attr) or "")
+                if name:
+                    starts[name] = (index, bookmark_id)
+
+        objects: dict[str, dict] = {}
+        for compound in compounds:
+            bookmark_name = bookmark_name_for_block_id(f"compound:{compound.id or compound.number}")
+            start = starts.get(bookmark_name)
+            if start is None:
+                continue
+            start_index, bookmark_id = start
+            for child in children[start_index:]:
+                object_xml = child.find(".//w:object", NS)
+                descriptor = _structure_object_descriptor(object_xml, rels)
+                if descriptor:
+                    objects[compound.number] = descriptor
+                    break
+                if any(str(end.attrib.get(id_attr) or "") == bookmark_id for end in child.findall(".//w:bookmarkEnd", NS)):
+                    break
+        return objects
+
+
+def _structure_object_descriptor(object_xml, rels: dict[str, str]) -> dict | None:
+    if object_xml is None:
+        return None
+    image_rel = object_xml.find(".//v:imagedata", NS)
+    ole_rel = object_xml.find(".//o:OLEObject", NS)
+    if image_rel is None or ole_rel is None:
+        return None
+    prog_id = str(ole_rel.attrib.get("ProgID") or "")
+    if "ChemDraw" not in prog_id and "ChemSketch" not in prog_id:
+        return None
+    image_target = rels.get(image_rel.attrib.get(f"{{{NS['r']}}}id", ""))
+    ole_target = rels.get(ole_rel.attrib.get(f"{{{NS['r']}}}id", ""))
+    if not image_target or not ole_target:
+        return None
+    width, height = _object_size(object_xml)
+    return {
+        "object": object_xml,
+        "image_target": image_target,
+        "ole_target": ole_target,
+        "width": width,
+        "height": height,
+    }
 
 
 def _rels_map(data: bytes) -> dict[str, str]:
