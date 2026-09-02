@@ -417,7 +417,14 @@ class SIGeneratorApp:
         files = ttk.LabelFrame(parent, text="Optional inputs", padding=12, style="Card.TLabelframe")
         files.grid(row=row, column=0, sticky="ew", pady=(10, 0))
         files.columnconfigure(1, weight=1)
-        self._file_row(files, 0, "SI template .docx", self.template_docx, lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
+        self._si_template_widgets = self._file_row(
+            files,
+            0,
+            "SI template .docx",
+            self.template_docx,
+            lambda: self._browse_file(self.template_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
+            optional=True,
+        )
         self._file_row(
             files,
             1,
@@ -1192,14 +1199,15 @@ class SIGeneratorApp:
         if not hasattr(self, "_separate_input_widgets"):
             return
         all_in_one = self.input_mode.get() == "all_in_one"
-        self._set_grid_widgets_visible(self._journal_profile_widgets, not all_in_one)
+        self._set_grid_widgets_visible(self._journal_profile_widgets, True)
         self._set_grid_widgets_visible(self._separate_input_widgets, not all_in_one)
         self._set_grid_widgets_visible(self._unified_input_widgets, all_in_one)
-        for frame in (self._optional_inputs_frame, self._loadings_frame):
-            if all_in_one:
-                frame.grid_remove()
-            else:
-                frame.grid()
+        self._optional_inputs_frame.grid()
+        self._set_grid_widgets_visible(self._si_template_widgets, not all_in_one)
+        if all_in_one:
+            self._loadings_frame.grid_remove()
+        else:
+            self._loadings_frame.grid()
 
     @staticmethod
     def _set_grid_widgets_visible(widgets, visible: bool) -> None:
