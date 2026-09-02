@@ -200,6 +200,8 @@ class SIGeneratorApp:
         self._configure_style()
         self._load_logo_assets()
         self._build_ui()
+        self._input_mode_trace = self.input_mode.trace_add("write", self._on_input_mode_changed)
+        self._refresh_generate_input_mode()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._poll_log_queue()
 
@@ -371,7 +373,8 @@ class SIGeneratorApp:
         simple = ttk.LabelFrame(content, text="Simple", padding=12, style="Card.TLabelframe")
         simple.grid(row=0, column=0, sticky="ew")
         simple.columnconfigure(1, weight=1)
-        ttk.Label(simple, text="Publication preset").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        profile_label = ttk.Label(simple, text="Publication preset")
+        profile_label.grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
         profile_combo = ttk.Combobox(
             simple,
             textvariable=self.journal_profile_label,
@@ -380,7 +383,9 @@ class SIGeneratorApp:
         )
         profile_combo.grid(row=0, column=1, sticky="ew", pady=4)
         profile_combo.bind("<<ComboboxSelected>>", lambda _event: self._apply_journal_profile())
-        ttk.Button(simple, text="Apply", command=self._apply_journal_profile).grid(row=0, column=2, sticky="e", padx=(8, 0), pady=4)
+        profile_apply = ttk.Button(simple, text="Apply", command=self._apply_journal_profile)
+        profile_apply.grid(row=0, column=2, sticky="e", padx=(8, 0), pady=4)
+        self._journal_profile_widgets = (profile_label, profile_combo, profile_apply)
         ttk.Label(simple, text="Input format").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=4)
         input_modes = ttk.Frame(simple)
         input_modes.grid(row=1, column=1, columnspan=2, sticky="w", pady=4)
@@ -391,13 +396,13 @@ class SIGeneratorApp:
             variable=self.input_mode,
             value="all_in_one",
         ).pack(side="left", padx=(16, 0))
-        self._file_row(simple, 2, "Compound table (separate mode)", self.input_path, self._browse_input)
-        self._file_row(simple, 3, "All-in-one input (single-file mode)", self.unified_input_docx, self._browse_unified_input)
+        self._separate_input_widgets = self._file_row(simple, 2, "Compound table", self.input_path, self._browse_input)
+        self._unified_input_widgets = self._file_row(simple, 3, "All-in-one input", self.unified_input_docx, self._browse_unified_input)
         self._source_row(simple, 4, "Spectra source", self.spectra_source, self._browse_spectra_source, self._browse_spectra_folder)
         self._folder_row(simple, 5, "Output folder", self.output_folder, self._browse_output_folder)
 
-        self._build_optional_inputs_block(content, 1)
-        self._build_loadings_block(content, 2)
+        self._optional_inputs_frame = self._build_optional_inputs_block(content, 1)
+        self._loadings_frame = self._build_loadings_block(content, 2)
 
         results = ttk.LabelFrame(content, text="Results", padding=12, style="Card.TLabelframe")
         results.grid(row=3, column=0, sticky="ew", pady=(10, 0))
@@ -408,7 +413,7 @@ class SIGeneratorApp:
         self._result_row(results, 3, "Report", self.result_report, lambda: self._open_result_path(self.result_report, "Report"), "Open report")
         ttk.Label(results, textvariable=self.result_overview, style="Muted.TLabel").grid(row=4, column=0, columnspan=3, sticky="ew", pady=(6, 0))
 
-    def _build_optional_inputs_block(self, parent: ttk.Frame, row: int) -> None:
+    def _build_optional_inputs_block(self, parent: ttk.Frame, row: int) -> ttk.LabelFrame:
         files = ttk.LabelFrame(parent, text="Optional inputs", padding=12, style="Card.TLabelframe")
         files.grid(row=row, column=0, sticky="ew", pady=(10, 0))
         files.columnconfigure(1, weight=1)
@@ -444,8 +449,9 @@ class SIGeneratorApp:
             ),
             optional=True,
         )
+        return files
 
-    def _build_loadings_block(self, parent: ttk.Frame, row: int) -> None:
+    def _build_loadings_block(self, parent: ttk.Frame, row: int) -> ttk.LabelFrame:
         loadings = ttk.LabelFrame(parent, text="Reagent Loadings", padding=12, style="Card.TLabelframe")
         loadings.grid(row=row, column=0, sticky="ew", pady=(10, 0))
         loadings.columnconfigure(1, weight=1)
@@ -470,6 +476,7 @@ class SIGeneratorApp:
             lambda: self._browse_file(self.loadings_scope_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
             optional=True,
         )
+        return loadings
 
     def _build_advanced_page(self, parent: ttk.Frame) -> None:
         page = self._make_page(parent, "advanced")
@@ -1145,28 +1152,62 @@ class SIGeneratorApp:
             self._theme_switch.set_theme(theme)
             self._theme_switch.set_mode(self.theme_mode.get())
 
-    def _source_row(self, parent, row: int, label: str, variable: StringVar, file_command, folder_command, optional: bool = False) -> None:
-        ttk.Label(parent, text=f"{label}{' (optional)' if optional else ''}").grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(parent, textvariable=variable).grid(row=row, column=1, sticky="ew", pady=4)
+    def _source_row(self, parent, row: int, label: str, variable: StringVar, file_command, folder_command, optional: bool = False):
+        field_label = ttk.Label(parent, text=f"{label}{' (optional)' if optional else ''}")
+        field_label.grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
+        entry = ttk.Entry(parent, textvariable=variable)
+        entry.grid(row=row, column=1, sticky="ew", pady=4)
         button_box = ttk.Frame(parent)
         button_box.grid(row=row, column=2, sticky="e", padx=(8, 0), pady=4)
         ttk.Button(button_box, text="Zip...", command=file_command).pack(side="left", padx=(0, 6))
         ttk.Button(button_box, text="Folder...", command=folder_command).pack(side="left")
+        return field_label, entry, button_box
 
-    def _file_row(self, parent, row: int, label: str, variable: StringVar, command, optional: bool = False, extra_button=None) -> None:
-        ttk.Label(parent, text=f"{label}{' (optional)' if optional else ''}").grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(parent, textvariable=variable).grid(row=row, column=1, sticky="ew", pady=4)
+    def _file_row(self, parent, row: int, label: str, variable: StringVar, command, optional: bool = False, extra_button=None):
+        field_label = ttk.Label(parent, text=f"{label}{' (optional)' if optional else ''}")
+        field_label.grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
+        entry = ttk.Entry(parent, textvariable=variable)
+        entry.grid(row=row, column=1, sticky="ew", pady=4)
         button_box = ttk.Frame(parent)
         button_box.grid(row=row, column=2, sticky="e", padx=(8, 0), pady=4)
         if extra_button:
             text, extra_command = extra_button
             ttk.Button(button_box, text=text, command=extra_command).pack(side="left", padx=(0, 6))
         ttk.Button(button_box, text="Browse...", command=command).pack(side="left")
+        return field_label, entry, button_box
 
-    def _folder_row(self, parent, row: int, label: str, variable: StringVar, command, optional: bool = False) -> None:
-        ttk.Label(parent, text=f"{label}{' (optional)' if optional else ''}").grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(parent, textvariable=variable).grid(row=row, column=1, sticky="ew", pady=4)
-        ttk.Button(parent, text="Browse...", command=command).grid(row=row, column=2, sticky="e", padx=(8, 0), pady=4)
+    def _folder_row(self, parent, row: int, label: str, variable: StringVar, command, optional: bool = False):
+        field_label = ttk.Label(parent, text=f"{label}{' (optional)' if optional else ''}")
+        field_label.grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
+        entry = ttk.Entry(parent, textvariable=variable)
+        entry.grid(row=row, column=1, sticky="ew", pady=4)
+        button = ttk.Button(parent, text="Browse...", command=command)
+        button.grid(row=row, column=2, sticky="e", padx=(8, 0), pady=4)
+        return field_label, entry, button
+
+    def _on_input_mode_changed(self, *_args) -> None:
+        self._refresh_generate_input_mode()
+
+    def _refresh_generate_input_mode(self) -> None:
+        if not hasattr(self, "_separate_input_widgets"):
+            return
+        all_in_one = self.input_mode.get() == "all_in_one"
+        self._set_grid_widgets_visible(self._journal_profile_widgets, not all_in_one)
+        self._set_grid_widgets_visible(self._separate_input_widgets, not all_in_one)
+        self._set_grid_widgets_visible(self._unified_input_widgets, all_in_one)
+        for frame in (self._optional_inputs_frame, self._loadings_frame):
+            if all_in_one:
+                frame.grid_remove()
+            else:
+                frame.grid()
+
+    @staticmethod
+    def _set_grid_widgets_visible(widgets, visible: bool) -> None:
+        for widget in widgets:
+            if visible:
+                widget.grid()
+            else:
+                widget.grid_remove()
 
     def _result_row(self, parent, row: int, label: str, variable: StringVar, open_command=None, button_text: str = "Open") -> None:
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=3)
