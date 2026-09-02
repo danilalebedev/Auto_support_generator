@@ -46,14 +46,16 @@ from .workflows.patch_si import run_patch_si
 
 
 INSTRUCTION_TEMPLATE_FILES = (
-    ("Example 1 - All-in-one input", Path("example_1") / "All_in_one_input.docx", "Compound table, reaction schema, scope and SI template in one Word file."),
+    ("Example 1 - All-in-one input", Path("example_1") / "All_in_one_input.docx", "Four products with a complete reaction schema, scope and SI template in one editable Word file."),
     ("Example 1 - Compound table", Path("example_1") / "Compound_table.docx", "Four compounds for the first synthetic series."),
     ("Example 1 - Spectra source", Path("example_1") / "Spectra_source", "Matching raw 1H and 13C spectra as a folder."),
     ("Example 1 - SI template", Path("example_1") / "SI_template.docx", "Word template controlling text and appendix formatting."),
     ("Example 1 - Reaction schema", Path("example_1") / "Reaction_schema.docx", "Reagent rules used to calculate reaction loadings."),
     ("Example 1 - Scope", Path("example_1") / "Scope.docx", "Per-compound reaction and product data."),
-    ("Example 2", Path("example_2"), "Complete second-series input set with the same five upload-field names."),
-    ("Example 3", Path("example_3"), "Complete new-method input set; includes Spectra_source as both folder and zip."),
+    ("Example 2 - All-in-one input", Path("example_2") / "All_in_one_input.docx", "A smaller two-product input demonstrating the same combined-file structure."),
+    ("Example 2 - Complete folder", Path("example_2"), "The same second-series input supplied as separate files."),
+    ("Example 3 - All-in-one input", Path("example_3") / "All_in_one_input.docx", "A different reaction method with two variable reagents and five products."),
+    ("Example 3 - Complete folder", Path("example_3"), "The same new-method input as separate files, including spectra as a folder and zip."),
 )
 STARTER_EXAMPLE_DIRS = (Path("example_1"), Path("example_2"), Path("example_3"))
 
@@ -740,17 +742,18 @@ class SIGeneratorApp:
             text=(
                 "1. Copy an example\n"
                 "   - Click Copy all examples.\n"
-                "   - Start with example_1 and edit copies of its Word files.\n"
-                "2. Fill Generate\n"
-                "   - Publication preset: choose the target journal; the app applies its Word and spectrum defaults.\n"
-                "   - Input format: choose Separate files or Single all-in-one DOCX.\n"
-                "   - All-in-one input may contain Compound table, Reaction schema, Scope and SI template.\n"
-                "   - Spectra source: Spectra_source folder or Spectra_source.zip.\n"
+                "   - Start with example_1 and choose either its separate files or All_in_one_input.docx.\n"
+                "2. Choose an input format in Generate\n"
+                "   - Separate files: select Compound_table.docx and, when needed, SI_template.docx, Reaction_schema.docx and Scope.docx.\n"
+                "   - Single all-in-one DOCX: select only All_in_one_input.docx; its Word sections replace those four separate files.\n"
+                "3. Complete the visible fields\n"
+                "   - Publication preset: choose the target journal.\n"
+                "   - Spectra source: select Spectra_source folder or Spectra_source.zip.\n"
+                "   - MestReNova.exe and 1H/13C .mngp remain external settings in both modes.\n"
                 "   - Output folder: choose where a separate run folder will be created.\n"
-                "3. Optional settings\n"
-                "   - In Generate, add an SI template, MestReNova path/styles, or reagent-loading files if needed.\n"
+                "4. Optional processing\n"
                 "   - Open Processing for spectra mode, peak thresholds, ppm ranges, baseline correction, and checks.\n"
-                "4. Run\n"
+                "5. Run\n"
                 "   - Click Generate SI.\n"
                 "   - Open Results when the run finishes."
             ),
@@ -765,14 +768,15 @@ class SIGeneratorApp:
                 "Required fields\n"
                 "- Publication preset: select a journal or General Organic SI. Selection applies the built-in Word template, MNGP profiles, ppm windows and appendix rules.\n"
                 "- Apply: restores the selected preset after manual Processing edits. Manual edits made afterward are treated as user overrides.\n"
+                "- Input format: choose Separate files or Single all-in-one DOCX. The form immediately hides fields that belong to the other mode.\n"
                 "- Separate files: upload Compound_table.docx with compound data and ChemDraw OLE structures.\n"
-                "- Single all-in-one DOCX: upload All_in_one_input.docx and keep its [AUTO SI: ...] section labels unchanged.\n"
-                "- Only Compound table is required in the all-in-one file. Reaction schema + Scope enable loadings; SI template controls output formatting.\n"
+                "- Single all-in-one DOCX: upload All_in_one_input.docx. Compound table, reaction data and Word formatting are read from its marked sections.\n"
                 "- Spectra source: upload a .zip archive or choose a folder with raw spectra.\n"
                 "- Output folder: choose where the run folder will be created.\n"
-                "- Optional inputs: add SI_template.docx, MestReNova.exe, and separate 1H/13C .mngp files when defaults are not enough.\n"
-                "- Reagent Loadings: enable this block and provide Reaction_schema.docx plus Scope.docx to calculate amounts.\n"
                 "- Generate SI: starts SI generation.\n\n"
+                "Mode-specific fields\n"
+                "- Separate files shows SI_template.docx and the Reagent Loadings block. Provide both Reaction_schema.docx and Scope.docx to calculate amounts.\n"
+                "- Single all-in-one DOCX hides those duplicated fields. Publication preset, MestReNova.exe and separate 1H/13C .mngp profiles remain visible because they are application settings, not table data.\n\n"
                 "Important rules\n"
                 "- Compound numbers in the table must match spectra folder names, for example 3a, 3b, 3c.\n"
                 "- The Word table should contain editable ChemDraw OLE structures in the structure column.\n"
@@ -782,7 +786,35 @@ class SIGeneratorApp:
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        processing = self._instruction_block(content, 2, "Processing", "Spectra controls, preprocessing, and validation options.")
+        input_formats = self._instruction_block(content, 2, "Input formats", "Separate documents or one combined Word input.", expanded=True)
+        ttk.Label(
+            input_formats,
+            text=(
+                "Separate files\n"
+                "- Compound_table.docx is required. It stores product numbers, properties, analytical values and editable ChemDraw OLE structures.\n"
+                "- SI_template.docx is optional and controls the generated wording and Word formatting.\n"
+                "- Reaction_schema.docx and Scope.docx are optional as a pair. Together they enable reagent-loadings and yield calculations.\n\n"
+                "Single all-in-one DOCX\n"
+                "- Upload one All_in_one_input.docx instead of the four Word files above.\n"
+                "- [AUTO SI: COMPOUND TABLE] is required and must be followed by the compound table.\n"
+                "- [AUTO SI: REACTION SCHEMA] and [AUTO SI: SCOPE] are optional, but both are required to calculate loadings.\n"
+                "- [AUTO SI: SI TEMPLATE] is optional. If omitted, the selected Publication preset supplies the SI template.\n"
+                "- [AUTO SI: END] marks the end of the combined input. Keep every section label unchanged.\n"
+                "- A missing optional section or an optional value marked with '-' does not stop generation.\n\n"
+                "Still selected in the application\n"
+                "- Publication preset, Spectra source, Output folder, MestReNova.exe and 1H/13C .mngp profiles are not stored in the combined file.\n"
+                "- Processing settings such as thresholds, ppm ranges, baseline correction and appendix mode are configured on the Processing page.\n\n"
+                "Ready examples\n"
+                "- example_1/All_in_one_input.docx: complete four-product series and the recommended starting point.\n"
+                "- example_2/All_in_one_input.docx: compact two-product example.\n"
+                "- example_3/All_in_one_input.docx: a different method with two variable reagents.\n"
+                "- Open or copy them from Example files below. Replace values and structures, but preserve section labels and table headers."
+            ),
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+
+        processing = self._instruction_block(content, 3, "Processing", "Spectra controls, preprocessing, and validation options.")
         ttk.Label(
             processing,
             text=(
@@ -806,7 +838,7 @@ class SIGeneratorApp:
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        results = self._instruction_block(content, 3, "Results", "Where generated files are stored.")
+        results = self._instruction_block(content, 4, "Results", "Where generated files are stored.")
         ttk.Label(
             results,
             text=(
@@ -827,7 +859,7 @@ class SIGeneratorApp:
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        templates = self._instruction_block(content, 4, "Example files", "Open or copy editable starter files.", expanded=True)
+        templates = self._instruction_block(content, 5, "Example files", "Open or copy editable input files for both input modes.", expanded=True)
         templates.columnconfigure(1, weight=1)
         ttk.Button(templates, text="Copy all examples", command=self._copy_starter_files).grid(row=0, column=2, sticky="e", padx=(8, 0), pady=(0, 8))
         for row, (label, relative_path, description) in enumerate(INSTRUCTION_TEMPLATE_FILES, start=1):
@@ -839,7 +871,7 @@ class SIGeneratorApp:
                 command=lambda relative_path=relative_path: self._open_example_file(relative_path),
             ).grid(row=row, column=2, sticky="e", padx=(8, 0), pady=3)
 
-        spectra = self._instruction_block(content, 5, "Spectra source", "How raw spectra should be organized.")
+        spectra = self._instruction_block(content, 6, "Spectra source", "How raw spectra should be organized.")
         ttk.Label(
             spectra,
             text=(
@@ -859,10 +891,10 @@ class SIGeneratorApp:
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        aliases = self._instruction_block(content, 6, "Template aliases", "Placeholders available inside SI_template.docx.")
+        aliases = self._instruction_block(content, 7, "Template aliases", "Placeholders available inside SI_template.docx.")
         self._build_alias_reference(aliases)
 
-        check = self._instruction_block(content, 7, "Check", "Validate an existing generated SI.")
+        check = self._instruction_block(content, 8, "Check", "Validate an existing generated SI.")
         ttk.Label(
             check,
             text=(
@@ -881,7 +913,7 @@ class SIGeneratorApp:
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        patch = self._instruction_block(content, 8, "Patch", "Create a modified copy of an existing SI.")
+        patch = self._instruction_block(content, 9, "Patch", "Create a modified copy of an existing SI.")
         ttk.Label(
             patch,
             text=(
@@ -906,7 +938,7 @@ class SIGeneratorApp:
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        add = self._instruction_block(content, 9, "Add", "Append new compounds to an old SI.")
+        add = self._instruction_block(content, 10, "Add", "Append new compounds to an old SI.")
         ttk.Label(
             add,
             text=(
@@ -943,7 +975,7 @@ class SIGeneratorApp:
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        profiles = self._instruction_block(content, 10, "Publication presets", "Built-in journal formatting and validation profiles.")
+        profiles = self._instruction_block(content, 11, "Publication presets", "Built-in journal formatting and validation profiles.")
         ttk.Label(
             profiles,
             text=(
