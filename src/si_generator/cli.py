@@ -57,6 +57,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate Supporting Information DOCX from a Word compound table.")
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument("--word-input", help="Path to a Word table with ChemDraw/ChemSketch OLE structures.")
+    input_group.add_argument(
+        "--all-in-one-input",
+        help="Path to one DOCX containing the compound table and optional reaction schema, scope, and SI template sections.",
+    )
     input_group.add_argument("--check-manifest", help="Check an existing support_information.manifest.json file.")
     input_group.add_argument("--patch-manifest", help="Patch an existing support_information.manifest.json file.")
     input_group.add_argument("--add-compounds-manifest", help="Append new compounds to an existing SI manifest.")

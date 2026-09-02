@@ -32,6 +32,7 @@ from .nodes.patching import (
 )
 from .nodes.render import build_document_model_node, postprocess_word_objects_node, render_docx_node
 from .nodes.settings import load_settings_node
+from .nodes.unified_input import prepare_unified_input_node
 from .nodes.spectra import mnova_batch_node, plan_nmr_processing_node, prepare_spectra_source_node, route_nmr_processing
 from .nodes.validation import validate_input_node, validate_support_node
 from .state import AddCompoundsState, CheckSIState, GenerateSIState, PatchSIState
@@ -47,6 +48,7 @@ FATAL_INPUT_MISMATCH_CODES = {
 def build_generate_si_graph():
     builder = StateGraph(GenerateSIState)
 
+    builder.add_node("prepare_unified_input", prepare_unified_input_node)
     builder.add_node("load_settings", load_settings_node)
     builder.add_node("read_input_table", read_input_table_node)
     builder.add_node("normalize_compounds", normalize_compounds_node)
@@ -65,7 +67,8 @@ def build_generate_si_graph():
     builder.add_node("postprocess_word_objects", postprocess_word_objects_node)
     builder.add_node("write_manifest", write_manifest_node)
 
-    builder.add_edge(START, "load_settings")
+    builder.add_edge(START, "prepare_unified_input")
+    builder.add_edge("prepare_unified_input", "load_settings")
     builder.add_edge("load_settings", "read_input_table")
     builder.add_edge("read_input_table", "normalize_compounds")
     builder.add_edge("normalize_compounds", "prepare_spectra_source")

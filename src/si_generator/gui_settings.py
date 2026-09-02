@@ -12,6 +12,7 @@ from .runtime_paths import gui_settings_path
 SETTINGS_VERSION = 2
 STRING_FIELDS = (
     "input_path",
+    "unified_input_docx",
     "spectra_source",
     "spectra_zip",
     "template_docx",
@@ -64,6 +65,7 @@ BOOL_FIELDS = (
 )
 CHOICE_FIELDS = {
     "input_kind": {"word"},
+    "input_mode": {"separate", "all_in_one"},
     "add_input_kind": {"word"},
     "add_method_mode": {"same_series", "new_method"},
     "insert_spectra_as": {"png", "mnova", "none"},

@@ -77,7 +77,8 @@ def _spectra_source_input_number_mismatch(compounds, spectra_root: Path) -> Issu
 def _copy_input_artifacts(request, input_dir: Path) -> dict[str, str]:
     artifacts: dict[str, str] = {}
     for key, source in {
-        "compound_table_copy": request.input_path,
+        "unified_input_copy": request.unified_input_docx,
+        "compound_table_copy": request.compound_table_path,
         "template_docx_copy": request.template_docx,
         "references_copy": request.references_path,
         "loadings_schema_copy": request.loadings_schema_docx,

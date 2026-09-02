@@ -44,7 +44,8 @@ def build_manifest(state: GenerateSIState) -> dict:
         "run_id": state.get("run_id", ""),
         "input_hashes": _input_hashes(
             {
-                "compound_table": request.input_path,
+                "unified_input": request.unified_input_docx,
+                "compound_table": request.compound_table_path,
                 "spectra_source": request.resolved_spectra_source,
                 "template_docx": request.template_docx,
                 "references": request.references_path,
@@ -239,6 +240,10 @@ def _run_config(request, artifacts: dict[str, str], output_root: Path) -> dict:
         "version": 1,
         "journal_profile_id": request.journal_profile_id,
         "input_kind": request.input_kind,
+        "input_mode": "all_in_one" if request.unified_input_docx else "separate",
+        "unified_input_docx": _artifact_or_request_path(
+            "unified_input_copy", request.unified_input_docx, artifacts, output_root
+        ),
         "template_docx": _artifact_or_request_path("template_docx_copy", request.template_docx, artifacts, output_root),
         "references_path": _artifact_or_request_path("references_copy", request.references_path, artifacts, output_root),
         "loadings_schema_docx": _artifact_or_request_path("loadings_schema_copy", request.loadings_schema_docx, artifacts, output_root),

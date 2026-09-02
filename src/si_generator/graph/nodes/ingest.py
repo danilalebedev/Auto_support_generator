@@ -8,7 +8,10 @@ from ...word_input import read_word_compounds
 def read_input_table_node(state: GenerateSIState) -> dict:
     request = state["request"]
     if request.input_kind == "word":
-        compounds = read_word_compounds(request.input_path, extract_structure_metadata=request.extract_structure_metadata)
+        compounds = read_word_compounds(
+            request.compound_table_path,
+            extract_structure_metadata=request.extract_structure_metadata,
+        )
     else:
         compounds = read_compounds(request.input_path)
 

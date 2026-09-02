@@ -32,6 +32,29 @@ from si_generator.graph.state import CheckSIRequest
 
 
 class GuiWorkflowTests(unittest.TestCase):
+    def test_build_generate_request_accepts_single_all_in_one_docx(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            unified = root / "All_in_one_input.docx"
+            unified.write_bytes(b"placeholder")
+
+            request = _build_generate_request(
+                input_kind="word",
+                input_mode="all_in_one",
+                input_path_text="",
+                unified_input_text=str(unified),
+                output_docx_text=str(root / "support.docx"),
+                generate_loadings=True,
+                loadings_schema_text="",
+                loadings_scope_text="",
+                insert_spectra_as="none",
+            )
+
+        self.assertEqual(request.input_path, unified)
+        self.assertEqual(request.unified_input_docx, unified)
+        self.assertIsNone(request.loadings_schema_docx)
+        self.assertIsNone(request.loadings_scope_docx)
+
     def test_builds_graph_request_from_gui_values(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

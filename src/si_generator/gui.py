@@ -46,6 +46,7 @@ from .workflows.patch_si import run_patch_si
 
 
 INSTRUCTION_TEMPLATE_FILES = (
+    ("Example 1 - All-in-one input", Path("example_1") / "All_in_one_input.docx", "Compound table, reaction schema, scope and SI template in one Word file."),
     ("Example 1 - Compound table", Path("example_1") / "Compound_table.docx", "Four compounds for the first synthetic series."),
     ("Example 1 - Spectra source", Path("example_1") / "Spectra_source", "Matching raw 1H and 13C spectra as a folder."),
     ("Example 1 - SI template", Path("example_1") / "SI_template.docx", "Word template controlling text and appendix formatting."),
@@ -105,6 +106,8 @@ class SIGeneratorApp:
         self.root.rowconfigure(0, weight=1)
 
         self.input_path = StringVar()
+        self.unified_input_docx = StringVar()
+        self.input_mode = StringVar(value="separate")
         self.spectra_source = StringVar()
         self.spectra_zip = self.spectra_source
         self.template_docx = StringVar()
@@ -378,9 +381,20 @@ class SIGeneratorApp:
         profile_combo.grid(row=0, column=1, sticky="ew", pady=4)
         profile_combo.bind("<<ComboboxSelected>>", lambda _event: self._apply_journal_profile())
         ttk.Button(simple, text="Apply", command=self._apply_journal_profile).grid(row=0, column=2, sticky="e", padx=(8, 0), pady=4)
-        self._file_row(simple, 1, "Compound table", self.input_path, self._browse_input)
-        self._source_row(simple, 2, "Spectra source", self.spectra_source, self._browse_spectra_source, self._browse_spectra_folder)
-        self._folder_row(simple, 3, "Output folder", self.output_folder, self._browse_output_folder)
+        ttk.Label(simple, text="Input format").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=4)
+        input_modes = ttk.Frame(simple)
+        input_modes.grid(row=1, column=1, columnspan=2, sticky="w", pady=4)
+        ttk.Radiobutton(input_modes, text="Separate files", variable=self.input_mode, value="separate").pack(side="left")
+        ttk.Radiobutton(
+            input_modes,
+            text="Single all-in-one DOCX",
+            variable=self.input_mode,
+            value="all_in_one",
+        ).pack(side="left", padx=(16, 0))
+        self._file_row(simple, 2, "Compound table (separate mode)", self.input_path, self._browse_input)
+        self._file_row(simple, 3, "All-in-one input (single-file mode)", self.unified_input_docx, self._browse_unified_input)
+        self._source_row(simple, 4, "Spectra source", self.spectra_source, self._browse_spectra_source, self._browse_spectra_folder)
+        self._folder_row(simple, 5, "Output folder", self.output_folder, self._browse_output_folder)
 
         self._build_optional_inputs_block(content, 1)
         self._build_loadings_block(content, 2)
@@ -715,7 +729,8 @@ class SIGeneratorApp:
                 "   - Start with example_1 and edit copies of its Word files.\n"
                 "2. Fill Generate\n"
                 "   - Publication preset: choose the target journal; the app applies its Word and spectrum defaults.\n"
-                "   - Compound table: Compound_table.docx.\n"
+                "   - Input format: choose Separate files or Single all-in-one DOCX.\n"
+                "   - All-in-one input may contain Compound table, Reaction schema, Scope and SI template.\n"
                 "   - Spectra source: Spectra_source folder or Spectra_source.zip.\n"
                 "   - Output folder: choose where a separate run folder will be created.\n"
                 "3. Optional settings\n"
@@ -736,7 +751,9 @@ class SIGeneratorApp:
                 "Required fields\n"
                 "- Publication preset: select a journal or General Organic SI. Selection applies the built-in Word template, MNGP profiles, ppm windows and appendix rules.\n"
                 "- Apply: restores the selected preset after manual Processing edits. Manual edits made afterward are treated as user overrides.\n"
-                "- Compound table: upload Compound_table.docx with compound data and ChemDraw OLE structures.\n"
+                "- Separate files: upload Compound_table.docx with compound data and ChemDraw OLE structures.\n"
+                "- Single all-in-one DOCX: upload All_in_one_input.docx and keep its [AUTO SI: ...] section labels unchanged.\n"
+                "- Only Compound table is required in the all-in-one file. Reaction schema + Scope enable loadings; SI template controls output formatting.\n"
                 "- Spectra source: upload a .zip archive or choose a folder with raw spectra.\n"
                 "- Output folder: choose where the run folder will be created.\n"
                 "- Optional inputs: add SI_template.docx, MestReNova.exe, and separate 1H/13C .mngp files when defaults are not enough.\n"
@@ -1160,9 +1177,17 @@ class SIGeneratorApp:
 
     def _browse_input(self) -> None:
         self.input_kind.set("word")
+        self.input_mode.set("separate")
         self._browse_file(self.input_path, [("Word documents", "*.docx"), ("All files", "*.*")])
         if self.input_path.get() and not self.output_folder.get():
             self._set_output_folder(str(Path(self.input_path.get()).parent), save=False)
+
+    def _browse_unified_input(self) -> None:
+        self.input_kind.set("word")
+        self.input_mode.set("all_in_one")
+        self._browse_file(self.unified_input_docx, [("Word documents", "*.docx"), ("All files", "*.*")])
+        if self.unified_input_docx.get() and not self.output_folder.get():
+            self._set_output_folder(str(Path(self.unified_input_docx.get()).parent), save=False)
 
     def _browse_file(self, variable: StringVar, filetypes) -> None:
         kwargs: dict[str, object] = {"filetypes": filetypes}
@@ -1529,7 +1554,9 @@ class SIGeneratorApp:
     def _build_request(self) -> GenerateSIRequest:
         return _build_generate_request(
             input_kind=self.input_kind.get(),
+            input_mode=self.input_mode.get(),
             input_path_text=self.input_path.get(),
+            unified_input_text=self.unified_input_docx.get(),
             output_docx_text=_output_docx_from_folder(self.output_folder.get(), self.output_docx.get()),
             spectra_source_text=self.spectra_source.get(),
             template_docx_text=self.template_docx.get(),
@@ -1772,6 +1799,8 @@ class SIGeneratorApp:
     def _string_settings_variables(self) -> dict[str, StringVar]:
         return {
             "input_path": self.input_path,
+            "unified_input_docx": self.unified_input_docx,
+            "input_mode": self.input_mode,
             "spectra_source": self.spectra_source,
             "spectra_zip": self.spectra_source,
             "template_docx": self.template_docx,
@@ -2182,6 +2211,8 @@ def _build_generate_request(
     input_kind: str,
     input_path_text: str,
     output_docx_text: str,
+    input_mode: str = "separate",
+    unified_input_text: str = "",
     spectra_source_text: str = "",
     spectra_zip_text: str = "",
     template_docx_text: str = "",
@@ -2213,13 +2244,22 @@ def _build_generate_request(
     check_support: bool = True,
     journal_profile_text: str = DEFAULT_JOURNAL_PROFILE_ID,
 ) -> GenerateSIRequest:
-    input_path = _required_existing_file(input_path_text, "Choose an existing compound table.", suffixes=(".docx",))
+    unified_input = None
+    if input_mode == "all_in_one":
+        unified_input = _required_existing_file(
+            unified_input_text,
+            "Choose an existing all-in-one input DOCX.",
+            suffixes=(".docx",),
+        )
+        input_path = unified_input
+    else:
+        input_path = _required_existing_file(input_path_text, "Choose an existing compound table.", suffixes=(".docx",))
     output_docx = Path(output_docx_text.strip().strip('"')).expanduser()
     if not output_docx.name.lower().endswith(".docx"):
         raise ValueError("Output file must be a .docx file.")
     shared_peak_threshold = _optional_peak_threshold_fraction(peak_threshold_percent_text)
     loadings_schema = loadings_scope = None
-    if generate_loadings:
+    if generate_loadings and not unified_input:
         loadings_schema = _optional_existing_file(loadings_schema_text, "Reaction schema .docx", suffixes=(".docx",))
         loadings_scope = _optional_existing_file(loadings_scope_text, "Scope .docx", suffixes=(".docx",))
         if any((loadings_schema, loadings_scope)) and not all((loadings_schema, loadings_scope)):
@@ -2229,6 +2269,7 @@ def _build_generate_request(
         input_path=input_path,
         input_kind="word",
         output_path=output_docx,
+        unified_input_docx=unified_input,
         spectra_source=_optional_spectra_source(spectra_source_text or spectra_zip_text),
         template_docx=_optional_existing_file(template_docx_text, "SI template .docx", suffixes=(".docx",)),
         references_path=_optional_existing_file(references_text, "References .yml", suffixes=(".yml", ".yaml")),
@@ -2677,7 +2718,9 @@ def _example_field_updates(table: Path, spectra_zip: Path, output_docx: Path) ->
     classic_13c = Path(_default_mngp_profile_text("13C"))
     return {
         "input_kind": "word",
+        "input_mode": "separate",
         "input_path": str(table),
+        "unified_input_docx": str(example / "All_in_one_input.docx") if (example / "All_in_one_input.docx").exists() else "",
         "spectra_source": str(spectra_zip),
         "spectra_zip": str(spectra_zip),
         "output_docx": str(output_docx),

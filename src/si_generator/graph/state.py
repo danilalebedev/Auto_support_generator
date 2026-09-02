@@ -35,6 +35,7 @@ class GenerateSIState(TypedDict, total=False):
     manifest: dict[str, Any]
     status: Literal["pass", "fail"]
     journal_profile: dict[str, Any]
+    unified_input_components: dict[str, str]
 
 
 class CheckSIState(TypedDict, total=False):

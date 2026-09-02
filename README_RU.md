@@ -63,9 +63,9 @@ Auto Support Generator автоматически собирает Supporting In
 ## Быстрый старт
 
 1. Откройте **Instructions → Example files → Copy all examples**.
-2. Возьмите `example_1` и замените данные в его Word-файлах своими.
-3. В **Generate** выберите журнал, `Compound_table.docx`, `Spectra_source` и папку результата.
-4. При необходимости измените примененные настройки, шаблон, профили `.mngp`, Reaction schema и Scope.
+2. Возьмите `example_1`: можно редактировать отдельные Word-файлы или один `All_in_one_input.docx`.
+3. В **Generate** выберите журнал и режим **Separate files** либо **Single all-in-one DOCX**.
+4. Укажите `Spectra_source` и папку результата. При необходимости измените `.mngp` и Processing.
 5. В **Processing** проверьте настройки спектров.
 6. Вернитесь в Generate и нажмите **Generate SI**.
 7. После завершения нажмите **Open support** или **Open output folder**.
@@ -77,7 +77,9 @@ Auto Support Generator автоматически собирает Supporting In
 | Поле программы | Что загрузить |
 |---|---|
 | **Publication preset** | Целевой журнал. Выбор применяет встроенный Word-шаблон, MNGP, диапазоны ppm и правила appendix; **Apply** возвращает значения профиля после ручных изменений. |
+| **Input format** | **Separate files** для обычного набора документов или **Single all-in-one DOCX** для единого файла. |
 | **Compound table** | `Compound_table.docx`: одна строка на соединение, номер, свойства, HRMS/IR/Anal и OLE-структура ChemDraw. |
+| **All-in-one input** | `All_in_one_input.docx`, содержащий Compound table и необязательные секции Reaction schema, Scope и SI template. Используется только в режиме **Single all-in-one DOCX**. |
 | **Spectra source** | Папку `Spectra_source` или `Spectra_source.zip` с подпапками по номерам соединений. |
 | **Output folder** | Папку, внутри которой программа создаст отдельный каталог текущего запуска. |
 
@@ -98,6 +100,18 @@ Auto Support Generator автоматически собирает Supporting In
 | **Scope .docx** | `Scope.docx`: данные для каждого продукта, включая массы и структуры переменных реагентов. |
 
 Включите расчет загрузок только при наличии обоих файлов. Номера продуктов в Compound table и Scope должны совпадать.
+
+### Единый All-in-one DOCX
+
+Файл разделяется неизменяемыми метками:
+
+- `[AUTO SI: COMPOUND TABLE]` — обязательная таблица соединений;
+- `[AUTO SI: REACTION SCHEMA]` — необязательные правила расчета реагентов;
+- `[AUTO SI: SCOPE]` — необязательные данные серии;
+- `[AUTO SI: SI TEMPLATE]` — необязательный текст и форматирование результата;
+- `[AUTO SI: END]` — конец входных данных.
+
+Если обе секции Reaction schema и Scope присутствуют, расчет загрузок включается автоматически. Если отсутствует SI template, используется выбранный **Publication preset**. Отсутствующие необязательные секции и поля не останавливают генерацию. Готовые объединенные примеры находятся в `examples/example_1/All_in_one_input.docx`, `example_2` и `example_3`.
 
 ## Processing
 

@@ -55,9 +55,9 @@ For source use, install Python 3.12, run `Setup Auto SI Generator.bat`, then `Ru
 ## Quick start
 
 1. Open **Instructions → Example files → Copy all examples**.
-2. Start with `example_1` and replace the values in copies of its Word files.
-3. On **Generate**, select a publication preset, `Compound_table.docx`, `Spectra_source` and an output folder.
-4. Optionally adjust the applied settings, SI template, `.mngp` profiles, Reaction schema and Scope.
+2. Start with `example_1`: edit either the separate Word files or the single `All_in_one_input.docx`.
+3. On **Generate**, select a publication preset and choose **Separate files** or **Single all-in-one DOCX**.
+4. Select `Spectra_source` and an output folder. Optionally adjust `.mngp` and Processing settings.
 5. Review spectrum settings on **Processing**.
 6. Click **Generate SI**.
 7. When complete, click **Open support** or **Open output folder**.
@@ -69,7 +69,9 @@ For source use, install Python 3.12, run `Setup Auto SI Generator.bat`, then `Ru
 | GUI field | Input |
 |---|---|
 | **Publication preset** | Target journal. Selection applies its Word template, MNGP profiles, ppm windows and appendix rules; **Apply** restores preset values after manual edits. |
+| **Input format** | **Separate files** for the conventional document set or **Single all-in-one DOCX** for one combined file. |
 | **Compound table** | `Compound_table.docx`: one row per compound with number, properties, HRMS/IR/Anal and a ChemDraw OLE structure. |
+| **All-in-one input** | `All_in_one_input.docx` containing the Compound table and optional Reaction schema, Scope and SI template sections. Used only in **Single all-in-one DOCX** mode. |
 | **Spectra source** | A `Spectra_source` folder or `Spectra_source.zip`, organized by compound number. |
 | **Output folder** | Parent folder in which the app creates a separate run directory. |
 
@@ -90,6 +92,18 @@ For source use, install Python 3.12, run `Setup Auto SI Generator.bat`, then `Ru
 | **Scope .docx** | `Scope.docx`: per-product reaction data and structures for variable reagents. |
 
 Enable loadings only when both files are supplied. Product numbers in Compound table and Scope must match.
+
+### Single all-in-one DOCX
+
+The file is divided by fixed labels:
+
+- `[AUTO SI: COMPOUND TABLE]` — required compound table;
+- `[AUTO SI: REACTION SCHEMA]` — optional reagent calculation rules;
+- `[AUTO SI: SCOPE]` — optional series data;
+- `[AUTO SI: SI TEMPLATE]` — optional output text and formatting;
+- `[AUTO SI: END]` — end of input data.
+
+When both Reaction schema and Scope are present, reagent-loadings calculation is enabled automatically. If SI template is absent, the selected **Publication preset** is used. Missing optional sections and fields do not stop generation. Ready-to-edit combined examples are available at `examples/example_1/All_in_one_input.docx`, and in `example_2` and `example_3`.
 
 ## Processing
 

@@ -17,6 +17,8 @@ class GenerateSIRequest:
     input_path: Path
     input_kind: InputKind
     output_path: Path
+    unified_input_docx: Path | None = None
+    resolved_compound_table_docx: Path | None = None
     template_docx: Path | None = None
     references_path: Path | None = None
     spectra_source: Path | None = None
@@ -52,7 +54,11 @@ class GenerateSIRequest:
 
     @property
     def input_base_dir(self) -> Path:
-        return self.input_path.parent
+        return self.compound_table_path.parent
+
+    @property
+    def compound_table_path(self) -> Path:
+        return self.resolved_compound_table_docx or self.input_path
 
     @property
     def output_dir(self) -> Path:

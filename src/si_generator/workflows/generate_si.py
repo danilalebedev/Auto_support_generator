@@ -30,10 +30,12 @@ def output_path_from_state(state: GenerateSIState) -> Path:
 def request_from_args(args: Namespace) -> GenerateSIRequest:
     profile_id = str(getattr(args, "journal_profile", None) or DEFAULT_JOURNAL_PROFILE_ID)
     profile_defaults = journal_profile_defaults(profile_id)
+    unified_input = Path(args.all_in_one_input) if getattr(args, "all_in_one_input", None) else None
     return GenerateSIRequest(
-        input_path=Path(args.word_input),
+        input_path=unified_input or Path(args.word_input),
         input_kind="word",
         output_path=Path(args.output),
+        unified_input_docx=unified_input,
         template_docx=Path(args.template_docx) if args.template_docx else profile_defaults["template_docx"],
         references_path=Path(args.references) if args.references else None,
         spectra_source=Path(args.spectra_source) if getattr(args, "spectra_source", None) else None,
