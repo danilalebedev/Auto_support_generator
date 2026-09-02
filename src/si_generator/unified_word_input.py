@@ -144,6 +144,8 @@ def build_unified_input_docx(
 
     end = document.add_paragraph(END_MARKER)
     _format_section_marker(end)
+    for table in document.tables:
+        _apply_table_borders(table)
     document.save(output)
     return output
 
@@ -152,6 +154,24 @@ def _format_section_marker(paragraph) -> None:
     if paragraph.runs:
         paragraph.runs[0].bold = True
         paragraph.runs[0].font.size = Pt(13)
+
+
+def _apply_table_borders(table) -> None:
+    properties = table._tbl.tblPr
+    if properties is None:
+        properties = etree.Element(qn("w:tblPr"))
+        table._tbl.insert(0, properties)
+    borders = properties.find(qn("w:tblBorders"))
+    if borders is None:
+        borders = etree.SubElement(properties, qn("w:tblBorders"))
+    for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        border = borders.find(qn(f"w:{edge}"))
+        if border is None:
+            border = etree.SubElement(borders, qn(f"w:{edge}"))
+        border.set(qn("w:val"), "single")
+        border.set(qn("w:sz"), "4")
+        border.set(qn("w:space"), "0")
+        border.set(qn("w:color"), "000000")
 
 
 def _remap_element_relationships(element, source_part, target_part) -> None:

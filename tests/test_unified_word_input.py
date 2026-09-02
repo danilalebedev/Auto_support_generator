@@ -6,6 +6,7 @@ import unittest
 import zipfile
 
 from docx import Document
+from docx.oxml.ns import qn
 
 from si_generator.domain.requests import GenerateSIRequest
 from si_generator.graph.nodes.unified_input import prepare_unified_input_node
@@ -22,6 +23,28 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class UnifiedWordInputTests(unittest.TestCase):
+    def test_combined_example_tables_have_complete_borders(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            compound_table = root / "Compound_table.docx"
+            document = Document()
+            table = document.add_table(rows=2, cols=2)
+            table.cell(0, 0).text = "number"
+            table.cell(0, 1).text = "name"
+            table.cell(1, 0).text = "1a"
+            table.cell(1, 1).text = "Example"
+            document.save(compound_table)
+
+            unified = build_unified_input_docx(compound_table, root / "All_in_one_input.docx")
+
+            result = Document(unified)
+            borders = result.tables[0]._tbl.tblPr.find(qn("w:tblBorders"))
+            self.assertIsNotNone(borders)
+            for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+                border = borders.find(qn(f"w:{edge}"))
+                self.assertIsNotNone(border)
+                self.assertEqual(border.get(qn("w:val")), "single")
+
     def test_materializes_all_sections_and_preserves_compound_ole_parts(self) -> None:
         source = REPO_ROOT / "examples" / "example_1" / "All_in_one_input.docx"
         with tempfile.TemporaryDirectory() as tmp:
