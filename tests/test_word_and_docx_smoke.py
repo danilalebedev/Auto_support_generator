@@ -23,6 +23,7 @@ class WordAndDocxSmokeTests(unittest.TestCase):
         self.assertEqual([compound.number for compound in compounds[:2]], ["2a", "2b"])
         self.assertTrue(compounds[0].name.startswith("Methyl"))
         self.assertTrue(compounds[0].has_word_structure)
+        self.assertTrue(compounds[0].smiles)
 
     def test_hrms_number_extraction_accepts_decimal_comma(self) -> None:
         self.assertEqual(_first_number("Found 272,9921"), "272.9921")

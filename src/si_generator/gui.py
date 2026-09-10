@@ -832,6 +832,7 @@ class SIGeneratorApp:
                 "- Highlight solvent peaks: keep off for normal reports unless you explicitly want solvent peaks marked.\n\n"
                 "Chemistry options\n"
                 "- Check support: validates NMR, HRMS and elemental analysis when enough data are available.\n"
+                "- 13C validation automatically counts symmetry-equivalent aromatic carbons from the ChemDraw structure as one signal.\n"
                 "- Calculate elemental analysis: generates calculated elemental-analysis values for rows where this block is not explicitly disabled."
             ),
             wraplength=760,

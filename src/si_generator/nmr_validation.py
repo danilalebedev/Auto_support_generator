@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+from rdkit import Chem
+
 from .chemistry import parse_formula
 from .domain.elemental_analysis import DEFAULT_ELEMENTS, calculate_elemental_analysis_block, found_from_block
 from .domain.massspec import calculate_hrms, hrms_adduct_text, hrms_found_text, parse_mz_value
@@ -32,6 +34,7 @@ def validate_nmr_counts(compounds: list[Compound]) -> None:
             continue
         expected_h = formula.get("H", 0)
         expected_c = formula.get("C", 0)
+        expected_c_signals = expected_c13_signal_count(compound.smiles, expected_c)
 
         if compound.h1_nmr:
             found_h = count_h_from_1h_nmr(compound.h1_nmr)
@@ -52,8 +55,12 @@ def validate_nmr_counts(compounds: list[Compound]) -> None:
 
         if compound.c13_nmr:
             found_c = count_c_from_13c_nmr(compound.c13_nmr)
-            if found_c < expected_c:
-                _append_validation_issue(compound, "NMR_C_COUNT_MISMATCH", f"C expected {expected_c}, found {found_c}")
+            if found_c < expected_c_signals:
+                _append_validation_issue(
+                    compound,
+                    "NMR_C_COUNT_MISMATCH",
+                    _c13_count_mismatch_text(expected_c, expected_c_signals, found_c),
+                )
                 if _looks_mnova_nmr_source(compound, "13C"):
                     _append_validation_issue(
                         compound,
@@ -65,8 +72,16 @@ def validate_nmr_counts(compounds: list[Compound]) -> None:
                         ),
                         append_warning=False,
                     )
-            elif found_c > expected_c and not _allows_heteronuclear_split_overcount(formula, expected_c, found_c):
-                _append_validation_issue(compound, "NMR_C_COUNT_MISMATCH", f"C expected {expected_c}, found {found_c}")
+            elif found_c > expected_c_signals and not _allows_heteronuclear_split_overcount(
+                formula,
+                expected_c_signals,
+                found_c,
+            ):
+                _append_validation_issue(
+                    compound,
+                    "NMR_C_COUNT_MISMATCH",
+                    _c13_count_mismatch_text(expected_c, expected_c_signals, found_c),
+                )
                 if _looks_mnova_nmr_source(compound, "13C"):
                     _append_validation_issue(
                         compound,
@@ -181,6 +196,38 @@ def count_c_from_13c_nmr(text: str) -> int:
     if assigned_count:
         return assigned_count
     return _count_13c_peak_items(data)
+
+
+def expected_c13_signal_count(smiles: str, formula_carbon_count: int) -> int:
+    """Count graph-distinct aromatic carbons and keep non-aromatic carbons separate."""
+    if not smiles or formula_carbon_count <= 0:
+        return formula_carbon_count
+    molecule = Chem.MolFromSmiles(smiles)
+    if molecule is None:
+        return formula_carbon_count
+    carbon_atoms = [atom for atom in molecule.GetAtoms() if atom.GetAtomicNum() == 6]
+    if len(carbon_atoms) != formula_carbon_count:
+        return formula_carbon_count
+    aromatic_carbons = [atom for atom in carbon_atoms if atom.GetIsAromatic()]
+    if not aromatic_carbons:
+        return formula_carbon_count
+    symmetry_classes = Chem.CanonicalRankAtoms(
+        molecule,
+        breakTies=False,
+        includeChirality=True,
+        includeIsotopes=True,
+    )
+    distinct_aromatic_carbons = len({symmetry_classes[atom.GetIdx()] for atom in aromatic_carbons})
+    return formula_carbon_count - len(aromatic_carbons) + distinct_aromatic_carbons
+
+
+def _c13_count_mismatch_text(formula_carbons: int, expected_signals: int, found_signals: int) -> str:
+    if expected_signals < formula_carbons:
+        return (
+            f"C signals expected {expected_signals} after aromatic symmetry correction "
+            f"({formula_carbons} C atoms in formula), found {found_signals}"
+        )
+    return f"C expected {expected_signals}, found {found_signals}"
 
 
 def _allows_heteronuclear_split_overcount(formula: dict[str, int], expected_c: int, found_c: int) -> bool:

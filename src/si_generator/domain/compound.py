@@ -22,6 +22,7 @@ class Compound:
     melting_point: str = ""
     rf: str = ""
     formula: str = ""
+    smiles: str = ""
     hrms_label: str = "HRMS (ESI-TOF) m/z"
     hrms_adduct: str = "[M+H]+"
     hrms_found: str = ""
@@ -95,6 +96,7 @@ def compound_from_domain_dict(data: dict[str, Any]) -> Compound:
         number=str(data.get("number") or ""),
         name=str(data.get("name") or ""),
         formula=str(data.get("formula") or structure.get("formula") or ""),
+        smiles=str(data.get("smiles") or structure.get("smiles") or ""),
         preparation=str(reaction.get("preparation") or ""),
         yield_text=str(physical.get("yield_text") or ""),
         color=str(physical.get("color") or ""),
@@ -147,6 +149,7 @@ def _structure_block(compound: Compound) -> dict[str, Any]:
             "path": compound.structure_path,
             "has_word_structure": compound.has_word_structure,
             "formula": compound.formula,
+            "smiles": compound.smiles,
         }
     )
 

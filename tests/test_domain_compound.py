@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from si_generator.domain.compound import Compound as DomainCompound
-from si_generator.domain.compound import compound_to_domain_dict
+from si_generator.domain.compound import compound_from_domain_dict, compound_to_domain_dict
 
 
 class DomainCompoundTests(unittest.TestCase):
@@ -13,6 +13,7 @@ class DomainCompoundTests(unittest.TestCase):
             number="2a",
             name="Example",
             formula="C2H6O",
+            smiles="CCO",
             color="white",
             state="solid",
             h1_nmr="δ = 1.23 (s, 6H).",
@@ -26,6 +27,7 @@ class DomainCompoundTests(unittest.TestCase):
 
         self.assertEqual(snapshot["id"], "cmp_001")
         self.assertEqual(snapshot["number"], "2a")
+        self.assertEqual(snapshot["structure"]["smiles"], "CCO")
         self.assertEqual(snapshot["physical"]["color"], "white")
         self.assertEqual(snapshot["nmr"]["spectra"]["1H"]["formatted_text"], "δ = 1.23 (s, 6H).")
         self.assertEqual(snapshot["hrms"]["found_text"], "47.0491")
@@ -36,6 +38,13 @@ class DomainCompoundTests(unittest.TestCase):
         snapshot = compound_to_domain_dict(DomainCompound(id="cmp_001", number="2a", name="Example"))
 
         self.assertNotIn("hrms", snapshot)
+
+    def test_compound_domain_round_trip_preserves_smiles(self) -> None:
+        original = DomainCompound(id="cmp_001", number="2a", name="Example", formula="C2H6O", smiles="CCO")
+
+        restored = compound_from_domain_dict(compound_to_domain_dict(original))
+
+        self.assertEqual(restored.smiles, "CCO")
 
 
 if __name__ == "__main__":

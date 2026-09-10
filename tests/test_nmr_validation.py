@@ -4,7 +4,14 @@ import unittest
 
 from si_generator.chemistry import calc_hrms_mz
 from si_generator.domain.compound import Compound
-from si_generator.nmr_validation import count_c_from_13c_nmr, count_h_from_1h_nmr, validate_elemental_analysis, validate_hrms, validate_support
+from si_generator.nmr_validation import (
+    count_c_from_13c_nmr,
+    count_h_from_1h_nmr,
+    expected_c13_signal_count,
+    validate_elemental_analysis,
+    validate_hrms,
+    validate_support,
+)
 
 
 class NmrValidationTests(unittest.TestCase):
@@ -15,6 +22,39 @@ class NmrValidationTests(unittest.TestCase):
     def test_counts_13c_peak_list(self) -> None:
         text = "δ = 167.2, 140.9, 136.7, 52.0, 30.7."
         self.assertEqual(count_c_from_13c_nmr(text), 5)
+
+    def test_aromatic_symmetry_counts_equivalent_ring_carbons_once(self) -> None:
+        smiles = "O=S=Nc1ccc(C(=O)c2ccccc2)cc1"
+
+        self.assertEqual(expected_c13_signal_count(smiles, 13), 9)
+
+        compound = Compound(
+            number="1f",
+            name="Symmetric aromatic example",
+            formula="C13H9NO2S",
+            smiles=smiles,
+            c13_nmr="δ = 190.0, 150.0, 140.0, 135.0, 130.0, 128.0, 125.0, 120.0, 115.0.",
+        )
+        validate_support([compound])
+
+        self.assertEqual(compound.validation_issues, [])
+
+    def test_aromatic_symmetry_keeps_non_aromatic_carbons_individual(self) -> None:
+        smiles = "O=S=Nc1ccccc1C(=O)N1CCCCCC1"
+
+        self.assertEqual(expected_c13_signal_count(smiles, 13), 13)
+
+    def test_13c_validation_falls_back_to_formula_without_structure(self) -> None:
+        compound = Compound(
+            number="x",
+            name="No structure",
+            formula="C6H6",
+            c13_nmr="δ = 128.0.",
+        )
+
+        validate_support([compound])
+
+        self.assertIn("C expected 6, found 1", compound.nmr_check_warning)
 
     def test_hrms_warning_for_bad_found_value(self) -> None:
         compound = Compound(number="x", name="X", formula="C2H6O", hrms_found="999.0000")

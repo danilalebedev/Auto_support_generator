@@ -120,6 +120,8 @@ When both Reaction schema and Scope are present, reagent-loadings calculation is
 | **Apply to 1H/13C** | Select nuclei receiving baseline correction. |
 | **Whittaker / polynomial parameters** | Expert parameters for the selected baseline algorithm. |
 
+During `13C NMR` validation, the program reads the ChemDraw structure and automatically counts graph-symmetric aromatic carbons as one expected signal. Non-aromatic carbons remain separate. If the structure or SMILES is unavailable or inconsistent with the formula, validation falls back to the strict total carbon count.
+
 ## Spectra source layout
 
 ```text

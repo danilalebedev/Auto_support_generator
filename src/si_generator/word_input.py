@@ -75,12 +75,12 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
                 formula = formula or _formula_from_structure_in_row(doc, table, row)
             if not name:
                 missing_name_rows.append(row)
-            rows_data.append((row, fields, number, formula, name, metadata is not None))
+            rows_data.append((row, fields, number, formula, name, metadata))
 
         generated_names = _chemdraw_names_for_rows(path, missing_name_rows)
         compounds: list[Compound] = []
 
-        for row, fields, number, formula, name, has_structure in rows_data:
+        for row, fields, number, formula, name, metadata in rows_data:
             name = name or generated_names.get(row, "") or f"Compound {number}"
             compounds.append(
                 Compound(
@@ -93,6 +93,7 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
                     melting_point=_clean_empty_value(fields.get("melting_point", "")),
                     rf=fields.get("rf", ""),
                     formula=formula,
+                    smiles=metadata.smiles if metadata else "",
                     hrms_label=fields.get("hrms_label") or "HRMS (ESI-TOF) m/z",
                     hrms_adduct=fields.get("hrms_adduct") or _adduct_from_headers(headers) or "[M+H]+",
                     hrms_found=fields.get("hrms_found", ""),
@@ -107,7 +108,7 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
                     elemental_analysis=_elemental_analysis_from_fields(fields),
                     reaction=reaction_from_fields(fields),
                     references=parse_reference_keys(fields.get("references", "")),
-                    has_word_structure=has_structure,
+                    has_word_structure=metadata is not None,
                 )
             )
 
@@ -157,6 +158,7 @@ def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Comp
                 melting_point=_clean_empty_value(fields.get("melting_point", "")),
                 rf=fields.get("rf", ""),
                 formula=formula,
+                smiles=metadata.smiles if metadata else "",
                 hrms_label=fields.get("hrms_label") or "HRMS (ESI-TOF) m/z",
                 hrms_adduct=fields.get("hrms_adduct") or _adduct_from_headers(headers) or "[M+H]+",
                 hrms_found=fields.get("hrms_found", ""),
