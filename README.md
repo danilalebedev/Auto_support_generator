@@ -6,7 +6,7 @@ Auto Support Generator is an early research software project for automated gener
 
 A ChemRxiv preprint describing the method, software architecture, and example workflows is currently in preparation.
 
-Until an open-source license is added, all rights are reserved. You may view and fork this repository under GitHub's Terms of Service, but reuse, redistribution, or derivative works require permission from the author.
+Auto Support Generator is an open-source research software project. Its source code is publicly available on GitHub.
 
 Author: Danila Lebedev  
 Copyright © 2026 Danila Lebedev
