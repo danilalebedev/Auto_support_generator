@@ -24,14 +24,17 @@ if ($LASTEXITCODE -ne 0) {
 $distDir = Join-Path $root "dist"
 $buildDir = Join-Path $root "build\pyinstaller"
 $setupBuildDir = Join-Path $root "build\pyinstaller-setup"
+$uninstallBuildDir = Join-Path $root "build\pyinstaller-uninstall"
 $specDir = Join-Path $root "build\pyinstaller-spec"
 $entryPoint = Join-Path $root "scripts\auto_support_generator_app.py"
 $installerEntryPoint = Join-Path $root "scripts\auto_support_generator_installer.py"
+$uninstallerEntryPoint = Join-Path $root "scripts\auto_support_generator_uninstall.py"
 $mnovaScript = Join-Path $root "src\si_generator\resources\scripts\extract_nmr_report.qs"
 $assets = Join-Path $root "src\si_generator\resources\assets"
 $mngpStyles = Join-Path $root "src\si_generator\resources\mngp_styles"
 $templates = Join-Path $root "src\si_generator\templates"
 $setupExe = Join-Path $distDir "AutoSupportGeneratorSetup.exe"
+$uninstallExe = Join-Path $distDir "AutoSupportGeneratorUninstall.exe"
 $sedPath = Join-Path $distDir "AutoSupportGeneratorSetup.sed"
 
 foreach ($oldFile in @($setupExe, $sedPath)) {
@@ -66,6 +69,26 @@ if (-not (Test-Path -LiteralPath $appExe)) {
     throw "PyInstaller did not create $appExe"
 }
 
+Write-Host "Building AutoSupportGeneratorUninstall.exe..."
+& $venvPython -m PyInstaller `
+    --noconfirm `
+    --clean `
+    --log-level=WARN `
+    --onefile `
+    --windowed `
+    --name AutoSupportGeneratorUninstall `
+    --paths (Join-Path $root "scripts") `
+    --distpath $distDir `
+    --workpath $uninstallBuildDir `
+    --specpath $specDir `
+    $uninstallerEntryPoint
+if ($LASTEXITCODE -ne 0) {
+    throw "AutoSupportGeneratorUninstall.exe build failed with exit code $LASTEXITCODE."
+}
+if (-not (Test-Path -LiteralPath $uninstallExe)) {
+    throw "PyInstaller did not create $uninstallExe"
+}
+
 $payloadDir = Join-Path $distDir "installer_payload"
 if (Test-Path -LiteralPath $payloadDir) {
     Remove-Item -LiteralPath $payloadDir -Recurse -Force
@@ -75,6 +98,7 @@ $payloadExamplesDir = Join-Path $payloadDir "examples"
 New-Item -ItemType Directory -Path $payloadExamplesDir | Out-Null
 
 Copy-Item -LiteralPath $appExe -Destination (Join-Path $payloadDir "AutoSupportGenerator.exe")
+Copy-Item -LiteralPath $uninstallExe -Destination (Join-Path $payloadDir "AutoSupportGeneratorUninstall.exe")
 Copy-Item -LiteralPath (Join-Path $root "LICENSE") -Destination (Join-Path $payloadDir "LICENSE")
 Copy-Item -LiteralPath (Join-Path $root "README.md") -Destination (Join-Path $payloadDir "README.md")
 Copy-Item -LiteralPath (Join-Path $root "README_RU.md") -Destination (Join-Path $payloadDir "README_RU.md")
@@ -117,5 +141,6 @@ Copy-Item -LiteralPath $setupExe -Destination $trackedInstallerExe -Force
 Write-Host ""
 Write-Host "Build finished:"
 Write-Host "  $appExe"
+Write-Host "  $uninstallExe"
 Write-Host "  $setupExe"
 Write-Host "  $trackedInstallerExe"

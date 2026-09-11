@@ -20,6 +20,22 @@ Copyright © 2026 Danila Lebedev
 - Email: [lebedevdanilaaa@gmail.com](mailto:lebedevdanilaaa@gmail.com)
 - Telegram: [@lebdanchem](https://t.me/lebdanchem)
 
+## Установка без Git и Python
+
+1. Откройте файл [`installer/AutoSupportGeneratorSetup.exe`](installer/AutoSupportGeneratorSetup.exe) на GitHub.
+2. Нажмите **Download raw file** и сохраните установщик. Клонировать репозиторий и устанавливать Git не нужно.
+3. Запустите `AutoSupportGeneratorSetup.exe`. Если появился Windows SmartScreen, убедитесь, что файл скачан из этого репозитория, затем нажмите **Подробнее → Выполнить в любом случае**.
+4. В поле **Installation folder** оставьте предложенный путь в `%LOCALAPPDATA%` или нажмите **Browse...** и выберите другую папку.
+5. Оставьте включенным создание ярлыков и нажмите **Install**.
+6. Запустите **Auto Support Generator** с рабочего стола или из меню «Пуск».
+7. Перед первой генерацией отдельно запустите Word, ChemDraw и MestReNova и завершите их первичную настройку.
+
+Microsoft Word, ChemDraw и MestReNova являются отдельными лицензионными программами и не входят в установщик.
+
+### Удаление
+
+Откройте **Параметры Windows → Приложения → Установленные приложения → Auto Support Generator → Удалить** либо выберите **Пуск → Auto Support Generator → Uninstall Auto Support Generator**. По умолчанию удаляются только файлы программы, а output, настройки и неизвестные пользовательские файлы сохраняются. Чтобы удалить всю папку установки, снимите галочку сохранения пользовательских данных и подтвердите действие.
+
 ## License
 
 Copyright © 2026 Danila Lebedev.
@@ -68,14 +84,9 @@ Auto Support Generator автоматически собирает Supporting In
 
 В готовой сборке Python устанавливать не нужно. Перед первым запуском один раз откройте Word, ChemDraw и MestReNova вручную и завершите их первичную настройку. Если MestReNova не найдена автоматически, укажите ее `.exe` в Generate.
 
-## Установка
+## Запуск из исходного кода
 
-1. Откройте папку `installer` в репозитории.
-2. Скачайте и запустите `AutoSupportGeneratorSetup.exe`.
-3. Разрешите установку только из доверенной копии этого репозитория.
-4. Запустите **Auto Support Generator** с ярлыка.
-
-Для запуска из исходного кода используйте Python 3.12, затем выполните `Setup Auto SI Generator.bat` и `Run Auto SI Generator.bat`.
+Этот раздел нужен только разработчикам. Установите Python 3.12, затем выполните `Setup Auto SI Generator.bat` и `Run Auto SI Generator.bat`. Обычным пользователям следует использовать готовый установщик по инструкции в начале README.
 
 ## Быстрый старт
 

@@ -51,6 +51,10 @@ class InstallerTests(unittest.TestCase):
             self.assertFalse(old_example.exists())
             self.assertTrue((app_dir / "examples" / "example_1" / "Compound_table.docx").is_file())
             self.assertTrue((app_dir / "docs" / "assets" / "gui_overview.png").is_file())
+            self.assertTrue((app_dir / installer.UNINSTALL_EXE_NAME).is_file())
+            manifest = installer._read_install_manifest(app_dir)
+            self.assertEqual(manifest["app_name"], installer.APP_NAME)
+            self.assertEqual(Path(manifest["install_dir"]), app_dir.resolve())
 
     def test_install_payload_reports_missing_required_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -79,6 +83,7 @@ class InstallerTests(unittest.TestCase):
             self.assertIn("-AppDir", command)
             self.assertIn(str(app_dir), command)
             self.assertIn(str(app_dir / installer.APP_EXE_NAME), command)
+            self.assertIn(str(app_dir / installer.UNINSTALL_EXE_NAME), command)
 
     def test_main_quiet_no_shortcuts_installs_to_local_app_data(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -88,7 +93,9 @@ class InstallerTests(unittest.TestCase):
 
             with patch.dict(os.environ, {"LOCALAPPDATA": str(local_app_data)}), patch.object(
                 installer, "_payload_root", return_value=payload
-            ), patch.object(sys, "argv", ["AutoSupportGeneratorSetup.exe", "--quiet", "--no-shortcuts"]):
+            ), patch.object(installer, "_register_uninstaller"), patch.object(
+                sys, "argv", ["AutoSupportGeneratorSetup.exe", "--quiet", "--no-shortcuts"]
+            ):
                 exit_code = installer.main()
 
             app_dir = local_app_data / installer.INSTALL_DIR_NAME
@@ -103,6 +110,8 @@ class InstallerTests(unittest.TestCase):
             selected_dir = root / "Selected Install"
 
             with patch.object(installer, "_payload_root", return_value=payload), patch.object(
+                installer, "_register_uninstaller"
+            ), patch.object(
                 sys,
                 "argv",
                 [
@@ -143,6 +152,83 @@ class InstallerTests(unittest.TestCase):
             installer._install_dir_from_args(["--install-dir=C:/Apps/AutoSupportGenerator"]),
             Path("C:/Apps/AutoSupportGenerator"),
         )
+
+    def test_uninstall_preserves_user_output_and_settings_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            payload = make_payload(root)
+            app_dir = root / "Installed"
+            with patch.object(installer, "_payload_root", return_value=payload):
+                installer._install_payload(app_dir)
+            (app_dir / "output").mkdir()
+            (app_dir / "output" / "result.docx").write_text("keep", encoding="utf-8")
+            (app_dir / "gui_settings.json").write_text("keep", encoding="utf-8")
+
+            with patch.object(installer, "_remove_shortcuts"), patch.object(
+                installer, "_unregister_uninstaller"
+            ):
+                code = installer._uninstall_noninteractive(app_dir, quiet=True, remove_user_data=False)
+
+            self.assertEqual(code, 0)
+            self.assertFalse((app_dir / installer.APP_EXE_NAME).exists())
+            self.assertFalse((app_dir / installer.UNINSTALL_EXE_NAME).exists())
+            self.assertFalse((app_dir / "examples").exists())
+            self.assertEqual((app_dir / "output" / "result.docx").read_text(encoding="utf-8"), "keep")
+            self.assertEqual((app_dir / "gui_settings.json").read_text(encoding="utf-8"), "keep")
+
+    def test_uninstall_remove_user_data_deletes_valid_install_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            payload = make_payload(root)
+            app_dir = root / "Installed"
+            with patch.object(installer, "_payload_root", return_value=payload):
+                installer._install_payload(app_dir)
+            (app_dir / "output").mkdir()
+            (app_dir / "output" / "result.docx").write_text("delete", encoding="utf-8")
+
+            with patch.object(installer, "_remove_shortcuts"), patch.object(
+                installer, "_unregister_uninstaller"
+            ):
+                code = installer._uninstall_noninteractive(app_dir, quiet=True, remove_user_data=True)
+
+            self.assertEqual(code, 0)
+            self.assertFalse(app_dir.exists())
+
+    def test_uninstall_refuses_folder_without_install_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            user_file = root / "notes.txt"
+            user_file.write_text("keep", encoding="utf-8")
+
+            with patch.object(installer, "_remove_shortcuts"), patch.object(
+                installer, "_unregister_uninstaller"
+            ):
+                code = installer._uninstall_noninteractive(root, quiet=True, remove_user_data=True)
+
+            self.assertEqual(code, 1)
+            self.assertEqual(user_file.read_text(encoding="utf-8"), "keep")
+
+    def test_main_routes_uninstall_to_selected_folder(self) -> None:
+        selected_dir = Path("C:/Apps/AutoSupportGenerator")
+        with patch.object(
+            installer,
+            "_uninstall_noninteractive",
+            return_value=0,
+        ) as uninstall:
+            exit_code = installer.main(
+                ["--uninstall", "--quiet", "--remove-user-data", "--install-dir", str(selected_dir)]
+            )
+
+        self.assertEqual(exit_code, 0)
+        uninstall.assert_called_once_with(selected_dir, quiet=True, remove_user_data=True)
+
+    def test_main_opens_uninstaller_ui_for_selected_folder(self) -> None:
+        selected_dir = Path("C:/Apps/AutoSupportGenerator")
+        with patch.object(installer, "_run_gui_uninstaller", return_value=0) as uninstall_ui:
+            exit_code = installer.main(["--uninstall", "--install-dir", str(selected_dir)])
+
+        self.assertEqual(exit_code, 0)
+        uninstall_ui.assert_called_once_with(selected_dir)
 
 
 if __name__ == "__main__":

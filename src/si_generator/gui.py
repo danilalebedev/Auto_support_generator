@@ -1009,7 +1009,11 @@ class SIGeneratorApp:
                 "- Auto Support Generator does not bundle Word, ChemDraw or MestReNova. Each product must be installed and licensed separately.\n"
                 "- ChemDraw download guidance: https://support.revvitysignals.com/hc/en-us/articles/4408210538132\n"
                 "- Mnova downloads: https://mestrelab.com/download\n"
-                "- Open all three programs once and complete their initial setup before the first generation."
+                "- Open all three programs once and complete their initial setup before the first generation.\n\n"
+                "Install and uninstall\n"
+                "- Setup lets you keep the suggested Local AppData folder or choose another installation folder with Browse.\n"
+                "- Uninstall from Windows Settings > Apps > Installed apps, or from the Auto Support Generator folder in Start Menu.\n"
+                "- Uninstall keeps generated output and settings by default. Clear the keep-data option only to delete the entire installation folder."
             ),
             wraplength=760,
             justify="left",

@@ -5,6 +5,7 @@ This beta release expands Auto Support Generator from the original SI generation
 ## Highlights
 
 - New Fluent-style GUI with light and dark themes and built-in instructions.
+- Installer folder selection, Windows Apps & Features registration, and a dedicated uninstaller that preserves generated output and settings by default.
 - Separate Generate, Processing, Check, Patch and Add workflows.
 - Per-run output folders with DOCX, input copies, spectra, Mnova files, reports and logs.
 - Raw spectra can be supplied as a zip archive or a normal folder.

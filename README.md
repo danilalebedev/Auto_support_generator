@@ -18,6 +18,19 @@ Questions, feedback, or bug reports are welcome. Contact the author:
 - Email: [lebedevdanilaaa@gmail.com](mailto:lebedevdanilaaa@gmail.com)
 - Telegram: [@lebdanchem](https://t.me/lebdanchem)
 
+## Install without Git or Python
+
+1. Open [`installer/AutoSupportGeneratorSetup.exe`](installer/AutoSupportGeneratorSetup.exe) on GitHub.
+2. Click **Download raw file** and save the installer.
+3. Run `AutoSupportGeneratorSetup.exe`. If Windows SmartScreen appears, verify that the file came from this repository, then choose **More info → Run anyway**.
+4. Use **Browse...** to choose the installation folder or keep the suggested folder under `%LOCALAPPDATA%`.
+5. Keep shortcut creation enabled and click **Install**.
+6. Launch **Auto Support Generator** from the desktop or Start Menu shortcut.
+
+Microsoft Word, ChemDraw, and MestReNova are licensed external applications and must be installed separately.
+
+To uninstall, open **Windows Settings → Apps → Installed apps → Auto Support Generator → Uninstall**, or use **Start Menu → Auto Support Generator → Uninstall Auto Support Generator**. Generated output and settings are preserved by default.
+
 ## Choose language
 
 - [Русская версия](README_RU.md)
