@@ -8,16 +8,7 @@
 
 [English](README_EN.md) | **Русский**
 
-## Research status and citation
-
-Auto Support Generator is an early research software project for automated generation of supporting information in organic chemistry.
-
-A ChemRxiv preprint describing the method, software architecture, and example workflows is currently in preparation.
-
-Auto Support Generator — исследовательский проект с открытым исходным кодом. Исходный код проекта опубликован на GitHub.
-
-Author: Danila Lebedev  
-Copyright © 2026 Danila Lebedev
+Auto Support Generator — проект с открытым исходным кодом, распространяемый по лицензии Apache License 2.0.
 
 ## Контакты
 
