@@ -1,5 +1,11 @@
 # Auto Support Generator
 
+## Видео интерфейса
+
+[![Демонстрация интерфейса Auto Support Generator](docs/assets/Auto_Support_Generator_promo_ru_preview.gif)](docs/assets/Auto_Support_Generator_promo_ru.mp4)
+
+Нажмите на превью, чтобы открыть полное видео со звуком.
+
 [English](README_EN.md) | **Русский**
 
 ## Research status and citation

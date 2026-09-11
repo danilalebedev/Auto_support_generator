@@ -1,5 +1,11 @@
 # Auto Support Generator
 
+## Video demo
+
+[![Auto Support Generator interface demo](docs/assets/Auto_Support_Generator_promo_ru_preview.gif)](docs/assets/Auto_Support_Generator_promo_ru.mp4)
+
+Click the preview to open the full video with sound.
+
 ## Research status and citation
 
 Auto Support Generator is an early research software project for automated generation of supporting information in organic chemistry.
