@@ -13,6 +13,21 @@ Auto Support Generator — исследовательский проект с о
 Author: Danila Lebedev  
 Copyright © 2026 Danila Lebedev
 
+## Контакты
+
+Если у вас есть вопросы, предложения или сообщения об ошибках, напишите автору:
+
+- Email: [lebedevdanilaaa@gmail.com](mailto:lebedevdanilaaa@gmail.com)
+- Telegram: [@lebdanchem](https://t.me/lebdanchem)
+
+## License
+
+Copyright © 2026 Danila Lebedev.
+
+This project is licensed under the Apache License, Version 2.0.
+
+See the [LICENSE](LICENSE) file for details.
+
 ![Интерфейс Auto Support Generator](docs/assets/gui_overview.png)
 
 ## Назначение
@@ -49,7 +64,9 @@ Auto Support Generator автоматически собирает Supporting In
 | ChemDraw | структуры и названия | 22.2.0.3300 |
 | MestReNova | обработка ЯМР | 14.2.0-26256 |
 
-В готовой сборке Python устанавливать не нужно. Перед первым запуском один раз откройте ChemDraw и MestReNova вручную. Если MestReNova не найдена автоматически, укажите ее `.exe` в Generate.
+Лицензионные установщики доступны через [официальную инструкцию ChemDraw](https://support.revvitysignals.com/hc/en-us/articles/4408210538132-How-do-I-download-the-MSI-installer-for-ChemDraw) и [официальную страницу загрузки Mnova](https://mestrelab.com/download). ChemDraw и MestReNova не входят в установщик Auto Support Generator и требуют собственных действующих лицензий.
+
+В готовой сборке Python устанавливать не нужно. Перед первым запуском один раз откройте Word, ChemDraw и MestReNova вручную и завершите их первичную настройку. Если MestReNova не найдена автоматически, укажите ее `.exe` в Generate.
 
 ## Установка
 
@@ -111,7 +128,7 @@ Auto Support Generator автоматически собирает Supporting In
 - `[AUTO SI: SI TEMPLATE]` — необязательный текст и форматирование результата;
 - `[AUTO SI: END]` — конец входных данных.
 
-Если обе секции Reaction schema и Scope присутствуют, расчет загрузок включается автоматически. Если отсутствует SI template, используется выбранный **Publication preset**. Отсутствующие необязательные секции и поля не останавливают генерацию. Готовые объединенные примеры находятся в `examples/example_1/All_in_one_input.docx`, `example_2` и `example_3`.
+Если обе секции Reaction schema и Scope присутствуют, расчет загрузок включается автоматически. Если отсутствует SI template, используется выбранный **Publication preset**. Настройки Publication preset, Spectra source, MestReNova, `.mngp` и Processing задаются в приложении и не хранятся в all-in-one DOCX. Отсутствующие необязательные секции и поля не останавливают генерацию. Готовые объединенные примеры находятся в `examples/example_1/All_in_one_input.docx`, `example_2` и `example_3`.
 
 ## Processing
 
@@ -181,7 +198,7 @@ Patch использует уже обработанные PNG и Mnova OLE и �
 
 ## Профили журналов
 
-В Generate доступен **Publication preset**. Профиль задает встроенный Word-шаблон, поля и шрифт документа, диапазоны спектров, MNGP по умолчанию, ориентацию appendix и дополнительные предупреждения проверки. Настройки Processing, измененные после применения профиля, считаются пользовательскими переопределениями и сохраняются в manifest.
+В Generate доступен **Publication preset**. Сначала выберите журнал и нажмите **Apply**, затем при необходимости измените отдельные параметры в Processing. Профиль задает встроенный Word-шаблон, поля и шрифт документа, диапазоны спектров, MNGP по умолчанию, ориентацию appendix и дополнительные предупреждения проверки. Настройки Processing, измененные после применения профиля, считаются пользовательскими переопределениями и сохраняются в manifest. В Patch операция **Reformat existing SI** применяет другой профиль к уже созданному SI без повторного запуска обработки Mnova.
 
 | Издательство | Доступные профили |
 |---|---|
@@ -228,11 +245,11 @@ Patch использует уже обработанные PNG и Mnova OLE и �
 
 | Папка | Содержимое |
 |---|---|
-| `docx/` | `support_information.docx` и manifest |
-| `input/` | копии использованных входных файлов |
-| `spectra/` | PNG спектров |
-| `mnova/` | обработанные и одиночные `.mnova` |
-| `logs/` | диагностические логи |
-| `reports/` | отчеты обработки и проверки |
+| `docx/` | `support_information.docx`, `support_information.manifest.json` и `support_information.run_summary.json` |
+| `input/` | копии Word-входов, профилей `.mngp` и использованного Spectra source |
+| `spectra/` | каталог `processed_spectra/`, PNG и архив `processed_spectra.zip`, если спектры обрабатывались |
+| `mnova/` | каталог `processed/` с обработанными и одиночными `.mnova` для кликабельных объектов |
+| `logs/` | логи запуска, автоматизации Word/ChemDraw/Mnova и каталог `mnova_reports/` |
+| `reports/` | текстовые отчеты NMR и отчеты проверки; операции Add/Patch также сохраняют собственный JSON-отчет |
 
-При ошибке сначала откройте `logs/` последнего запуска. Не редактируйте выходной DOCX во время повторной генерации: Word блокирует открытый файл.
+При ошибке сначала откройте `logs/` последнего запуска. Не редактируйте выходной DOCX во время повторной генерации: Word блокирует открытый файл. Для сообщения об ошибке приложите `support_information.run_summary.json` и папку `logs/` проблемного запуска.

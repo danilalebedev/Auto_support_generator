@@ -75,6 +75,7 @@ $payloadExamplesDir = Join-Path $payloadDir "examples"
 New-Item -ItemType Directory -Path $payloadExamplesDir | Out-Null
 
 Copy-Item -LiteralPath $appExe -Destination (Join-Path $payloadDir "AutoSupportGenerator.exe")
+Copy-Item -LiteralPath (Join-Path $root "LICENSE") -Destination (Join-Path $payloadDir "LICENSE")
 Copy-Item -LiteralPath (Join-Path $root "README.md") -Destination (Join-Path $payloadDir "README.md")
 Copy-Item -LiteralPath (Join-Path $root "README_RU.md") -Destination (Join-Path $payloadDir "README_RU.md")
 Copy-Item -LiteralPath (Join-Path $root "README_EN.md") -Destination (Join-Path $payloadDir "README_EN.md")

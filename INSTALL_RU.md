@@ -7,7 +7,7 @@
 - ChemDraw/ChemOffice с поддержкой OLE;
 - MestReNova.
 
-Проверенные версии: ChemDraw `22.2.0.3300`, MestReNova `14.2.0-26256`. Python для готовой сборки не нужен.
+Проверенные версии: ChemDraw `22.2.0.3300`, MestReNova `14.2.0-26256`. Используйте [официальную инструкцию загрузки ChemDraw](https://support.revvitysignals.com/hc/en-us/articles/4408210538132-How-do-I-download-the-MSI-installer-for-ChemDraw) и [официальную страницу загрузки Mnova](https://mestrelab.com/download). Обе программы требуют собственной действующей лицензии и не входят в установщик. Python для готовой сборки не нужен.
 
 ## Установка
 
@@ -54,6 +54,13 @@ examples\example_3
 6. Нажмите **Generate SI**.
 
 Подробное описание всех функций находится в `README_RU.md` и внутри страницы **Instructions** приложения.
+
+## Контакты
+
+- Email: [lebedevdanilaaa@gmail.com](mailto:lebedevdanilaaa@gmail.com)
+- Telegram: [@lebdanchem](https://t.me/lebdanchem)
+
+При обращении приложите `support_information.run_summary.json` и папку `logs` проблемного запуска.
 
 ## Если программа не запускается
 

@@ -13,6 +13,21 @@ Auto Support Generator is an open-source research software project. Its source c
 Author: Danila Lebedev  
 Copyright © 2026 Danila Lebedev
 
+## Contact
+
+Questions, feedback, or bug reports are welcome. Contact the author:
+
+- Email: [lebedevdanilaaa@gmail.com](mailto:lebedevdanilaaa@gmail.com)
+- Telegram: [@lebdanchem](https://t.me/lebdanchem)
+
+## License
+
+Copyright © 2026 Danila Lebedev.
+
+This project is licensed under the Apache License, Version 2.0.
+
+See the [LICENSE](LICENSE) file for details.
+
 ![Auto Support Generator interface](docs/assets/gui_overview.png)
 
 ## Purpose
@@ -41,7 +56,9 @@ The application also preserves editable ChemDraw OLE structures, obtains structu
 | ChemDraw | structures and names | 22.2.0.3300 |
 | MestReNova | NMR processing | 14.2.0-26256 |
 
-The packaged application does not require a separate Python installation. Open ChemDraw and MestReNova manually once before the first run. If MestReNova is not detected, select its `.exe` on Generate.
+Licensed installers are available through the [official ChemDraw download guidance](https://support.revvitysignals.com/hc/en-us/articles/4408210538132-How-do-I-download-the-MSI-installer-for-ChemDraw) and the [official Mnova downloads page](https://mestrelab.com/download). ChemDraw and MestReNova are not bundled with Auto Support Generator and require their own valid licenses.
+
+The packaged application does not require a separate Python installation. Open Word, ChemDraw and MestReNova manually once before the first run and complete their initial setup. If MestReNova is not detected, select its `.exe` on Generate.
 
 ## Installation
 
@@ -103,7 +120,7 @@ The file is divided by fixed labels:
 - `[AUTO SI: SI TEMPLATE]` — optional output text and formatting;
 - `[AUTO SI: END]` — end of input data.
 
-When both Reaction schema and Scope are present, reagent-loadings calculation is enabled automatically. If SI template is absent, the selected **Publication preset** is used. Missing optional sections and fields do not stop generation. Ready-to-edit combined examples are available at `examples/example_1/All_in_one_input.docx`, and in `example_2` and `example_3`.
+When both Reaction schema and Scope are present, reagent-loadings calculation is enabled automatically. If SI template is absent, the selected **Publication preset** is used. Publication preset, Spectra source, MestReNova, `.mngp`, and Processing settings remain application settings and are not stored in the all-in-one DOCX. Missing optional sections and fields do not stop generation. Ready-to-edit combined examples are available at `examples/example_1/All_in_one_input.docx`, and in `example_2` and `example_3`.
 
 ## Processing
 
@@ -169,7 +186,7 @@ Old blocks are not rebuilt. Duplicate numbers or mismatched numbers across input
 
 ## Publication presets
 
-**Publication preset** on Generate controls the built-in Word template, page/font settings, spectrum windows, default MNGP files, appendix layout and journal-specific validation warnings. Processing values changed after applying a preset are treated as user overrides and recorded in the manifest.
+On Generate, choose a **Publication preset** and click **Apply**, then adjust individual Processing values if needed. The preset controls the built-in Word template, page/font settings, spectrum windows, default MNGP files, appendix layout and journal-specific validation warnings. Processing values changed after applying a preset are treated as user overrides and recorded in the manifest. In Patch, **Reformat existing SI** applies another preset to an existing SI without rerunning Mnova processing.
 
 | Publisher | Available profiles |
 |---|---|
@@ -213,11 +230,11 @@ Each run creates `output/runs/YYYYMMDD_HHMMSS_name/`:
 
 | Folder | Contents |
 |---|---|
-| `docx/` | final `support_information.docx` and manifest |
-| `input/` | copies of inputs used for the run |
-| `spectra/` | spectrum PNG files |
-| `mnova/` | processed and single-spectrum `.mnova` files |
-| `logs/` | diagnostic logs |
-| `reports/` | processing and validation reports |
+| `docx/` | `support_information.docx`, `support_information.manifest.json`, and `support_information.run_summary.json` |
+| `input/` | copies of Word inputs, `.mngp` profiles, and the Spectra source used for the run |
+| `spectra/` | `processed_spectra/`, PNG files, and `processed_spectra.zip` when spectra were processed |
+| `mnova/` | `processed/` with processed and single-spectrum `.mnova` files used by clickable objects |
+| `logs/` | run, Word/ChemDraw/Mnova automation logs, and `mnova_reports/` |
+| `reports/` | NMR text and validation reports; Add and Patch runs also write their operation-specific JSON report |
 
-If a run fails, inspect the latest `logs/` folder first. Close an existing output DOCX before regenerating it because Word locks open files.
+If a run fails, inspect the latest `logs/` folder first. Close an existing output DOCX before regenerating it because Word locks open files. When reporting a failure, attach `support_information.run_summary.json` and the run's `logs/` folder.

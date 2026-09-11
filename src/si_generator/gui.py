@@ -849,12 +849,12 @@ class SIGeneratorApp:
                 "- Open logs: opens diagnostic logs for Word, ChemDraw and Mnova automation.\n"
                 "- Open report: opens the readable run report.\n\n"
                 "Output folder structure\n"
-                "- docx: final support and manifest.\n"
-                "- input: copied input files used for this run.\n"
-                "- spectra: exported spectrum pictures.\n"
-                "- mnova: processed Mnova files.\n"
-                "- logs: automation diagnostics.\n"
-                "- reports: NMR text reports and validation summaries."
+                "- docx: support_information.docx, support_information.manifest.json and support_information.run_summary.json.\n"
+                "- input: copies of Word inputs, .mngp profiles and the spectra source used for the run.\n"
+                "- spectra: processed_spectra, exported PNG files and processed_spectra.zip when spectra were processed.\n"
+                "- mnova: processed and single-spectrum .mnova files used by clickable objects.\n"
+                "- logs: run, Word/ChemDraw/Mnova automation logs and mnova_reports.\n"
+                "- reports: NMR text and validation reports; Add and Patch also write operation-specific JSON reports."
             ),
             wraplength=760,
             justify="left",
@@ -981,7 +981,7 @@ class SIGeneratorApp:
             profiles,
             text=(
                 "How presets work\n"
-                "- Generate: select a preset, then optionally change individual fields in Processing. Overrides are recorded in the manifest.\n"
+                "- Generate: select a preset and click Apply, then optionally change individual fields in Processing. Overrides are recorded in the manifest.\n"
                 "- Add / Same series: inherits the old preset. Add / New method: uses the selected preset.\n"
                 "- Patch / Reformat: rebuilds an existing SI for another journal without reprocessing spectra.\n"
                 "- Built-in DOCX files are reproducible house templates based on current author guidance, not official publisher templates. Always check the journal website before submission.\n\n"
@@ -992,6 +992,37 @@ class SIGeneratorApp:
                 "- Elsevier: Tetrahedron, Tetrahedron Letters, European Journal of Medicinal Chemistry, Bioorganic & Medicinal Chemistry.\n"
                 "- Nature Portfolio: Nature Chemistry, Communications Chemistry.\n"
                 "- Other: Molecules, Beilstein Journal of Organic Chemistry, Chemical Papers, and General Organic SI."
+            ),
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+
+        requirements = self._instruction_block(content, 12, "Software requirements", "Tested external tools and licensed downloads.")
+        ttk.Label(
+            requirements,
+            text=(
+                "Tested versions\n"
+                "- Microsoft Word desktop: Microsoft 365 / Word 2021.\n"
+                "- ChemDraw: 22.2.0.3300.\n"
+                "- MestReNova: 14.2.0-26256.\n\n"
+                "Installation\n"
+                "- Auto Support Generator does not bundle Word, ChemDraw or MestReNova. Each product must be installed and licensed separately.\n"
+                "- ChemDraw download guidance: https://support.revvitysignals.com/hc/en-us/articles/4408210538132\n"
+                "- Mnova downloads: https://mestrelab.com/download\n"
+                "- Open all three programs once and complete their initial setup before the first generation."
+            ),
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
+
+        contact = self._instruction_block(content, 13, "Contact", "Report a problem or contact the author.", expanded=True)
+        ttk.Label(
+            contact,
+            text=(
+                "Author: Danila Lebedev\n"
+                "Email: lebedevdanilaaa@gmail.com\n"
+                "Telegram: @lebdanchem (https://t.me/lebdanchem)\n\n"
+                "For a generation failure, include support_information.run_summary.json and the logs folder from the failed run."
             ),
             wraplength=760,
             justify="left",

@@ -21,4 +21,8 @@ This beta release expands Auto Support Generator from the original SI generation
 
 Download `AutoSupportGeneratorSetup.exe` from the GitHub release assets and run it on Windows. Microsoft Word, ChemDraw and MestReNova must be installed separately.
 
+Tested integrations are ChemDraw `22.2.0.3300` and MestReNova `14.2.0-26256`. Use the vendors' licensed distribution channels: [ChemDraw download guidance](https://support.revvitysignals.com/hc/en-us/articles/4408210538132-How-do-I-download-the-MSI-installer-for-ChemDraw) and [Mnova downloads](https://mestrelab.com/download).
+
+Support: [lebedevdanilaaa@gmail.com](mailto:lebedevdanilaaa@gmail.com), [@lebdanchem](https://t.me/lebdanchem).
+
 This is a research beta. Keep copies of original input data and review generated SI before publication.

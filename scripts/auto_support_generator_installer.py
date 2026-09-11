@@ -16,6 +16,7 @@ LOG_FILE_NAME = "install.log"
 
 PAYLOAD_FILES = (
     APP_EXE_NAME,
+    "LICENSE",
     "README.md",
     "README_RU.md",
     "README_EN.md",
