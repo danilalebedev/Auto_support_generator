@@ -736,7 +736,7 @@ class SIGeneratorApp:
         content = instructions_scroll.content
         content.columnconfigure(0, weight=1)
 
-        quick = self._instruction_block(content, 0, "Quick start", "Minimal path for a normal SI run.", expanded=True)
+        quick = self._instruction_block(content, 0, "Quick start", "Minimal path for a normal SI run.")
         ttk.Label(
             quick,
             text=(
@@ -761,7 +761,7 @@ class SIGeneratorApp:
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        generate = self._instruction_block(content, 1, "Generate", "Main inputs needed to build a new SI.", expanded=True)
+        generate = self._instruction_block(content, 1, "Generate", "Main inputs needed to build a new SI.")
         ttk.Label(
             generate,
             text=(
@@ -786,19 +786,26 @@ class SIGeneratorApp:
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        input_formats = self._instruction_block(content, 2, "Input formats", "Separate documents or one combined Word input.", expanded=True)
+        input_formats = self._instruction_block(content, 2, "Input formats", "Separate documents or one combined Word input.")
         ttk.Label(
             input_formats,
             text=(
                 "Separate files\n"
                 "- Compound_table.docx is required. It stores product numbers, properties, analytical values and editable ChemDraw OLE structures.\n"
-                "- SI_template.docx is optional and controls the generated wording and Word formatting.\n"
+                "- SI_template.docx is a custom method template. Lay it out like one finished compound block; its text, alias order, bold and italic formatting control the generated SI.\n"
                 "- Reaction_schema.docx and Scope.docx are optional as a pair. Together they enable reagent-loadings and yield calculations.\n\n"
+                "How the three files work together\n"
+                "- SI template: decide which calculated values should appear by placing {Object.attribute} aliases in the desired sentence.\n"
+                "- Reaction schema: list Reagent_1, Reagent_2, named reagents and solvents with equivalents, MW, density or concentration. Reagent_1 defines reaction scale.\n"
+                "- Scope: add one row per product with matching Product_number, variable ChemDraw OLE structures, Reagent_1 mass and isolated product mass.\n"
+                "- The app calculates reagent mmol/mass/volume and product yield, then inserts only values whose aliases are present in the SI template.\n"
+                "- Compound table, Scope and top-level spectra folders must use exactly the same product numbers.\n\n"
                 "Single all-in-one DOCX\n"
                 "- Upload one All_in_one_input.docx instead of the four Word files above.\n"
                 "- [AUTO SI: COMPOUND TABLE] is required and must be followed by the compound table.\n"
                 "- [AUTO SI: REACTION SCHEMA] and [AUTO SI: SCOPE] are optional, but both are required to calculate loadings.\n"
-                "- [AUTO SI: SI TEMPLATE] is optional. If omitted, the selected Publication preset supplies the SI template.\n"
+                "- [AUTO SI: SI TEMPLATE] contains the same editable custom template as SI_template.docx. Every bundled all-in-one example includes it.\n"
+                "- If the SI template section is removed, the selected Publication preset supplies the template.\n"
                 "- [AUTO SI: END] marks the end of the combined input. Keep every section label unchanged.\n"
                 "- A missing optional section or an optional value marked with '-' does not stop generation.\n\n"
                 "Still selected in the application\n"
@@ -831,8 +838,9 @@ class SIGeneratorApp:
                 "- Whittaker settings: advanced baseline parameters for difficult 13C spectra.\n"
                 "- Highlight solvent peaks: keep off for normal reports unless you explicitly want solvent peaks marked.\n\n"
                 "Chemistry options\n"
-                "- Check support: validates NMR, HRMS and elemental analysis when enough data are available.\n"
-                "- 13C validation automatically counts symmetry-equivalent aromatic carbons from the ChemDraw structure as one signal.\n"
+                "- Check support: sums 1H integrals and counts 13C signals against the molecular formula, compares found and calculated HRMS, and validates elemental analysis.\n"
+                "- 13C validation counts symmetry-equivalent aromatic carbons from the ChemDraw structure as one expected signal.\n"
+                "- Validation reports mismatches for review; it does not replace manual spectrum interpretation.\n"
                 "- Calculate elemental analysis: generates calculated elemental-analysis values for rows where this block is not explicitly disabled."
             ),
             wraplength=760,
@@ -854,13 +862,18 @@ class SIGeneratorApp:
                 "- spectra: processed_spectra, exported PNG files and processed_spectra.zip when spectra were processed.\n"
                 "- mnova: processed and single-spectrum .mnova files used by clickable objects.\n"
                 "- logs: run, Word/ChemDraw/Mnova automation logs and mnova_reports.\n"
-                "- reports: NMR text and validation reports; Add and Patch also write operation-specific JSON reports."
+                "- reports: NMR text and validation reports; Add and Patch also write operation-specific JSON reports.\n\n"
+                "Editing generated spectra\n"
+                "- Every run has its own folder, so an earlier SI is not overwritten.\n"
+                "- Separate editable 1H and 13C files are kept under mnova/processed; exported pictures are under spectra.\n"
+                "- In mnova appendix mode, double-click a spectrum picture in support_information.docx, edit it in MestReNova, then save it back to Word.\n"
+                "- Keep support_information.manifest.json: Check, Patch and Add use it to connect compounds, settings and artifacts."
             ),
             wraplength=760,
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        templates = self._instruction_block(content, 5, "Example files", "Open or copy editable input files for both input modes.", expanded=True)
+        templates = self._instruction_block(content, 5, "Example files", "Open or copy editable input files for both input modes.")
         templates.columnconfigure(1, weight=1)
         ttk.Button(templates, text="Copy all examples", command=self._copy_starter_files).grid(row=0, column=2, sticky="e", padx=(8, 0), pady=(0, 8))
         for row, (label, relative_path, description) in enumerate(INSTRUCTION_TEMPLATE_FILES, start=1):
@@ -903,9 +916,11 @@ class SIGeneratorApp:
                 "- Existing manifest: upload support_information.manifest.json from a previous run.\n"
                 "- Support .docx override: optional. Use only if the support file was moved or renamed.\n\n"
                 "What it checks\n"
-                "- Manifest structure and compound order.\n"
-                "- Support file, bookmarks, linked artifacts and unresolved template aliases.\n"
-                "- Analytical NMR/HRMS/elemental-analysis warnings are calculated during Generate and saved in its reports.\n\n"
+                "- Manifest structure, compound order, support file, bookmarks, linked artifacts and unresolved template aliases.\n"
+                "- 1H integral count against the number of H atoms in the molecular formula.\n"
+                "- 13C signal count against the formula, with symmetry-equivalent aromatic carbons counted once when structure data are available.\n"
+                "- HRMS found m/z against the calculated value and elemental-analysis values against the molecular formula.\n"
+                "- Chemical checks are rerun from compound snapshots stored in the manifest; MestReNova is not opened.\n\n"
                 "Output\n"
                 "- JSON check report.\n"
                 "- Short readable summary in the GUI."
@@ -1019,7 +1034,7 @@ class SIGeneratorApp:
             justify="left",
         ).grid(row=0, column=0, sticky="ew")
 
-        contact = self._instruction_block(content, 13, "Contact", "Report a problem or contact the author.", expanded=True)
+        contact = self._instruction_block(content, 13, "Contact", "Report a problem or contact the author.")
         ttk.Label(
             contact,
             text=(
@@ -1038,8 +1053,9 @@ class SIGeneratorApp:
         ttk.Label(
             parent,
             text=(
-                "Use aliases in Word as {Object.attribute}. Formatting is inherited from the placeholder: "
-                "if the placeholder is bold or italic, the inserted value keeps that style."
+                "Use aliases in Word as {Object.attribute}. Object identifies the entity (Product, Reagent_1, NBS); "
+                "attribute selects its value (name, mg, mmol, yield.percent). For example, {NBS.mg} requests the "
+                "calculated NBS mass. Formatting is inherited from the placeholder: if it is bold or italic, the inserted value keeps that style."
             ),
             wraplength=760,
             justify="left",
@@ -1109,7 +1125,7 @@ class SIGeneratorApp:
                 ("{nmr.1h.label}", "Mnova report / input table", "1H NMR label, usually 1H NMR."),
                 ("{nmr.1h.conditions}", "Mnova report / input table", "1H NMR solvent and frequency, for example CDCl3, 600 MHz."),
                 ("{nmr.1h.peaks}", "Mnova report / input table", "1H NMR peak list after delta =."),
-                ("{nmr.13c.label}", "Mnova report / input table", "13C NMR label, usually 13C{1H} NMR."),
+                ("{nmr.13c.label}", "Mnova report / input table", "13C NMR label, usually 13C NMR."),
                 ("{nmr.13c.conditions}", "Mnova report / input table", "13C NMR solvent and frequency."),
                 ("{nmr.13c.peaks}", "Mnova report / input table", "13C NMR peak list after delta =."),
                 ("{nmr.extra}", "Input table", "Additional NMR lines, for example 19F NMR."),

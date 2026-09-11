@@ -104,6 +104,14 @@ class UnifiedWordInputTests(unittest.TestCase):
         for marker in SECTION_MARKERS.values():
             self.assertIn(marker, text)
 
+    def test_every_bundled_all_in_one_example_contains_an_si_template(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            staging_root = Path(tmp)
+            for example_name in ("example_1", "example_2", "example_3"):
+                source = REPO_ROOT / "examples" / example_name / "All_in_one_input.docx"
+                bundle = materialize_unified_input(source, staging_root / example_name)
+                self.assertIsNotNone(bundle.si_template, example_name)
+
     def test_minimal_all_in_one_input_runs_without_optional_sections(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

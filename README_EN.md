@@ -56,7 +56,7 @@ Auto Support Generator builds organic-chemistry Supporting Information (SI). It 
 |---|---|
 | **Generate** | Creates a new SI from a compound table and raw spectra and applies a publication preset. |
 | **Processing** | Controls NMR processing, appendix type and analytical validation. |
-| **Check** | Checks the integrity of a previous output: manifest, DOCX, bookmarks and artifacts. |
+| **Check** | Checks a previous output: manifest/DOCX/artifact integrity, 1H and 13C counts against the molecular formula, HRMS and elemental analysis; writes a mismatch report. |
 | **Patch** | Creates a modified SI copy without reprocessing spectra: renumber, remove, reorder, swap or journal reformatting. |
 | **Add** | Appends new compounds without rebuilding old compound blocks. |
 | **Instructions** | Provides built-in help, alias tables and downloadable examples. |
@@ -99,15 +99,15 @@ This section is for developers. Install Python 3.12, run `Setup Auto SI Generato
 | **Publication preset** | Target journal. Selection applies its Word template, MNGP profiles, ppm windows and appendix rules; **Apply** restores preset values after manual edits. |
 | **Input format** | **Separate files** for the conventional document set or **Single all-in-one DOCX** for one combined file. |
 | **Compound table** | `Compound_table.docx`: one row per compound with number, properties, HRMS/IR/Anal and a ChemDraw OLE structure. |
-| **All-in-one input** | `All_in_one_input.docx` containing the Compound table and optional Reaction schema, Scope and SI template sections. Used only in **Single all-in-one DOCX** mode. |
+| **All-in-one input** | `All_in_one_input.docx` containing Compound table, Reaction schema, Scope and a custom SI template. Used only in **Single all-in-one DOCX** mode; bundled examples contain all four parts. |
 | **Spectra source** | A `Spectra_source` folder or `Spectra_source.zip`, organized by compound number. |
-| **Output folder** | Parent folder in which the app creates a separate run directory. |
+| **Output folder** | Parent folder for results. The app creates a separate run directory and sorts DOCX files, editable Mnova files, PNG images, input copies, reports and logs into subfolders. |
 
 ### Optional inputs
 
 | GUI field | Input |
 |---|---|
-| **SI template .docx** | `SI_template.docx` controlling text, formatting and aliases. |
+| **SI template .docx** | `SI_template.docx` controlling text, formatting and aliases. This is the custom method template: lay it out like the desired SI and change wording, field order, bold/italic styling and displayed values. When empty, the selected publication template is used. |
 | **MestReNova .exe** | `MestReNova.exe` when automatic detection fails. |
 | **1H .mngp** | Custom 1H display profile; built-in classic is used when empty. |
 | **13C .mngp** | Custom 13C display profile; built-in classic is used when empty. |
@@ -121,6 +121,62 @@ This section is for developers. Install Python 3.12, run `Setup Auto SI Generato
 
 Enable loadings only when both files are supplied. Product numbers in Compound table and Scope must match.
 
+### Preparing the Word inputs
+
+Start with the files under **Instructions → Example files**. Keep their column headers and replace the demonstration values and OLE structures instead of creating new tables from scratch.
+
+**1. Configure the SI template first**
+
+`SI_template.docx` represents one finished compound block. An object names the entity, such as `Product`, `Reagent_1`, `NBS` or `Solvent_CHCl3`; the attribute after the dot selects a property such as `.name`, `.mg`, `.mmol` or `.ml`. Thus `{NBS.mg}` means “calculated NBS mass”, while `{Product.yield.percent}` means “product yield in percent”. The application repeats the block for every product and replaces aliases with values. Bold or italic formatting applied to an alias in Word is inherited by the inserted value.
+
+Include only fields you want in the final SI. A value may be calculated but is displayed only where its alias occurs. For a custom method, change the normal text around aliases and the reagent objects used. In all-in-one mode, place the same template after `[AUTO SI: SI TEMPLATE]`.
+
+**2. Fill Compound table**
+
+| Column | How to fill it |
+|---|---|
+| `number` | Unique product number such as `2a`. It must exactly match Scope and the spectrum folder name. |
+| `structure` | Editable ChemDraw OLE object pasted into the Word cell. Do not replace it with a PNG. The app obtains formula, molecular weight, SMILES and name from this structure. |
+| `color` | Appearance such as `white solid`; `-` disables the field for that compound. |
+| `mp` | Melting point without `°C`; `-` disables the field. |
+| `Rf` | Value and system, for example `0.38 (petroleum ether : ethyl acetate = 7 : 1)`; `-` disables the field. |
+| `HRMS` | Experimental found `m/z`; the calculated value and ion formula come from the structure. `-` disables HRMS. |
+| `Elemental_analysis` | Experimental values such as `C, 48.38; H, 3.69`; `-` disables Anal. |
+| `IR` | IR peak list when this column is used; `-` disables IR. |
+
+**3. Fill Reaction schema**
+
+| Column | How to fill it |
+|---|---|
+| `Reagents` | Use `Reagent_1`, `Reagent_2`, ... for variable Scope structures; a normal name (`NBS`, `DBP`) for a constant reagent; or `Solvent_CHCl3` for a solvent. `Reagent_1` defines the reaction scale. |
+| `equiv.` | Equivalents relative to `Reagent_1`; normally use `1` for `Reagent_1`. |
+| `MW, g/mol` | Molecular weight of a constant reagent. For `Reagent_N`, it is extracted from the Scope OLE structure and may remain blank. |
+| `Density, g/ml` | Density of a liquid reagent when a calculated volume is required. |
+| `Concentration, M` | Solution or solvent concentration when volume is calculated from reaction scale. |
+
+The number of `Reagent_N` objects is not limited to two: add matching `Reagent_3`, `Reagent_4`, and later rows and columns as needed. Each Reaction schema object name must match the start of its alias in SI template.
+
+**4. Fill Scope**
+
+| Column | How to fill it |
+|---|---|
+| `Reagent_N` | ChemDraw OLE structure of the variable reagent for that series row. |
+| `Mass of Reagent_1, mg` | Actual mass of limiting `Reagent_1`; this determines reaction scale. |
+| `Product` | Product OLE structure used for molecular weight and name calculation. |
+| `Product_number` | The same number as Compound table and Spectra source. |
+| `Mass of product, mg` | Isolated product mass used to calculate amount and yield. |
+
+**5. Loading calculation**
+
+1. Molecular weights of variable reagents and products come from ChemDraw; constant reagents use `MW` from Reaction schema.
+2. Reaction scale is based on `Reagent_1`: `mmol = mass_mg / MW / equiv`.
+3. For each following reagent: `mmol = reaction_scale × equiv`, then `mass_mg = mmol × MW`.
+4. For a liquid with density: `volume_mcl = mass_mg / density_g_ml`. For a solution with concentration: `volume_ml = reaction_scale_mmol / concentration_M`.
+5. For the product: `product_mmol = product_mass_mg / product_MW`; `yield_percent = product_mmol / reaction_scale_mmol × 100`.
+6. The `.g`, `.kg`, `.mol`, `.ml` and `.l` aliases convert the calculated base value; mL volumes are displayed to two decimal places.
+
+If both loading tables are absent, SI generation continues without these calculations. If only one file is supplied or product numbers differ, the app reports the problem instead of silently calculating against mismatched inputs.
+
 ### Single all-in-one DOCX
 
 The file is divided by fixed labels:
@@ -131,7 +187,7 @@ The file is divided by fixed labels:
 - `[AUTO SI: SI TEMPLATE]` — optional output text and formatting;
 - `[AUTO SI: END]` — end of input data.
 
-When both Reaction schema and Scope are present, reagent-loadings calculation is enabled automatically. If SI template is absent, the selected **Publication preset** is used. Publication preset, Spectra source, MestReNova, `.mngp`, and Processing settings remain application settings and are not stored in the all-in-one DOCX. Missing optional sections and fields do not stop generation. Ready-to-edit combined examples are available at `examples/example_1/All_in_one_input.docx`, and in `example_2` and `example_3`.
+Every bundled `All_in_one_input.docx` already contains Compound table, Reaction schema, Scope and SI template. Edit the template directly under `[AUTO SI: SI TEMPLATE]`; the application extracts and uses it in place of a separate file. If this section is removed, the selected **Publication preset** supplies the template. Reaction schema plus Scope enables loading calculations automatically. Publication preset, Spectra source, Output folder, MestReNova, `.mngp` and Processing remain application settings and are not stored in the combined DOCX.
 
 ## Processing
 
@@ -150,6 +206,15 @@ When both Reaction schema and Scope are present, reagent-loadings calculation is
 
 During `13C NMR` validation, the program reads the ChemDraw structure and automatically counts graph-symmetric aromatic carbons as one expected signal. Non-aromatic carbons remain separate. If the structure or SMILES is unavailable or inconsistent with the formula, validation falls back to the strict total carbon count.
 
+### Chemical validation logic
+
+- **1H NMR:** integral labels such as `1H`, `2H` and `3H` are summed and compared with the number of H atoms in the molecular formula.
+- **13C NMR:** described signals are counted and compared with the expected count. Symmetry-equivalent aromatic carbons from the structure count as one signal; without structure data, the full formula carbon count is used.
+- **HRMS:** found `m/z` is compared with the calculated value for the formula and adduct. The base tolerance is 5 ppm, while a publication profile may add journal-specific requirements.
+- **Elemental analysis:** experimental element percentages are compared with values calculated from the formula.
+
+This check does not prove a structure and does not replace manual spectrum interpretation. It identifies mismatches that should be reviewed in the input, integration, peak picking or molecular formula.
+
 ## Spectra source layout
 
 ```text
@@ -166,7 +231,7 @@ Inner experiment names may vary; acquisition metadata identifies 1H and 13C. Top
 
 ## Check
 
-Select `support_information.manifest.json` from the old run's `docx` folder, optionally override a moved support DOCX, then click **Check support**. Check validates the manifest, compound order, DOCX/artifacts, bookmarks and unresolved aliases. It does not run MestReNova or recalculate analytical chemistry; that validation runs during Generate.
+Select `support_information.manifest.json` from the old run's `docx` folder, optionally override a moved support DOCX, then click **Check support**. Check validates the manifest, compound order, DOCX/artifacts, bookmarks and unresolved aliases. It then repeats the formula-based 1H, 13C, HRMS and elemental-analysis checks from compound snapshots stored in the manifest and writes mismatches to `support_information.check_report.json`. MestReNova is not opened.
 
 ## Patch
 
@@ -212,7 +277,7 @@ Profiles use a publisher base plus journal-specific overrides. Bundled DOCX file
 
 ## SI template aliases
 
-Place `{Object.attribute}` aliases directly in Word. Bold/italic formatting applied to an alias is inherited by the generated value.
+The SI template looks like the intended output and defines the style of a particular method. Place `{Object.attribute}` aliases directly in Word; bold/italic formatting applied to an alias is inherited by the generated value. The object before the dot identifies the entity (`Product`, `Reagent_1`, `NBS`), and the attribute after it selects the required property (`name`, `mg`, `mmol`, `yield.percent`). For example, `{Reagent_1.name}` and `{Reagent_1.mmol}` refer to one object but display different properties.
 
 - Product: `{Product.name}`, `{Product.number}`, `{Product.structure}`, `{Product.mg}`, `{Product.mmol}`, `{Product.yield.percent}`, `{Product.appearance}`, `{Product.mp}`, `{Product.rf.value}`, `{Product.rf.system}`, `{Product.nmr.1h.picture}`, `{Product.nmr.13c.picture}`.
 - Reagents: `{Reagent_1.name}` and `.mg`, `.g`, `.kg`, `.mmol`, `.mol`, `.mcl`, `.ml`, `.l`, `.eq`, `.number`. The same attributes work for named reagents and solvents.
@@ -248,4 +313,6 @@ Each run creates `output/runs/YYYYMMDD_HHMMSS_name/`:
 | `logs/` | run, Word/ChemDraw/Mnova automation logs, and `mnova_reports/` |
 | `reports/` | NMR text and validation reports; Add and Patch runs also write their operation-specific JSON report |
 
-If a run fails, inspect the latest `logs/` folder first. Close an existing output DOCX before regenerating it because Word locks open files. When reporting a failure, attach `support_information.run_summary.json` and the run's `logs/` folder.
+Each generation has its own folder, so an earlier SI is never overwritten. `mnova/processed/` contains separate editable 1H and 13C `.mnova` files, while `spectra/` contains the corresponding PNG images. In `mnova` appendix mode, double-click a spectrum picture inside `support_information.docx`, edit it in MestReNova, then save it back to Word. This supports manual correction of labels, peaks and scale after automatic processing.
+
+`support_information.manifest.json` connects compounds, DOCX blocks, settings and artifacts and is required by Check, Patch and Add. `support_information.run_summary.json` contains the run result and warning list. If a run fails, inspect its `logs/` folder first. Do not keep the output DOCX open while regenerating because Word locks it. Attach the run summary and `logs/` folder when reporting a problem.

@@ -14,12 +14,50 @@ from si_generator.docx_builder import build_document_from_model
 from si_generator.domain.bookmarks import bookmark_name_for_block_id
 from si_generator.domain.manifest import check_manifest, manifest_has_errors
 from si_generator.graph.state import CheckSIRequest
-from si_generator.domain.compound import Compound
+from si_generator.domain.compound import Compound, compound_to_domain_dict
 from si_generator.render.document_model import build_si_document_model
 from si_generator.workflows.check_si import run_check_si
 
 
 class CheckWorkflowTests(unittest.TestCase):
+    def test_manifest_check_repeats_formula_based_analytical_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            support_docx = root / "support_information.docx"
+            Document().save(support_docx)
+            manifest_path = root / "support_information.manifest.json"
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="Example",
+                formula="C2H6O",
+                h1_nmr="delta = 3.70 (q, J = 7.0 Hz, 2H).",
+                c13_nmr="delta = 58.0.",
+                hrms_found="999.0000",
+            )
+            manifest = {
+                "run_id": "run",
+                "artifacts": {"support_docx": str(support_docx), "manifest": str(manifest_path)},
+                "order": ["cmp_001"],
+                "compounds": {
+                    "cmp_001": {
+                        "id": "cmp_001",
+                        "number": "2a",
+                        "docx_block_id": "compound:cmp_001",
+                        "artifacts": {},
+                        "domain_snapshot": compound_to_domain_dict(compound),
+                    }
+                },
+            }
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            state = run_check_si(CheckSIRequest(manifest_path=manifest_path))
+
+        issue_codes = {issue["code"] for issue in state["issues"]}
+        self.assertIn("NMR_H_COUNT_MISMATCH", issue_codes)
+        self.assertIn("NMR_C_COUNT_MISMATCH", issue_codes)
+        self.assertIn("HRMS_MISMATCH", issue_codes)
+
     def test_manifest_check_passes_for_valid_generated_manifest_shape(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

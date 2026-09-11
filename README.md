@@ -2,7 +2,7 @@
 
 ## Video demo
 
-[![Auto Support Generator interface demo](docs/assets/Auto_Support_Generator_promo_ru_preview.gif)](docs/assets/Auto_Support_Generator_promo_ru.mp4)
+[![Auto Support Generator interface demo](https://raw.githubusercontent.com/danilalebedev/Auto_support_generator/main/docs/assets/Auto_Support_Generator_promo_ru_preview.gif)](https://github.com/danilalebedev/Auto_support_generator/blob/main/docs/assets/Auto_Support_Generator_promo_ru.mp4)
 
 Click the preview to open the full video with sound.
 

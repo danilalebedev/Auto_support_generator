@@ -7,6 +7,7 @@ from ...domain.issues import compound_issue_counts, count_issues
 from ...domain.compound import compound_from_domain_dict
 from ...domain.journal_validation import validate_compounds_for_journal
 from ...domain.manifest import check_manifest, load_manifest, manifest_has_errors
+from ...nmr_validation import validate_support
 from ..state import CheckSIState
 
 
@@ -50,6 +51,9 @@ def check_manifest_node(state: CheckSIState) -> dict:
         if isinstance(entry, dict) and entry.get("domain_snapshot")
     ]
     if snapshots:
+        validate_support(snapshots)
+        for compound in snapshots:
+            issues.extend(compound.validation_issues)
         issues.extend(validate_compounds_for_journal(snapshots, profile_id))
     status = "fail" if manifest_has_errors(issues) else "pass"
     report_path = _check_report_path(manifest_path)
