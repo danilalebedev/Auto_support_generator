@@ -70,6 +70,38 @@ class TemplateRendererTests(unittest.TestCase):
         self.assertEqual(len(replacement_runs), 1)
         self.assertTrue(replacement_runs[0].italic)
 
+    def test_capitalizes_product_name_in_compound_text_and_spectrum_header(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "2a_1H.png"
+            image.write_bytes(_tiny_png())
+            template = root / "template.docx"
+            output = root / "support.docx"
+            document = Document()
+            document.add_paragraph("{Product.name} ({Product.number})")
+            document.add_page_break()
+            document.add_paragraph("{Product.name} ({Product.number})")
+            document.add_paragraph("{Product.nmr.1h.picture}")
+            document.save(template)
+
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="fallback name",
+                h1_image_path=str(image),
+                h1_spectrum_path="fid",
+                reaction={"template_values": {"Product.name": "methyl (E)-3-phenylacrylate"}},
+            )
+            model = build_si_document_model([compound], spectra_embed_mode="png")
+            build_document_from_model(model, output, template_path=template)
+            paragraphs = [paragraph.text for paragraph in Document(output).paragraphs]
+
+        titled_paragraphs = [text for text in paragraphs if "3-phenylacrylate" in text]
+        self.assertEqual(titled_paragraphs, [
+            "Methyl (E)-3-phenylacrylate (2a)",
+            "Methyl (E)-3-phenylacrylate (2a)",
+        ])
+
     def test_new_spectrum_picture_alias_renders_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

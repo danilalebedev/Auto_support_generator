@@ -44,6 +44,24 @@ class DocumentModelTests(unittest.TestCase):
         self.assertEqual(model["metadata"]["spectrum_count"], "1")
         self.assertEqual(model["metadata"]["references_count"], "0")
 
+    def test_capitalizes_compound_name_in_description_and_spectrum_titles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            image_path = Path(tmp) / "2a_1H.png"
+            image_path.write_bytes(b"not-a-real-image-for-model-only")
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="methyl (E)-3-phenylacrylate",
+                h1_image_path=str(image_path),
+            )
+
+            model = build_si_document_model([compound])
+
+        compound_block = model["sections"][0]["blocks"][0]
+        spectrum_block = model["sections"][1]["blocks"][0]
+        self.assertEqual(compound_block["title_text"], "Methyl (E)-3-phenylacrylate (2a)")
+        self.assertEqual(spectrum_block["title_text"], "Methyl (E)-3-phenylacrylate (2a)")
+
     def test_renders_docx_from_document_model(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output_path = Path(tmp) / "support_information.docx"

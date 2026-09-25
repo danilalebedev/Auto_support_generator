@@ -15,7 +15,7 @@ from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
-from .domain.compound import Compound
+from .domain.compound import Compound, capitalize_compound_name
 from .domain.elemental_analysis import calculate_elemental_analysis_block, found_from_block
 from .domain.ir import parse_ir_block
 from .domain.massspec import build_hrms_block, hrms_adduct_text, hrms_found_text, hrms_label_text
@@ -654,14 +654,16 @@ def _emu_to_pt(value: int) -> float:
 
 
 def _compound_values(compound: Compound, *, include_preparation: bool = True) -> dict[str, str]:
-    loadings_values = {str(key): str(value) for key, value in compound.reaction.get("template_values", {}).items()}
+    loadings_values = {_key(str(key)): str(value) for key, value in compound.reaction.get("template_values", {}).items()}
+    if loadings_values.get("product.name"):
+        loadings_values["product.name"] = capitalize_compound_name(loadings_values["product.name"])
     product_values = _product_values(compound)
     values = {
-        "compound.name": compound.name,
+        "compound.name": compound.display_name,
         "compound.number": compound.number,
         "compound.label": compound.label,
         "compound.number.structure": f"[[STRUCTURE:{compound.number}]]",
-        "product.name": compound.name,
+        "product.name": compound.display_name,
         "product.number": compound.number,
         "product.structure": f"[[STRUCTURE:{compound.number}]]",
         "compound.preparation": _summary_text(compound) if include_preparation else "",

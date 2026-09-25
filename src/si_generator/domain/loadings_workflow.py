@@ -11,7 +11,7 @@ from typing import Any
 from docx import Document
 
 from ..structure_metadata import StructureMetadata, extract_structure_metadata_by_cell
-from .compound import Compound
+from .compound import Compound, capitalize_compound_name
 from .types import Issue, ReagentAmount
 
 
@@ -320,7 +320,7 @@ def _base_template_values(
     rf_system: str,
 ) -> dict[str, str]:
     return {
-        _token_key("Product.name"): _metadata_display(row.product, compound.name),
+        _token_key("Product.name"): capitalize_compound_name(_metadata_display(row.product, compound.name)),
         _token_key("Product.number"): row.product_number,
         _token_key("Product.mg"): _format_mass(row.product_mass_mg),
         _token_key("Product.g"): _format_scaled_amount(_scale_value(row.product_mass_mg, 1 / 1000)),

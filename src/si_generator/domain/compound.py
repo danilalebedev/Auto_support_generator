@@ -55,8 +55,21 @@ class Compound:
     def label(self) -> str:
         return f"({self.number})"
 
+    @property
+    def display_name(self) -> str:
+        return capitalize_compound_name(self.name)
+
     def to_domain_dict(self) -> CompoundSnapshot:
         return compound_to_domain_dict(self)
+
+
+def capitalize_compound_name(value: str) -> str:
+    """Uppercase the first letter without changing chemical nomenclature that follows it."""
+    text = str(value or "")
+    for index, character in enumerate(text):
+        if character.isalpha():
+            return f"{text[:index]}{character.upper()}{text[index + 1:]}"
+    return text
 
 
 def compound_to_domain_dict(compound: Compound) -> CompoundSnapshot:

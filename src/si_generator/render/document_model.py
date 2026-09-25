@@ -62,7 +62,7 @@ def _compound_description_block(compound: Compound) -> DocumentBlock:
         "bookmark": bookmark_name_for_block_id(block_id),
         "compound_id": compound_id,
         "display_number": compound.number,
-        "title_text": f"{compound.name} {compound.label}",
+        "title_text": f"{compound.display_name} {compound.label}",
         "structure_placeholder": f"STRUCTURE:{compound.number}",
         "content": compound,
     }
@@ -104,7 +104,7 @@ def _spectrum_block(compound: Compound, nucleus: str, embed_mode: SpectrumEmbedM
         "bookmark": bookmark_name_for_block_id(block_id),
         "compound_id": compound_id,
         "display_number": compound.number,
-        "title_text": f"{compound.name} {compound.label}",
+        "title_text": f"{compound.display_name} {compound.label}",
         "content": compound,
         "structure_placeholder": f"SPECTRUM_STRUCTURE:{compound.number}:{nucleus}",
         "nucleus": nucleus,
