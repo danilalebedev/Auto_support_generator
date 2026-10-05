@@ -10,7 +10,7 @@ from si_generator.domain.compound import Compound
 from si_generator.domain.requests import GenerateSIRequest
 from si_generator.graph.compound_store import make_compound_store
 from si_generator.graph.nodes.spectra import prepare_spectra_source_node
-from si_generator.spectra_zip import prepare_spectra_source, spectra_source_compound_numbers
+from si_generator.spectra_zip import assign_spectra_from_folder, prepare_spectra_source, spectra_source_compound_numbers
 from si_generator.workflows.generate_si import request_from_args
 
 
@@ -80,6 +80,33 @@ class SpectraSourceTests(unittest.TestCase):
         self.assertEqual(mismatch["severity"], "error")
         self.assertIn("Input compounds: 2a", mismatch["message"])
         self.assertIn("Spectra folders: 2a, 2b", mismatch["message"])
+
+    def test_assign_spectra_from_folder_stores_compound_artifact_folders(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            compound_root = root / "spectra" / "2a"
+            cif_folder = compound_root / "cif"
+            one_d = compound_root / "spectra" / "1d" / "h1"
+            two_d = compound_root / "spectra" / "2d" / "hsqc"
+            cif_folder.mkdir(parents=True)
+            one_d.mkdir(parents=True)
+            two_d.mkdir(parents=True)
+            (cif_folder / "2a.cif").write_text("data_2a", encoding="utf-8")
+            (one_d / "fid").write_text("fid", encoding="utf-8")
+            (one_d / "acqus").write_text("##$NUC1= <1H>", encoding="latin1")
+            (two_d / "ser").write_text("ser", encoding="utf-8")
+            (two_d / "acqu2s").write_text("2d", encoding="latin1")
+            compound = Compound(number="2a", name="Example")
+
+            assign_spectra_from_folder([compound], root / "spectra")
+
+        self.assertEqual(compound.cif_folder, str(cif_folder.resolve()))
+        self.assertEqual(compound.cif_files, [str((cif_folder / "2a.cif").resolve())])
+        self.assertEqual(compound.spectra_1d_folder, str((compound_root / "spectra" / "1d").resolve()))
+        self.assertIn(str((one_d / "fid").resolve()), compound.spectra_1d_files)
+        self.assertEqual(compound.spectra_2d_folder, str((compound_root / "spectra" / "2d").resolve()))
+        self.assertIn(str((two_d / "ser").resolve()), compound.spectra_2d_files)
+        self.assertEqual(compound.h1_spectrum_path, str(one_d.resolve()))
 
     def test_prepare_spectra_source_rejects_zip_slip_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

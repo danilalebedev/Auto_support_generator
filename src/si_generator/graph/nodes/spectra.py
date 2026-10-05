@@ -7,7 +7,7 @@ from ..compound_store import ordered_compounds
 from ..state import GenerateSIState, Issue
 from ...domain.spectra_config import build_spectrum_render_spec
 from ...domain.types import SpectrumRenderSpec
-from ...nmr_fill import fill_nmr_from_mnova
+from ...nmr_fill import discover_2d_experiments, fill_nmr_from_mnova
 from ...output_layout import output_root_for, prepare_output_layout
 from ...spectra_zip import assign_spectra_from_folder, prepare_spectra_source, spectra_source_compound_numbers
 
@@ -113,6 +113,8 @@ def plan_nmr_processing_node(state: GenerateSIState) -> dict:
             compound_plan["1H"] = build_spectrum_render_spec("1H", spectra_config)
         if compound.c13_spectrum_path:
             compound_plan["13C"] = build_spectrum_render_spec("13C", spectra_config)
+        for nucleus, _ in discover_2d_experiments(compound):
+            compound_plan[nucleus] = build_spectrum_render_spec(nucleus, spectra_config)
         if compound_plan:
             compound_id = compound.id or compound.number
             spectra_plan[compound_id] = compound_plan
@@ -127,7 +129,7 @@ def route_nmr_processing(state: GenerateSIState) -> str:
     if not extract_nmr:
         return "skip_mnova"
     for compound in ordered_compounds(state):
-        if compound.h1_spectrum_path or compound.c13_spectrum_path:
+        if compound.h1_spectrum_path or compound.c13_spectrum_path or compound.spectra_2d_folder or compound.spectra_2d_files:
             return "run_mnova"
     return "skip_mnova"
 

@@ -4,6 +4,7 @@ from .types import BaselineMode, PeakPickingPolicy, SpectraConfig, SpectrumEmbed
 
 
 DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION = 0.80
+DEFAULT_C13_TARGET_SIGNAL_HEIGHT_FRACTION = 0.50
 DEFAULT_H1_PEAK_THRESHOLD_FRACTION = 0.06
 DEFAULT_C13_PEAK_THRESHOLD_FRACTION = 0.04
 DEFAULT_BASELINE_MODE: BaselineMode = "auto"
@@ -15,6 +16,11 @@ DEFAULT_WHITTAKER_ASYMMETRY = 0.001
 DEFAULT_PEAK_THRESHOLD_FRACTION = DEFAULT_H1_PEAK_THRESHOLD_FRACTION
 DEFAULT_PEAK_PICKING: PeakPickingPolicy = "normal"
 DEFAULT_HIGHLIGHT_SOLVENT_PEAKS = False
+DEFAULT_2D_CONTOUR_SCALING = 4.0
+DEFAULT_2D_HORIZONTAL_TRACE_SIZE = 0.08
+DEFAULT_2D_VERTICAL_TRACE_SIZE = 0.08
+DEFAULT_2D_USE_EXTERNAL_TRACES = True
+TWO_DIMENSIONAL_NUCLEI = {"HSQC", "HMBC", "NOESY", "COSY", "TOCSY", "ROESY", "2D"}
 DEFAULT_X_RANGES = {
     "1H": (-1.0, 12.0),
     "13C": (-10.0, 210.0),
@@ -30,6 +36,7 @@ def build_spectra_config(
     mnova_graphics_profile_1h_path: str | None = None,
     mnova_graphics_profile_13c_path: str | None = None,
     target_signal_height_fraction: float = DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION,
+    target_signal_height_fraction_13c: float = DEFAULT_C13_TARGET_SIGNAL_HEIGHT_FRACTION,
     peak_threshold_fraction: float | None = None,
     peak_threshold_fraction_1h: float | None = None,
     peak_threshold_fraction_13c: float | None = None,
@@ -42,11 +49,16 @@ def build_spectra_config(
     highlight_solvent_peaks: bool = DEFAULT_HIGHLIGHT_SOLVENT_PEAKS,
     x_range_ppm_1h: tuple[float, float] | None = None,
     x_range_ppm_13c: tuple[float, float] | None = None,
+    contour_scaling_2d: float = DEFAULT_2D_CONTOUR_SCALING,
+    horizontal_trace_size_2d: float = DEFAULT_2D_HORIZONTAL_TRACE_SIZE,
+    vertical_trace_size_2d: float = DEFAULT_2D_VERTICAL_TRACE_SIZE,
+    use_external_traces_2d: bool = DEFAULT_2D_USE_EXTERNAL_TRACES,
 ) -> SpectraConfig:
     config: SpectraConfig = {
         "extract_nmr": extract_nmr,
         "insert_spectra_as": insert_spectra_as,
         "target_signal_height_fraction": _target_signal_height_fraction(target_signal_height_fraction),
+        "target_signal_height_fraction_13c": _target_signal_height_fraction(target_signal_height_fraction_13c),
         "peak_threshold_fraction_1h": _normalized_fraction(
             peak_threshold_fraction_1h if peak_threshold_fraction_1h is not None else peak_threshold_fraction,
             DEFAULT_H1_PEAK_THRESHOLD_FRACTION,
@@ -70,6 +82,20 @@ def build_spectra_config(
         "ignore_regions_ppm": {},
         "peak_picking": DEFAULT_PEAK_PICKING,
         "keep_intermediate_reports": True,
+        "contour_scaling_2d": _bounded_float(contour_scaling_2d, DEFAULT_2D_CONTOUR_SCALING, 0.1, 100.0),
+        "horizontal_trace_size_2d": _bounded_float(
+            horizontal_trace_size_2d,
+            DEFAULT_2D_HORIZONTAL_TRACE_SIZE,
+            0.005,
+            0.25,
+        ),
+        "vertical_trace_size_2d": _bounded_float(
+            vertical_trace_size_2d,
+            DEFAULT_2D_VERTICAL_TRACE_SIZE,
+            0.005,
+            0.25,
+        ),
+        "use_external_traces_2d": bool(use_external_traces_2d),
     }
     if mnova_executable_path:
         config["mnova_executable_path"] = mnova_executable_path
@@ -87,12 +113,35 @@ def build_spectrum_render_spec(
     spectra_config: SpectraConfig | dict | None = None,
 ) -> SpectrumRenderSpec:
     config = spectra_config or {}
+    if nucleus in TWO_DIMENSIONAL_NUCLEI:
+        return {
+            "nucleus": nucleus,
+            "contour_scaling": _bounded_float(
+                config.get("contour_scaling_2d"),
+                DEFAULT_2D_CONTOUR_SCALING,
+                0.1,
+                100.0,
+            ),
+            "horizontal_trace_size": _bounded_float(
+                config.get("horizontal_trace_size_2d"),
+                DEFAULT_2D_HORIZONTAL_TRACE_SIZE,
+                0.005,
+                0.25,
+            ),
+            "vertical_trace_size": _bounded_float(
+                config.get("vertical_trace_size_2d"),
+                DEFAULT_2D_VERTICAL_TRACE_SIZE,
+                0.005,
+                0.25,
+            ),
+            "use_external_traces": bool(config.get("use_external_traces_2d", DEFAULT_2D_USE_EXTERNAL_TRACES)),
+        }
     default_threshold = _default_peak_threshold(nucleus)
     threshold_key = "peak_threshold_fraction_1h" if nucleus == "1H" else "peak_threshold_fraction_13c"
     spec: SpectrumRenderSpec = {
         "nucleus": nucleus,
         "x_range_ppm": _render_x_range_ppm(nucleus, config),
-        "target_signal_height_fraction": float(config.get("target_signal_height_fraction", DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION)),
+        "target_signal_height_fraction": _render_target_signal_height_fraction(nucleus, config),
         "peak_threshold_fraction": _normalized_fraction(
             config.get(threshold_key, config.get("peak_threshold_fraction")),
             default_threshold,
@@ -113,6 +162,17 @@ def build_spectrum_render_spec(
 
 def _default_peak_threshold(nucleus: str) -> float:
     return DEFAULT_C13_PEAK_THRESHOLD_FRACTION if nucleus == "13C" else DEFAULT_H1_PEAK_THRESHOLD_FRACTION
+
+
+def _render_target_signal_height_fraction(nucleus: str, config: SpectraConfig | dict) -> float:
+    if nucleus == "13C":
+        value = config.get(
+            "target_signal_height_fraction_13c",
+            config.get("target_signal_height_fraction", DEFAULT_C13_TARGET_SIGNAL_HEIGHT_FRACTION),
+        )
+    else:
+        value = config.get("target_signal_height_fraction", DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION)
+    return _target_signal_height_fraction(value)
 
 
 def _render_x_range_ppm(nucleus: str, config: SpectraConfig | dict) -> tuple[float, float]:
@@ -191,3 +251,13 @@ def _positive_float(value, fallback: float) -> float:
     except (TypeError, ValueError):
         return fallback
     return parsed if parsed > 0 else fallback
+
+
+def _bounded_float(value, fallback: float, minimum: float, maximum: float) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return fallback
+    if parsed < minimum or parsed > maximum:
+        return fallback
+    return parsed

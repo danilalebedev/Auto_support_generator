@@ -55,6 +55,11 @@ def validate_nmr_counts(compounds: list[Compound]) -> None:
 
         if compound.c13_nmr:
             found_c = count_c_from_13c_nmr(compound.c13_nmr)
+            if expected_c_signals < expected_c:
+                found_c = _count_13c_peak_items(
+                    _strip_delta_prefix(_normalize_chem_letters(compound.c13_nmr)),
+                    count_assignments=False,
+                )
             if found_c < expected_c_signals:
                 _append_validation_issue(
                     compound,
@@ -199,7 +204,7 @@ def count_c_from_13c_nmr(text: str) -> int:
 
 
 def expected_c13_signal_count(smiles: str, formula_carbon_count: int) -> int:
-    """Count graph-distinct aromatic carbons and keep non-aromatic carbons separate."""
+    """Estimate carbon environments from graph symmetry, not a shift prediction."""
     if not smiles or formula_carbon_count <= 0:
         return formula_carbon_count
     molecule = Chem.MolFromSmiles(smiles)
@@ -208,23 +213,20 @@ def expected_c13_signal_count(smiles: str, formula_carbon_count: int) -> int:
     carbon_atoms = [atom for atom in molecule.GetAtoms() if atom.GetAtomicNum() == 6]
     if len(carbon_atoms) != formula_carbon_count:
         return formula_carbon_count
-    aromatic_carbons = [atom for atom in carbon_atoms if atom.GetIsAromatic()]
-    if not aromatic_carbons:
-        return formula_carbon_count
     symmetry_classes = Chem.CanonicalRankAtoms(
         molecule,
         breakTies=False,
         includeChirality=True,
         includeIsotopes=True,
+        includeAtomMaps=False,
     )
-    distinct_aromatic_carbons = len({symmetry_classes[atom.GetIdx()] for atom in aromatic_carbons})
-    return formula_carbon_count - len(aromatic_carbons) + distinct_aromatic_carbons
+    return len({symmetry_classes[atom.GetIdx()] for atom in carbon_atoms})
 
 
 def _c13_count_mismatch_text(formula_carbons: int, expected_signals: int, found_signals: int) -> str:
     if expected_signals < formula_carbons:
         return (
-            f"C signals expected {expected_signals} after aromatic symmetry correction "
+            f"C signals expected {expected_signals} after molecular symmetry correction "
             f"({formula_carbons} C atoms in formula), found {found_signals}"
         )
     return f"C expected {expected_signals}, found {found_signals}"
@@ -278,7 +280,7 @@ def _count_c_assignment(env: str) -> int:
     return total
 
 
-def _count_13c_peak_items(data: str) -> int:
+def _count_13c_peak_items(data: str, *, count_assignments: bool = True) -> int:
     total = 0
     for item in _split_top_level_commas(data):
         item = item.strip()
@@ -286,7 +288,7 @@ def _count_13c_peak_items(data: str) -> int:
             continue
         mult = 1
         mult_match = re.search(r"\(\s*(\d+)\s*C\b", item, flags=re.IGNORECASE)
-        if mult_match:
+        if mult_match and count_assignments:
             mult = int(mult_match.group(1))
         total += mult
     return total

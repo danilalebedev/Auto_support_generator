@@ -42,10 +42,12 @@ class MnovaRenderSpecTests(unittest.TestCase):
             render_spec=render_spec,
             single_mnova_path="C:/ascii/out/2a_1H.mnova",
             graphics_profile_path="C:/ascii/profile/default.mngp",
+            horizontal_trace_path="C:/ascii/input/1H/fid",
+            vertical_trace_path="C:/ascii/input/13C/fid",
         )
         parts = line.split("\t")
 
-        self.assertEqual(len(parts), 8)
+        self.assertEqual(len(parts), 10)
         parsed = json.loads(parts[5])
         self.assertEqual(parsed["target_signal_height_fraction"], 0.72)
         self.assertEqual(parsed["peak_threshold_fraction"], 0.08)
@@ -59,6 +61,8 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertTrue(parsed["highlight_solvent_peaks"])
         self.assertEqual(parts[6], "C:/ascii/out/2a_1H.mnova")
         self.assertEqual(parts[7], "C:/ascii/profile/default.mngp")
+        self.assertEqual(parts[8], "C:/ascii/input/1H/fid")
+        self.assertEqual(parts[9], "C:/ascii/input/13C/fid")
 
     def test_empty_render_spec_is_empty_json_object(self) -> None:
         self.assertEqual(_render_spec_arg(None), "{}")
@@ -99,6 +103,7 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertEqual(h1["peak_picking"], "dense")
         self.assertEqual(h1["ignore_regions_ppm"], [(7.2, 7.4)])
         self.assertEqual(c13["peak_threshold_fraction"], 0.04)
+        self.assertEqual(c13["target_signal_height_fraction"], 0.7)
         self.assertEqual(c13["x_range_ppm"], (-5.0, 205.0))
         self.assertEqual(c13["ignore_regions_ppm"], [(76.0, 78.2)])
 
@@ -133,12 +138,22 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertEqual(h1_whittaker["whittaker_asymmetry"], 0.004)
         self.assertFalse(c13_whittaker["baseline_apply"])
 
+    def test_two_dimensional_render_spec_defaults_to_version_a(self) -> None:
+        spec = build_spectrum_render_spec("HMBC", build_spectra_config())
+
+        self.assertEqual(spec["contour_scaling"], 4.0)
+        self.assertEqual(spec["horizontal_trace_size"], 0.08)
+        self.assertEqual(spec["vertical_trace_size"], 0.08)
+        self.assertTrue(spec["use_external_traces"])
+
     def test_mnova_qs_consumes_render_spec_column(self) -> None:
         script = QS_SCRIPT.read_text(encoding="utf-8")
 
         self.assertIn("var renderSpec = parts.length >= 6 ? _parseRenderSpec(parts[5]) : {};", script)
         self.assertIn("var singleMnovaPath = parts.length >= 7 ? parts[6] : \"\";", script)
         self.assertIn("var graphicsProfilePath = parts.length >= 8 ? parts[7] : \"\";", script)
+        self.assertIn("var horizontalTracePath = parts.length >= 9 ? parts[8] : \"\";", script)
+        self.assertIn("var verticalTracePath = parts.length >= 10 ? parts[9] : \"\";", script)
         self.assertIn("_saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath", script)
         self.assertIn("function _readMNGPSpectrumProperties(profilePath, statusPath)", script)
         self.assertIn("function _applyGraphicsProfileDefault(graphicsProfilePath, statusPath)", script)
@@ -165,6 +180,27 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertIn("_isIgnoredByRenderSpec(delta, renderSpec", script)
         self.assertIn("_applyGraphicsProfileDefault(graphicsProfilePath, statusPath);", script)
         self.assertIn("_prepareSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {}, tasks[i].graphicsProfilePath || \"\", statusPath)", script)
+        self.assertIn("function _prepareTwoDimensionalSpectrumForExport(spectrum, nucleus, renderSpec, statusPath)", script)
+        self.assertIn('"traces.horizontal.visible", true', script)
+        self.assertIn('"traces.vertical.visible", true', script)
+        self.assertIn('"traces.horizontal.type", "Proj"', script)
+        self.assertIn('"traces.vertical.type", "Proj"', script)
+        self.assertIn('"traces.same_size", false', script)
+        self.assertIn('"traces.horizontal.size", horizontalTraceSize', script)
+        self.assertIn('"traces.vertical.size", verticalTraceSize', script)
+        self.assertIn("function _attachExternalTraces(spectrum, nucleus, horizontalTracePath, verticalTracePath, renderSpec, statusPath)", script)
+        self.assertIn("spectrum.setTrace(horizontalTrace, true);", script)
+        self.assertIn("spectrum.setTrace(verticalTrace, false);", script)
+        self.assertIn('"contours.scaling", contourScaling', script)
+        self.assertIn("function _twoDimensionalContourScaling(renderSpec)", script)
+        self.assertIn("function _twoDimensionalTraceSize(renderSpec, orientation)", script)
+        self.assertIn("spectrum.updateTraces();", script)
+        self.assertIn('"axes.horizontal.label", "ppm"', script)
+        self.assertIn('"axes.vertical.label", "ppm"', script)
+        self.assertLess(
+            script.index("_fitVerticalScaleForImage(spectrum, nucleus, renderSpec || {});"),
+            script.index("_filterPeaksForImage(spectrum, nucleus, renderSpec || {});", script.index("function _prepareSpectrumForExport")),
+        )
 
     def test_mnova_qs_uses_render_spec_for_baseline_processing(self) -> None:
         script = QS_SCRIPT.read_text(encoding="utf-8")

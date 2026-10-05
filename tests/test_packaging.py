@@ -98,7 +98,15 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(manifest["compounds"]["cmp_001"]["domain_snapshot"]["ir"]["peaks_cm1"], [1700])
         self.assertEqual(
             manifest["compounds"]["cmp_001"]["structure"],
-            {"has_word_structure": True, "path": str(structure_path)},
+            {
+                "has_word_structure": True,
+                "path": str(structure_path),
+                "cif_folder": "",
+                "cif_files": [],
+                "has_cif": False,
+                "crystallography_report_path": "",
+                "crystallography_data_path": "",
+            },
         )
         self.assertEqual(
             manifest["compounds"]["cmp_001"]["analytical_blocks"],

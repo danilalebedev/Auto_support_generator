@@ -26,6 +26,7 @@ class GenerateSIRequest:
     spectra_zip: Path | None = None
     crystallography_template_docx: Path | None = None
     cif_source: Path | None = None
+    cif_reporter_root: Path | None = None
     loadings_schema_docx: Path | None = None
     loadings_scope_docx: Path | None = None
     mnova_exe: Path | None = None
@@ -54,6 +55,9 @@ class GenerateSIRequest:
     insert_chemdraw: bool = False
     no_check_support: bool = False
     journal_profile_id: str = "organic.default"
+    show_scope: bool = False
+    scope_conditions: str = ""
+    scope_title: str = "Reaction and compound scope"
 
     @property
     def input_base_dir(self) -> Path:

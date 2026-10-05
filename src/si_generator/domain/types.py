@@ -48,7 +48,7 @@ class StructureBlock(TypedDict, total=False):
 
 
 class SpectrumRenderSpec(TypedDict, total=False):
-    nucleus: Literal["1H", "13C", "19F", "31P"]
+    nucleus: Literal["1H", "13C", "19F", "31P", "HSQC", "HMBC", "NOESY", "COSY", "TOCSY", "ROESY", "2D"]
     x_range_ppm: tuple[float, float]
     target_signal_height_fraction: float
     peak_threshold_fraction: float
@@ -60,10 +60,18 @@ class SpectrumRenderSpec(TypedDict, total=False):
     whittaker_lambda: float
     whittaker_asymmetry: float
     highlight_solvent_peaks: bool
+    contour_scaling: float
+    horizontal_trace_size: float
+    vertical_trace_size: float
+    use_external_traces: bool
+    horizontal_trace_render_spec: dict[str, object]
+    vertical_trace_render_spec: dict[str, object]
 
 
 class SpectrumAsset(TypedDict, total=False):
     source_path: str
+    source_folder: str
+    files: list[str]
     image_path: str
     mnova_path: str
     report_path: str
@@ -188,6 +196,7 @@ class SpectraConfig(TypedDict, total=False):
     extract_nmr: bool
     insert_spectra_as: SpectrumEmbedMode
     target_signal_height_fraction: float
+    target_signal_height_fraction_13c: float
     peak_threshold_fraction: float
     peak_threshold_fraction_1h: float
     peak_threshold_fraction_13c: float
@@ -206,6 +215,10 @@ class SpectraConfig(TypedDict, total=False):
     mnova_graphics_profile_path: str
     mnova_graphics_profile_1h_path: str
     mnova_graphics_profile_13c_path: str
+    contour_scaling_2d: float
+    horizontal_trace_size_2d: float
+    vertical_trace_size_2d: float
+    use_external_traces_2d: bool
     mnova_script_path: str
     keep_intermediate_reports: bool
 

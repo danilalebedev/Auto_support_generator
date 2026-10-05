@@ -823,7 +823,15 @@ class GuiWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             examples_root = root / "examples"
-            for example_name in ("example_1", "example_2", "example_3", "crystallography"):
+            example_names = (
+                "example_1",
+                "example_2",
+                "example_3",
+                "crystallography",
+                "crystallography_all_in_one",
+                "reaction_scope",
+            )
+            for example_name in example_names:
                 example = examples_root / example_name
                 example.mkdir(parents=True)
                 (example / "Compound_table.docx").write_text("placeholder", encoding="utf-8")
@@ -831,7 +839,7 @@ class GuiWorkflowTests(unittest.TestCase):
             first = copy_starter_files_to(root, examples_root=examples_root)
             second = copy_starter_files_to(root, examples_root=examples_root)
 
-            for example_name in ("example_1", "example_2", "example_3", "crystallography"):
+            for example_name in example_names:
                 self.assertTrue((first / example_name / "Compound_table.docx").exists())
             self.assertEqual(second.name, "AutoSupportGenerator_examples_2")
 

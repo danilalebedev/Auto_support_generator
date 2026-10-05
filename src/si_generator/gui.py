@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import re
 import shutil
 import tkinter as tk
 import threading
@@ -38,6 +39,7 @@ from .journal_profiles import (
     journal_profile_labels,
     resolve_journal_profile_id,
 )
+from .procedure_import import generate_procedure_inputs, read_procedure_text
 from .runtime_diagnostics import format_preflight_issues, issue_has_errors, preflight_generate_request
 from .runtime_paths import bundled_resource_path, default_output_path, examples_dir
 from .workflows.check_si import run_check_si
@@ -46,6 +48,9 @@ from .workflows.patch_si import run_patch_si
 
 
 INSTRUCTION_TEMPLATE_FILES = (
+    ("Crystallography - All-in-one input", Path("crystallography_all_in_one") / "All_in_one_input.docx", "Eight X-ray compounds with original experimental data plus embedded SI and crystallography templates."),
+    ("Crystallography - Eight-compound example", Path("crystallography_all_in_one"), "All-in-one DOCX, raw spectra, eight CIF structures, ORTEP plots and the generated output."),
+    ("Reaction scope - Example", Path("reaction_scope"), "Four compounds, editable reaction/scope CDXML and a generated Word example."),
     ("Crystallography - Complete folder", Path("crystallography"), "Four compounds, three CIF structures and original ORTEP images; includes a two-method example."),
     ("Crystallography template", Path("crystallography") / "Crystallography_template.docx", "Editable crystallography section headings, description, table and optional geometry."),
     ("Example 1 - All-in-one input", Path("example_1") / "All_in_one_input.docx", "Four products with a complete reaction schema, scope and SI template in one editable Word file."),
@@ -59,7 +64,14 @@ INSTRUCTION_TEMPLATE_FILES = (
     ("Example 3 - All-in-one input", Path("example_3") / "All_in_one_input.docx", "A different reaction method with two variable reagents and five products."),
     ("Example 3 - Complete folder", Path("example_3"), "The same new-method input as separate files, including spectra as a folder and zip."),
 )
-STARTER_EXAMPLE_DIRS = (Path("example_1"), Path("example_2"), Path("example_3"), Path("crystallography"))
+STARTER_EXAMPLE_DIRS = (
+    Path("example_1"),
+    Path("example_2"),
+    Path("example_3"),
+    Path("crystallography"),
+    Path("crystallography_all_in_one"),
+    Path("reaction_scope"),
+)
 
 
 THEME_PALETTES = {
@@ -151,6 +163,9 @@ class SIGeneratorApp:
         self.highlight_solvent_peaks = BooleanVar(value=False)
         self.check_support = BooleanVar(value=True)
         self.generate_loadings = BooleanVar(value=False)
+        self.show_scope = BooleanVar(value=False)
+        self.scope_conditions = StringVar(value="")
+        self.scope_title = StringVar(value="Reaction and compound scope")
         self.calculate_elemental_analysis = BooleanVar(value=False)
         self.status_text = StringVar(value="Ready")
         self.result_support = StringVar(value="")
@@ -420,8 +435,17 @@ class SIGeneratorApp:
         self._optional_inputs_frame = self._build_optional_inputs_block(content, 1)
         self._loadings_frame = self._build_loadings_block(content, 2)
 
+        scope_options = ttk.LabelFrame(content, text="Reaction and compound scope", padding=12, style="Card.TLabelframe")
+        scope_options.grid(row=3, column=0, sticky="ew", pady=(10, 0))
+        scope_options.columnconfigure(1, weight=1)
+        ttk.Checkbutton(scope_options, text="Show scope", variable=self.show_scope).grid(row=0, column=0, sticky="w")
+        ttk.Label(scope_options, text="Title").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(scope_options, textvariable=self.scope_title).grid(row=1, column=1, sticky="ew", pady=4)
+        ttk.Label(scope_options, text="Reaction conditions").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(scope_options, textvariable=self.scope_conditions).grid(row=2, column=1, sticky="ew", pady=4)
+
         results = ttk.LabelFrame(content, text="Results", padding=12, style="Card.TLabelframe")
-        results.grid(row=3, column=0, sticky="ew", pady=(10, 0))
+        results.grid(row=4, column=0, sticky="ew", pady=(10, 0))
         results.columnconfigure(1, weight=1)
         self._result_row(results, 0, "Support .docx", self.result_support, lambda: self._open_result_path(self.result_support, "Support .docx"), "Open support")
         self._result_row(results, 1, "Output folder", self.result_output_folder, lambda: self._open_result_path(self.result_output_folder, "Output folder"), "Open output folder")
@@ -499,7 +523,130 @@ class SIGeneratorApp:
             lambda: self._browse_file(self.loadings_scope_docx, [("Word documents", "*.docx"), ("All files", "*.*")]),
             optional=True,
         )
+        ttk.Label(
+            loadings,
+            text="Have an ordinary written procedure? Create a reaction schema, SI template, and editable Scope draft.",
+            style="Muted.TLabel",
+            wraplength=700,
+        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=(0, 8), pady=(10, 4))
+        ttk.Button(
+            loadings,
+            text="Create from procedure...",
+            command=self._open_procedure_import_dialog,
+        ).grid(row=3, column=2, sticky="e", pady=(10, 4))
         return loadings
+
+    def _open_procedure_import_dialog(self) -> None:
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Create input files from procedure")
+        dialog.geometry("820x620")
+        dialog.minsize(680, 520)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.columnconfigure(0, weight=1)
+        dialog.rowconfigure(2, weight=1)
+
+        ttk.Label(
+            dialog,
+            text="Paste a general procedure or load it from TXT, Markdown, or DOCX. Explicit masses, amounts, "
+            "volumes, equivalents, and concentrations are converted to Auto Support Generator aliases.",
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 8))
+
+        toolbar = ttk.Frame(dialog)
+        toolbar.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
+        procedure = tk.Text(dialog, wrap="word", undo=True, height=18)
+        procedure.grid(row=2, column=0, sticky="nsew", padx=16)
+
+        def load_method() -> None:
+            path = filedialog.askopenfilename(
+                parent=dialog,
+                title="Choose procedure",
+                filetypes=[
+                    ("Supported procedures", "*.docx *.txt *.md"),
+                    ("Word documents", "*.docx"),
+                    ("Text files", "*.txt *.md"),
+                    ("All files", "*.*"),
+                ],
+            )
+            if not path:
+                return
+            try:
+                loaded = read_procedure_text(path)
+            except Exception as exc:
+                messagebox.showerror("Auto Support Generator", f"Could not read the procedure:\n{exc}", parent=dialog)
+                return
+            procedure.delete("1.0", "end")
+            procedure.insert("1.0", loaded)
+
+        ttk.Button(toolbar, text="Load TXT or DOCX...", command=load_method).pack(side="left")
+
+        options = ttk.Frame(dialog)
+        options.grid(row=3, column=0, sticky="ew", padx=16, pady=12)
+        options.columnconfigure(1, weight=1)
+        variable_names = StringVar()
+        product_numbers = StringVar()
+        default_parent = Path(self.output_folder.get().strip() or default_output_path().parent)
+        generated_folder = StringVar(value=str(default_parent / "procedure_inputs"))
+        ttk.Label(options, text="Compounds varied in Scope (recommended)").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(options, textvariable=variable_names).grid(row=0, column=1, columnspan=2, sticky="ew", pady=4)
+        ttk.Label(
+            options,
+            text="Copy their names exactly from the procedure, comma-separated in Reagent_1, Reagent_2 order. "
+            "Leaving this empty creates an inferred draft that requires extra review.",
+            style="Muted.TLabel",
+        ).grid(row=1, column=1, columnspan=2, sticky="w")
+        ttk.Label(options, text="Product numbers").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(options, textvariable=product_numbers).grid(row=2, column=1, columnspan=2, sticky="ew", pady=4)
+        ttk.Label(options, text="Output folder").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(options, textvariable=generated_folder).grid(row=3, column=1, sticky="ew", pady=4)
+
+        def choose_output_folder() -> None:
+            selected = filedialog.askdirectory(parent=dialog, title="Choose output folder")
+            if selected:
+                generated_folder.set(selected)
+
+        ttk.Button(options, text="Browse...", command=choose_output_folder).grid(row=3, column=2, padx=(8, 0), pady=4)
+
+        buttons = ttk.Frame(dialog)
+        buttons.grid(row=4, column=0, sticky="e", padx=16, pady=(0, 16))
+
+        def create_inputs() -> None:
+            source_text = procedure.get("1.0", "end").strip()
+            if not source_text:
+                messagebox.showerror("Auto Support Generator", "Paste or load a procedure first.", parent=dialog)
+                return
+            variables = [item.strip() for item in re.split(r"[,;\n]", variable_names.get()) if item.strip()]
+            products = [item.strip() for item in re.split(r"[,;\n]", product_numbers.get()) if item.strip()]
+            try:
+                generated = generate_procedure_inputs(
+                    source_text,
+                    generated_folder.get().strip(),
+                    variable_names=variables,
+                    product_numbers=products,
+                )
+            except Exception as exc:
+                messagebox.showerror("Auto Support Generator", f"Could not create input files:\n{exc}", parent=dialog)
+                return
+            self.loadings_schema_docx.set(str(generated.reaction_schema))
+            self.loadings_scope_docx.set(str(generated.scope_draft))
+            self.template_docx.set(str(generated.si_template))
+            self.generate_loadings.set(False)
+            messagebox.showinfo(
+                "Auto Support Generator",
+                "Drafts created and selected. "
+                + ("" if variables else "Variable compounds were inferred; confirm Reagent_1/Reagent_2 before use. ")
+                + "Review Reaction_schema.docx and SI_template.docx, then fill "
+                "ChemDraw structures and measured masses in Scope_draft.docx. Rename it to Scope.docx or "
+                "keep the selected path, and enable Calculate reagent loadings when it is complete.",
+                parent=dialog,
+            )
+            dialog.destroy()
+
+        ttk.Button(buttons, text="Cancel", command=dialog.destroy).pack(side="left", padx=(0, 8))
+        ttk.Button(buttons, text="Create files", command=create_inputs, style="Accent.TButton").pack(side="left")
+        procedure.focus_set()
 
     def _build_advanced_page(self, parent: ttk.Frame) -> None:
         page = self._make_page(parent, "advanced")
@@ -822,6 +969,7 @@ class SIGeneratorApp:
                 "- [AUTO SI: COMPOUND TABLE] is required and must be followed by the compound table.\n"
                 "- [AUTO SI: REACTION SCHEMA] and [AUTO SI: SCOPE] are optional, but both are required to calculate loadings.\n"
                 "- [AUTO SI: SI TEMPLATE] contains the same editable custom template as SI_template.docx. Every bundled all-in-one example includes it.\n"
+                "- [AUTO SI: CRYSTALLOGRAPHY TEMPLATE] optionally contains the editable X-ray description/table template.\n"
                 "- If the SI template section is removed, the selected Publication preset supplies the template.\n"
                 "- [AUTO SI: END] marks the end of the combined input. Keep every section label unchanged.\n"
                 "- A missing optional section or an optional value marked with '-' does not stop generation.\n\n"
@@ -832,6 +980,7 @@ class SIGeneratorApp:
                 "- example_1/All_in_one_input.docx: complete four-product series and the recommended starting point.\n"
                 "- example_2/All_in_one_input.docx: compact two-product example.\n"
                 "- example_3/All_in_one_input.docx: a different method with two variable reagents.\n"
+                "- crystallography_all_in_one/All_in_one_input.docx: eight compounds with embedded SI and crystallography templates.\n"
                 "- Open or copy them from Example files below. Replace values and structures, but preserve section labels and table headers."
             ),
             wraplength=760,
@@ -856,7 +1005,7 @@ class SIGeneratorApp:
                 "- Highlight solvent peaks: keep off for normal reports unless you explicitly want solvent peaks marked.\n\n"
                 "Chemistry options\n"
                 "- Check support: sums 1H integrals and counts 13C signals against the molecular formula, compares found and calculated HRMS, and validates elemental analysis.\n"
-                "- 13C validation counts symmetry-equivalent aromatic carbons from the ChemDraw structure as one expected signal.\n"
+                "- 13C validation counts graph-equivalent carbons of all types once, using structure stereochemistry and isotopes. This is an estimate; conformational effects and peak overlap require review.\n"
                 "- Validation reports mismatches for review; it does not replace manual spectrum interpretation.\n"
                 "- Calculate elemental analysis: generates calculated elemental-analysis values for rows where this block is not explicitly disabled."
             ),
@@ -911,11 +1060,12 @@ class SIGeneratorApp:
                 "- Or a normal folder with the same internal layout.\n\n"
                 "Required layout\n"
                 "- Top level: one folder per compound number, for example 3a, 3b, 3c.\n"
-                "- Inside each compound folder: raw Bruker experiment folders containing fid files.\n"
+                "- Inside each compound folder: raw Bruker 1D experiment folders containing fid and optional 2D experiment folders containing ser.\n"
                 "- Folder names inside each compound can be arbitrary.\n\n"
                 "Detection\n"
-                "- The program searches for fid files.\n"
-                "- Acquisition metadata is used to decide whether a spectrum is 1H or 13C.\n"
+                "- Acquisition metadata identifies 1H, 13C, HSQC, HMBC, COSY, NOESY, TOCSY and ROESY; 2D axes are labelled ppm.\n"
+                "- Version A uses separately processed 1H/13C external projections, independent 8% trace sizes and contour scaling 4.0. HSQC/HMBC use 13C vertically; homonuclear spectra use 1H on both axes.\n"
+                "- The 13C projection is prepared with Bernstein baseline correction, polynomial order 3.\n"
                 "- Compound numbers in spectra source and compound table must be identical."
             ),
             wraplength=760,
@@ -935,7 +1085,7 @@ class SIGeneratorApp:
                 "What it checks\n"
                 "- Manifest structure, compound order, support file, bookmarks, linked artifacts and unresolved template aliases.\n"
                 "- 1H integral count against the number of H atoms in the molecular formula.\n"
-                "- 13C signal count against the formula, with symmetry-equivalent aromatic carbons counted once when structure data are available.\n"
+                "- 13C signal count against the formula, with graph-equivalent carbons of all types counted once when structure data are available.\n"
                 "- HRMS found m/z against the calculated value and elemental-analysis values against the molecular formula.\n"
                 "- Chemical checks are rerun from compound snapshots stored in the manifest; MestReNova is not opened.\n\n"
                 "Output\n"
@@ -1052,6 +1202,23 @@ class SIGeneratorApp:
         ).grid(row=0, column=0, sticky="ew")
 
         contact = self._instruction_block(content, 13, "Contact", "Report a problem or contact the author.")
+        scope_help = self._instruction_block(content, 16, "Reaction and compound scope", "An optional editable reaction and aligned product overview.")
+        ttk.Label(scope_help, text=(
+            "Generate\n"
+            "- Enable Show scope to insert the overview before compound descriptions. Leave it off to skip the entire feature.\n"
+            "- Provide Reaction_schema.docx and Scope.docx, or their sections in the all-in-one DOCX.\n"
+            "- Scope must contain matching product numbers, editable product and Reagent_i structures, and either measured masses or percentage yields in the Compound table.\n"
+            "- The reaction at the top uses the first product row. Named reagents appear above the arrow without equivalents; solvents appear below.\n"
+            "- Reaction conditions: enter temperature, time or other conditions. Unknown conditions are not guessed.\n"
+            "- Title: heading above the scheme.\n\n"
+            "Output and editing\n"
+            "- scope/reaction_scope_N.cdxml contains editable ChemDraw drawings. Native PNG previews are inserted in Word.\n"
+            "- Structures are aligned by a common molecular core. Each label is one line: bold compound number followed by a normal comma and yield, for example 2a, 80%.\n"
+            "- Patch updates numbers, order and removed compounds from saved scope data; NMR processing is not repeated. ChemDraw is needed to redraw previews.\n"
+            "- Add To Same Series extends the scope. New Method and Multiple series keep separate reaction overviews.\n"
+            "- Keep the complete output folder, including scope_graphic.json.\n"
+            "- Example files: Reaction scope - Example."
+        ), wraplength=760, justify="left").grid(row=0, column=0, sticky="ew")
         crystals = self._instruction_block(content, 14, "X-ray crystallography", "Optional CIF data, structure pictures and refinement tables.")
         ttk.Label(crystals, text=(
             "1. In Generate, choose CIF source: a folder or ZIP with numbered subfolders, e.g. CIF_source/3c/3c.cif.\n"
@@ -1059,9 +1226,11 @@ class SIGeneratorApp:
             "3. The default ACS-oriented section contains a structure figure, experimental description and crystal/refinement table.\n"
             "4. Beside sample.cif, optionally provide sample.json: growth, refinement, ccdc, notes, image, caption and include_geometry.\n"
             "5. image names an ORTEP PNG/JPEG; caption must state the actual probability level. Without it, the program draws a clearly identified coordinate preview, not thermal ellipsoids.\n"
-            "6. Crystallography template .docx is optional. Start from the downloadable example; keep {Crystal.description}, {Crystal.table} and {Crystal.geometry} in separate paragraphs.\n"
-            "7. Output reports/crystallography stores original CIFs, figures, extracted JSON and individual DOCX reports. Add and Patch preserve these bundles.\n"
-            "8. Local checks do not replace checkCIF. Optional sample.checkcif.pdf imports official alerts; CCDC deposition and responses remain the author's responsibility."
+            "6. Crystallography template .docx is optional. It can also be embedded in all-in-one under [AUTO SI: CRYSTALLOGRAPHY TEMPLATE]. Keep {Crystal.description}, {Crystal.table} and {Crystal.geometry} in separate paragraphs.\n"
+            "7. Tables use centered columns, top/bottom rules and automatic Table S1, S2, etc. captions. Add and Patch update the sequence.\n"
+            "8. Output reports/crystallography stores original CIFs, figures, extracted JSON and individual DOCX reports. Add and Patch preserve these bundles.\n"
+            "9. Local checks do not replace checkCIF. Optional sample.checkcif.pdf imports official alerts; CCDC deposition and responses remain the author's responsibility.\n"
+            "10. Ready example: crystallography_all_in_one contains eight compounds, raw NMR, CIF/ORTEP files, both embedded templates and a generated reference DOCX."
         ), wraplength=760, justify="left").grid(row=0, column=0, sticky="ew")
         series = self._instruction_block(content, 15, "Multiple series", "Generate one SI from several methods in one run.")
         ttk.Label(series, text=(
@@ -1767,6 +1936,9 @@ class SIGeneratorApp:
             calculate_elemental_analysis=self.calculate_elemental_analysis.get(),
             check_support=self.check_support.get(),
             journal_profile_text=self.journal_profile_label.get(),
+            show_scope=self.show_scope.get(),
+            scope_conditions=self.scope_conditions.get(),
+            scope_title=self.scope_title.get(),
         )
 
     def _run_workflow(self, request: GenerateSIRequest) -> None:
@@ -2009,6 +2181,8 @@ class SIGeneratorApp:
             "whittaker_lambda": self.whittaker_lambda,
             "whittaker_asymmetry": self.whittaker_asymmetry,
             "input_kind": self.input_kind,
+            "scope_conditions": self.scope_conditions,
+            "scope_title": self.scope_title,
             "insert_spectra_as": self.insert_spectra_as,
             "existing_manifest": self.existing_manifest,
             "check_support_docx": self.check_support_docx,
@@ -2052,6 +2226,7 @@ class SIGeneratorApp:
         return {
             "check_support": self.check_support,
             "generate_loadings": self.generate_loadings,
+            "show_scope": self.show_scope,
             "calculate_elemental_analysis": self.calculate_elemental_analysis,
             "baseline_apply_1h": self.baseline_apply_1h,
             "baseline_apply_13c": self.baseline_apply_13c,
@@ -2431,6 +2606,9 @@ def _build_generate_request(
     calculate_elemental_analysis: bool = False,
     check_support: bool = True,
     journal_profile_text: str = DEFAULT_JOURNAL_PROFILE_ID,
+    show_scope: bool = False,
+    scope_conditions: str = "",
+    scope_title: str = "Reaction and compound scope",
 ) -> GenerateSIRequest:
     unified_input = None
     if input_mode == "series":
@@ -2450,7 +2628,7 @@ def _build_generate_request(
         raise ValueError("Output file must be a .docx file.")
     shared_peak_threshold = _optional_peak_threshold_fraction(peak_threshold_percent_text)
     loadings_schema = loadings_scope = None
-    if generate_loadings and not unified_input and input_mode != "series":
+    if (generate_loadings or show_scope) and not unified_input and input_mode != "series":
         loadings_schema = _optional_existing_file(loadings_schema_text, "Reaction schema .docx", suffixes=(".docx",))
         loadings_scope = _optional_existing_file(loadings_scope_text, "Scope .docx", suffixes=(".docx",))
         if any((loadings_schema, loadings_scope)) and not all((loadings_schema, loadings_scope)):
@@ -2509,6 +2687,9 @@ def _build_generate_request(
         calculate_elemental_analysis=calculate_elemental_analysis,
         no_check_support=not check_support,
         journal_profile_id=_journal_profile_id_from_text(journal_profile_text),
+        show_scope=show_scope,
+        scope_conditions=scope_conditions.strip(),
+        scope_title=scope_title.strip() or "Reaction and compound scope",
     )
 
 

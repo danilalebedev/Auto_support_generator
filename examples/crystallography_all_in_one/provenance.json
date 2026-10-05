@@ -1,0 +1,70 @@
+{
+  "source_document": "Supporting_inf+ACHT.docx",
+  "source_sha256": "4b38f2fb4d1fc8fc578a90558369a6ab7e57a8b1841bc1671856b4ee3370233a",
+  "compounds": {
+    "3c": {
+      "ccdc": "2383313",
+      "cif_source": "3e, 2383313/da8828.cif",
+      "cif_sha256": "da6655e6149be11f3f57e6efa2177177de2841394bcde8e4c9cb1252c78da2b8",
+      "heading_paragraph": 98,
+      "ortep_paragraph": 104,
+      "growth_paragraph": 270
+    },
+    "3e": {
+      "ccdc": "2535885",
+      "cif_source": "для депонирования/p-Br (3d)/Da10842_pub.cif",
+      "cif_sha256": "8a13afbdb630e9964ee37c940537251af099e68f364ef53a9041a27b64856f52",
+      "heading_paragraph": 114,
+      "ortep_paragraph": 121,
+      "growth_paragraph": 274
+    },
+    "3f": {
+      "ccdc": "2432441",
+      "cif_source": "3f, 2432441/da9126a (2).cif",
+      "cif_sha256": "877d890808c1bed80e43d47f8ea26e96aa8dc624e246c2fc69529cdc0cbaa0c8",
+      "heading_paragraph": 123,
+      "ortep_paragraph": 130,
+      "growth_paragraph": 278
+    },
+    "3g": {
+      "ccdc": "2535886",
+      "cif_source": "для депонирования/3,4-OMe (3g)/Da10890_pub.cif",
+      "cif_sha256": "58188a690a18628053dec4012aa648246ce9928d6e35c378b5d4d3f7aa05fb8e",
+      "heading_paragraph": 132,
+      "ortep_paragraph": 138,
+      "growth_paragraph": 282
+    },
+    "3h": {
+      "ccdc": "2432443",
+      "cif_source": "3h, 2432443/da9335 (1).cif",
+      "cif_sha256": "18876dbc9540dc5dd3596367cc1d2f3f742615f55a08c950f6611959e10ba27f",
+      "heading_paragraph": 140,
+      "ortep_paragraph": 148,
+      "growth_paragraph": 286
+    },
+    "3i": {
+      "ccdc": "2535884",
+      "cif_source": "для депонирования/4-CN (3i)/Da9174_pub.cif",
+      "cif_sha256": "b05ee7321093d17065fc8463f862221294dccc4251114e4d9b00e47c4eed9aa1",
+      "heading_paragraph": 150,
+      "ortep_paragraph": 157,
+      "growth_paragraph": 290
+    },
+    "3s": {
+      "ccdc": "2364657",
+      "cif_source": "3q, 2364657/da8812.cif",
+      "cif_sha256": "82a0e3a5704f4c05f9a3e66d5fbd07ae1eda1c61dfc4c83b6cc6ab1010f4d032",
+      "heading_paragraph": 216,
+      "ortep_paragraph": 223,
+      "growth_paragraph": 294
+    },
+    "3v": {
+      "ccdc": "2117516",
+      "cif_source": "3u, 2117516/Olga2107dep.cif",
+      "cif_sha256": "cb183249dcf705eb537c5aac7678cf501c18f91d09dc5321bab13707cc7f1002",
+      "heading_paragraph": 237,
+      "ortep_paragraph": 245,
+      "growth_paragraph": 298
+    }
+  }
+}

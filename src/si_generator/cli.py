@@ -275,6 +275,9 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Do not add support-check warnings for NMR counts, HRMS values, and elemental analysis.",
     )
+    parser.add_argument("--show-scope", action="store_true", help="Insert a reaction and aligned product scope; save editable CDXML.")
+    parser.add_argument("--scope-conditions", default="", help="Reaction conditions shown below the arrow (solvent, temperature, time).")
+    parser.add_argument("--scope-title", default="Reaction and compound scope", help="Heading for the reaction and product overview.")
     return parser
 
 

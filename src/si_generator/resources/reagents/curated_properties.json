@@ -1,0 +1,295 @@
+{
+  "schema_version": "1.0",
+  "density_policy": "Only exact temperature-qualified mass/volume densities for whitelisted neat liquids. No relative vapor density, solution density, range, or unspecified temperature is used. Values are reference-temperature data, not automatically temperature-corrected.",
+  "by_cid": {
+    "8471": {
+      "density_g_ml": 0.7275,
+      "density_temperature_c": 20.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/896",
+      "density_evidence": "0.7275 g/cu cm at 20 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 95th Edition. CRC Press LLC, Boca Raton: FL 2014-2015, p. 3-526"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "7918": {
+      "density_g_ml": 1.082,
+      "density_temperature_c": 20.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/233",
+      "density_evidence": "1.082 g/cu cm at 20 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 95th Edition. CRC Press LLC, Boca Raton: FL 2014-2015, p. 3-4"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "6367": {
+      "density_g_ml": 1.1051,
+      "density_temperature_c": 20.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/662",
+      "density_evidence": "1.1051g/cu cm at  20 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 95th Edition. CRC Press LLC, Boca Raton: FL 2014-2015, p. 3-6"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "176": {
+      "density_g_ml": 1.0446,
+      "density_temperature_c": 25.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/40",
+      "density_evidence": "1.0446 g/cu cm at 25 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 94th Edition. CRC Press LLC, Boca Raton: FL 2013-2014, p. 3-4"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "12734": {
+      "density_g_ml": 0.806,
+      "density_temperature_c": 25.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/8051",
+      "density_evidence": "0.806 g/cu cm at 25 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.) CRC Handbook of Chemistry and Physics.   91st ed. Boca Raton, FL: CRC Press Inc., 2010-2011, p. 3-186"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "8028": {
+      "density_g_ml": 0.8833,
+      "density_temperature_c": 25.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/125",
+      "density_evidence": "0.8833 g/cu cm at 25 °C",
+      "density_reference": [
+        "Lide, D.R. CRC Handbook of Chemistry and Physics 88TH    Edition 2007-2008. CRC Press, Taylor & Francis, Boca Raton,    FL 2007, p. 3-474"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "31275": {
+      "density_g_ml": 1.0337,
+      "density_temperature_c": 20.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/81",
+      "density_evidence": "1.0337 g/cu cm at 20 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 95th Edition. CRC Press LLC, Boca Raton: FL 2014-2015, p. 3-228"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "6212": {
+      "density_g_ml": 1.4788,
+      "density_temperature_c": 25.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/56",
+      "density_evidence": "1.4788 g/cu cm at 25 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 95th Edition. CRC Press LLC, Boca Raton: FL 2014-2015, p. 3-520"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "8857": {
+      "density_g_ml": 0.9003,
+      "density_temperature_c": 20.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/83",
+      "density_evidence": "0.9003 g/cu cm at 20 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 94th Edition. CRC Press LLC, Boca Raton: FL 2013-2014, p. 3-250"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "15413": {
+      "density_g_ml": 0.7353,
+      "density_temperature_c": 25.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/5847",
+      "density_evidence": "0.7353 g/cu cm at 25 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 95th Edition. CRC Press LLC, Boca Raton: FL 2014-2015, p. 3-364"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "702": {
+      "density_g_ml": 0.7893,
+      "density_temperature_c": 20.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/82",
+      "density_evidence": "0.7893 g/cu cm at 20 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 95th Edition. CRC Press LLC, Boca Raton: FL 2014-2015, p. 3-246"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "6386": {
+      "density_g_ml": 0.7886,
+      "density_temperature_c": 20.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/50",
+      "density_evidence": "0.7886 g/cu cm at 20 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 94th Edition. CRC Press LLC, Boca Raton: FL 2013-2014, p. 3-392"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "1140": {
+      "density_g_ml": 0.8623,
+      "density_temperature_c": 20.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/131",
+      "density_evidence": "0.8623 g/cu cm at 20 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 95th Edition. CRC Press LLC, Boca Raton: FL 2014-2015, p. 3-514"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "241": {
+      "density_g_ml": 0.8756,
+      "density_temperature_c": 20.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/35",
+      "density_evidence": "0.8756 g/cu cm at 20 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 94th Edition. CRC Press LLC, Boca Raton: FL 2013-2014, p. 3-34"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "8058": {
+      "density_g_ml": 0.6606,
+      "density_temperature_c": 25.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/91",
+      "density_evidence": "0.6606 g/cu cm at 25 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.) CRC Handbook of Chemistry and Physics.   91st ed. Boca Raton, FL: CRC Press Inc., 2010-2011, p. 3-282"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "8900": {
+      "density_g_ml": 0.6795,
+      "density_temperature_c": 25.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/90",
+      "density_evidence": "0.6795 g/cu cm at 25 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 94th Edition. CRC Press LLC, Boca Raton: FL 2013-2014, p. 3-290"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "180": {
+      "density_g_ml": 0.7845,
+      "density_temperature_c": 20.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/41",
+      "density_evidence": "0.7845 g/cu cm at 20 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 95th Edition. CRC Press LLC, Boca Raton: FL 2014-2015, p. 3-4"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "962": {
+      "density_g_ml": 0.995,
+      "density_temperature_c": 25.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/8183",
+      "density_evidence": "0.9950 g/cu cm at 25 °C",
+      "density_reference": [
+        "O'Neil, M.J. (ed.). The Merck Index - An Encyclopedia of Chemicals, Drugs, and Biologicals. Cambridge, UK:  Royal Society of Chemistry, 2013., p. 1868"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "7964": {
+      "density_g_ml": 1.1058,
+      "density_temperature_c": 20.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/55",
+      "density_evidence": "1.1058 g/cu cm at 20 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 94th Edition. CRC Press LLC, Boca Raton: FL 2013-2014, p. 3-98"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    },
+    "6375": {
+      "density_g_ml": 1.1371,
+      "density_temperature_c": 20.0,
+      "density_source_url": "https://pubchem.ncbi.nlm.nih.gov/source/hsdb/106",
+      "density_evidence": "1.1371 g/cu cm at 20 °C",
+      "density_reference": [
+        "Haynes, W.M. (ed.). CRC Handbook of Chemistry and Physics. 94th Edition. CRC Press LLC, Boca Raton: FL 2013-2014, p. 3-414"
+      ],
+      "density_source_name": "Hazardous Substances Data Bank (HSDB)",
+      "density_basis": "neat liquid at reference temperature"
+    }
+  },
+  "identity_overrides": [
+    {
+      "cid": null,
+      "name": "sodium tert-butoxide",
+      "formula": "C4H9NaO",
+      "molecular_weight_g_mol": 96.1,
+      "aliases": [
+        "sodium tert-butoxide",
+        "NaOtBu",
+        "tBuONa",
+        "NaOt-Bu",
+        "t-BuONa"
+      ],
+      "source_url": "https://www.sigmaaldrich.com/MS/en/product/aldrich/703788",
+      "core_reagent": true,
+      "density_g_ml": null,
+      "density_temperature_c": null,
+      "provenance": "identity manually verified against formula"
+    },
+    {
+      "cid": null,
+      "name": "lithium bis(trimethylsilyl)amide",
+      "formula": "C6H18LiNSi2",
+      "molecular_weight_g_mol": 167.33,
+      "aliases": [
+        "lithium bis(trimethylsilyl)amide",
+        "LiHMDS"
+      ],
+      "source_url": "https://www.sigmaaldrich.com/US/en/product/aldrich/225770",
+      "core_reagent": true,
+      "density_g_ml": null,
+      "density_temperature_c": null,
+      "provenance": "identity manually verified against formula"
+    },
+    {
+      "cid": null,
+      "name": "borane dimethyl sulfide",
+      "formula": "C2H9BS",
+      "molecular_weight_g_mol": 75.97,
+      "aliases": [
+        "borane dimethyl sulfide",
+        "BH3.SMe2",
+        "BH3·SMe2",
+        "BH3·DMS",
+        "BMS"
+      ],
+      "source_url": "https://www.sigmaaldrich.com/SA/en/product/aldrich/179825",
+      "core_reagent": true,
+      "density_g_ml": null,
+      "density_temperature_c": null,
+      "provenance": "identity manually verified against formula"
+    },
+    {
+      "cid": null,
+      "name": "TEMPO",
+      "formula": "C9H18NO",
+      "molecular_weight_g_mol": 156.25,
+      "aliases": [
+        "TEMPO",
+        "2,2,6,6-tetramethylpiperidin-1-oxyl",
+        "2,2,6,6-Tetramethylpiperidin-1-yl)oxyl"
+      ],
+      "source_url": "https://pubchem.ncbi.nlm.nih.gov/compound/2724126",
+      "core_reagent": true,
+      "density_g_ml": null,
+      "density_temperature_c": null,
+      "provenance": "identity manually verified against formula"
+    }
+  ]
+}

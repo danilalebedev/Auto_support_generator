@@ -219,6 +219,8 @@ def generate_new_support_node(state: AddCompoundsState) -> dict:
     temp_output = temp_dir / "new_compounds.docx"
     temp_dir.mkdir(parents=True, exist_ok=True)
 
+    source_config = state.get("manifest", {}).get("run_config", {})
+
     generate_request = GenerateSIRequest(
         input_path=request.input_path,
         input_kind=request.input_kind,
@@ -253,6 +255,9 @@ def generate_new_support_node(state: AddCompoundsState) -> dict:
         calculate_elemental_analysis=bool(method_config.get("calculate_elemental_analysis", False)),
         no_check_support=bool(method_config.get("no_check_support", False)),
         journal_profile_id=str(method_config.get("journal_profile_id") or "organic.default"),
+        show_scope=bool(source_config.get("show_scope", False)),
+        scope_conditions=str(source_config.get("scope_conditions", "")) if request.method_mode == "same_series" else "",
+        scope_title=str(source_config.get("scope_title") or "Reaction and compound scope"),
     )
 
     from ...workflows.generate_si import output_path_from_state, run_generate_si
@@ -354,6 +359,11 @@ def write_add_manifest_node(state: AddCompoundsState) -> dict:
     preserve_crystallography(merged_manifest, _manifest_output_root(state.get("manifest", {}), request.manifest_path),
                             output_dirs(output_docx)["output_root"])
     _rebase_merged_artifacts(merged_manifest, request.manifest_path, output_docx)
+    from ...scope_graphic.lifecycle import refresh_add
+    refresh_add(state.get("manifest", {}), generated_manifest, merged_manifest,
+                _manifest_output_root(state.get("manifest", {}), request.manifest_path),
+                Path(state["artifacts"]["generated_support_docx"]).parent.parent,
+                output_docx, output_dirs(output_docx)["output_root"], id_map, request.method_mode)
     output_manifest.write_text(json.dumps(merged_manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     artifacts = {
         **state.get("artifacts", {}),
@@ -844,6 +854,8 @@ def _append_generated_docx_blocks(
             if spectrum_elements:
                 _insert_body_elements(target_body, _spectra_insert_index(target_body), spectrum_elements)
 
+            from ...crystallography.numbering import renumber_tables
+            renumber_tables(target_document)
             with zipfile.ZipFile(temp_docx, "w", zipfile.ZIP_DEFLATED) as target_out:
                 replaced = {"word/document.xml", "word/_rels/document.xml.rels", "[Content_Types].xml"}
                 for item in target_zip.infolist():

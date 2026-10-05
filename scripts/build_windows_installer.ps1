@@ -33,6 +33,7 @@ $mnovaScript = Join-Path $root "src\si_generator\resources\scripts\extract_nmr_r
 $assets = Join-Path $root "src\si_generator\resources\assets"
 $mngpStyles = Join-Path $root "src\si_generator\resources\mngp_styles"
 $templates = Join-Path $root "src\si_generator\templates"
+$reagentCatalog = Join-Path $root "src\si_generator\resources\reagents"
 $setupExe = Join-Path $distDir "AutoSupportGeneratorSetup.exe"
 $uninstallExe = Join-Path $distDir "AutoSupportGeneratorUninstall.exe"
 $sedPath = Join-Path $distDir "AutoSupportGeneratorSetup.sed"
@@ -59,6 +60,7 @@ Write-Host "Building AutoSupportGenerator.exe..."
     --add-data "$assets;assets" `
     --add-data "$mngpStyles;mngp_styles" `
     --add-data "$templates;si_generator/templates" `
+    --add-data "$reagentCatalog;si_generator/resources/reagents" `
     --distpath $distDir `
     --workpath $buildDir `
     --specpath $specDir `
@@ -111,6 +113,9 @@ Copy-Item -LiteralPath (Join-Path $root "RELEASE_BETA_1_2.md") -Destination (Joi
 Copy-Item -LiteralPath (Join-Path $root "examples\example_1") -Destination (Join-Path $payloadExamplesDir "example_1") -Recurse
 Copy-Item -LiteralPath (Join-Path $root "examples\example_2") -Destination (Join-Path $payloadExamplesDir "example_2") -Recurse
 Copy-Item -LiteralPath (Join-Path $root "examples\example_3") -Destination (Join-Path $payloadExamplesDir "example_3") -Recurse
+Copy-Item -LiteralPath (Join-Path $root "examples\crystallography") -Destination (Join-Path $payloadExamplesDir "crystallography") -Recurse
+Copy-Item -LiteralPath (Join-Path $root "examples\crystallography_all_in_one") -Destination (Join-Path $payloadExamplesDir "crystallography_all_in_one") -Recurse
+Copy-Item -LiteralPath (Join-Path $root "examples\reaction_scope") -Destination (Join-Path $payloadExamplesDir "reaction_scope") -Recurse
 $payloadDocsAssets = Join-Path $payloadDir "docs\assets"
 New-Item -ItemType Directory -Force -Path $payloadDocsAssets | Out-Null
 Copy-Item -LiteralPath (Join-Path $root "docs\assets\gui_overview.png") -Destination (Join-Path $payloadDocsAssets "gui_overview.png")

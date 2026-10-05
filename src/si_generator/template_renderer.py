@@ -29,13 +29,14 @@ from .runtime_paths import bundled_resource_path
 DEFAULT_TEMPLATE_RESOURCE = Path("si_generator/templates/SI_template.docx")
 
 PLACEHOLDER_RE = re.compile(r"\[\{([^{}]+)\}\]|\{([^{}]+)\}")
-NMR_LABEL_RE = re.compile(r"13C(?:\{1H\})?(?=\s*NMR\b)|1H(?=\s*NMR\b)")
+NMR_LABEL_RE = re.compile(
+    r"13C(?:\{1H\})?(?=\s*NMR\b)|1H(?=\s*NMR\b)|1H(?=\s*[\u2013-]\s*(?:1H|13C(?:\{1H\})?)\s*NMR\b)"
+)
 STEREOCHEMISTRY_RE = re.compile(r"\((?:\d*[EZ](?:,\d*[EZ])*)\)")
 RF_RE = re.compile(r"\bRf\b")
 GP_RE = re.compile(r"\bGP\d+\b")
 COMPOUND_NUMBER_RE = re.compile(r"(?<![A-Za-z0-9.])\d+[a-z](?![A-Za-z0-9])")
-CHEM_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9])(?:\[[A-Za-z0-9+\-]+\][+\-]|[A-Z][A-Za-z0-9]*[+\-]?)(?![A-Za-z0-9])")
-KNOWN_ISOTOPE_LABELS = ("13", "15", "18", "29", "31", "35", "37", "79", "81", "2")
+CHEM_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9])(?:\[[A-Za-z0-9+\-]+\][+\-]|(?:\^\d+)?[A-Z][A-Za-z0-9^]*[+\-]?)(?![A-Za-z0-9])")
 
 
 def default_template_path() -> Path:
@@ -221,7 +222,11 @@ def _render_template_paragraphs(
 
         paragraph = _clone_paragraph(document, template_paragraph)
         if spectrum_block is not None:
-            _normalize_spectrum_paragraph_spacing(paragraph, text)
+            _normalize_spectrum_paragraph_spacing(
+                paragraph,
+                text,
+                nucleus=str(spectrum_block.get("nucleus") or ""),
+            )
         _remove_empty_optional_fragments(paragraph, values)
         _replace_placeholders(paragraph, values)
         _apply_inline_formatting(paragraph)
@@ -240,13 +245,15 @@ def _clone_paragraph(document: DocumentObject, paragraph: Paragraph) -> Paragrap
     return Paragraph(new_p, document._body)
 
 
-def _normalize_spectrum_paragraph_spacing(paragraph: Paragraph, template_text: str) -> None:
+def _normalize_spectrum_paragraph_spacing(paragraph: Paragraph, template_text: str, *, nucleus: str = "") -> None:
     paragraph.paragraph_format.space_before = Pt(0)
     paragraph.paragraph_format.space_after = Pt(0)
     if _is_structure_placeholder_paragraph(template_text):
         # The appendix structure is a floating OLE object. Collapse its anchor
         # line so it does not create a blank line above the spectrum image.
         paragraph.paragraph_format.line_spacing = Pt(1)
+        if nucleus not in {"1H", "13C"}:
+            paragraph.paragraph_format.space_after = Pt(54)
         for run in paragraph.runs:
             run.font.size = Pt(1)
 
@@ -490,7 +497,7 @@ def _chemical_token_segments(token: str) -> list[tuple[str, dict[str, bool]]] | 
         return [(token[:-1], {}), (token[-1], {"superscript": True})]
     if not any(char.isdigit() for char in token) and token[-1:] not in {"+", "-"}:
         return None
-    if not re.fullmatch(r"[A-Z][A-Za-z0-9]*[+\-]?", token):
+    if not re.fullmatch(r"(?:\^\d+)?[A-Z](?:[A-Za-z0-9]|\^\d+)*[+\-]?", token):
         return None
 
     body = token
@@ -503,32 +510,28 @@ def _chemical_token_segments(token: str) -> list[tuple[str, dict[str, bool]]] | 
     index = 0
     while index < len(body):
         char = body[index]
+        if char == "^":
+            end = index + 1
+            while end < len(body) and body[end].isdigit():
+                end += 1
+            segments.append((body[index + 1:end], {"superscript": True}))
+            index = end
+            continue
         if char.isdigit():
             end = index + 1
             while end < len(body) and body[end].isdigit():
                 end += 1
-            segments.extend(_formula_digit_segments(body[index:end], next_char=body[end : end + 1]))
+            segments.append((body[index:end], {"subscript": True}))
             index = end
             continue
         end = index + 1
-        while end < len(body) and not body[end].isdigit():
+        while end < len(body) and not body[end].isdigit() and body[end] != "^":
             end += 1
         segments.append((body[index:end], {}))
         index = end
     if charge:
         segments.append((charge, {"superscript": True}))
     return segments
-
-
-def _formula_digit_segments(digits: str, *, next_char: str) -> list[tuple[str, dict[str, bool]]]:
-    if next_char.isupper():
-        for label in sorted(KNOWN_ISOTOPE_LABELS, key=len, reverse=True):
-            if digits.endswith(label) and len(digits) > len(label):
-                return [
-                    (digits[: -len(label)], {"subscript": True}),
-                    (label, {"superscript": True}),
-                ]
-    return [(digits, {"subscript": True})]
 
 
 def _merge_adjacent_segments(segments: list[tuple[str, dict[str, bool]]]) -> list[tuple[str, dict[str, bool]]]:
@@ -722,17 +725,52 @@ def _spectrum_values(compound: Compound, nucleus: str) -> dict[str, str]:
             "product.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:1H]]",
             "product.nmr.1h.picture": f"[[SPECTRUM:{compound.number}:1H]]",
         }
+    if nucleus == "13C":
+        return {
+            "spectrum.nucleus": "13C",
+            "spectrum.label": _nmr_label_from_text(compound.c13_nmr, "13C NMR"),
+            "spectrum.conditions": compound.c13_conditions,
+            "spectrum.structure.marker": f"[[SPECTRUM_STRUCTURE:{compound.number}:13C]]",
+            "spectrum.picture": f"[[SPECTRUM:{compound.number}:13C]]",
+            "compound.number.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:13C]]",
+            "compound.number.nmr.13c.picture": f"[[SPECTRUM:{compound.number}:13C]]",
+            "product.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:13C]]",
+            "product.nmr.13c.picture": f"[[SPECTRUM:{compound.number}:13C]]",
+        }
     return {
-        "spectrum.nucleus": "13C",
-        "spectrum.label": _nmr_label_from_text(compound.c13_nmr, "13C NMR"),
-        "spectrum.conditions": compound.c13_conditions,
-        "spectrum.structure.marker": f"[[SPECTRUM_STRUCTURE:{compound.number}:13C]]",
-        "spectrum.picture": f"[[SPECTRUM:{compound.number}:13C]]",
-        "compound.number.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:13C]]",
-        "compound.number.nmr.13c.picture": f"[[SPECTRUM:{compound.number}:13C]]",
-        "product.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:13C]]",
-        "product.nmr.13c.picture": f"[[SPECTRUM:{compound.number}:13C]]",
+        "spectrum.nucleus": nucleus,
+        "spectrum.label": _two_d_nmr_label(nucleus),
+        "spectrum.conditions": _two_d_nmr_conditions(compound),
+        "spectrum.structure.marker": f"[[SPECTRUM_STRUCTURE:{compound.number}:{nucleus}]]",
+        "spectrum.picture": f"[[SPECTRUM:{compound.number}:{nucleus}]]",
+        "compound.number.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:{nucleus}]]",
+        "compound.number.nmr.13c.picture": f"[[SPECTRUM:{compound.number}:{nucleus}]]",
+        "product.structure": f"[[SPECTRUM_STRUCTURE:{compound.number}:{nucleus}]]",
+        "product.nmr.13c.picture": f"[[SPECTRUM:{compound.number}:{nucleus}]]",
     }
+
+
+def _two_d_nmr_label(nucleus: str) -> str:
+    axes = {
+        "HSQC": ("1H", "13C"),
+        "HMBC": ("1H", "13C"),
+        "NOESY": ("1H", "1H"),
+        "COSY": ("1H", "1H"),
+        "TOCSY": ("1H", "1H"),
+        "ROESY": ("1H", "1H"),
+    }.get(nucleus.upper())
+    if axes is None:
+        return f"{nucleus} NMR"
+    return f"{nucleus} {axes[0]}\u2013{axes[1]} NMR"
+
+
+def _two_d_nmr_conditions(compound: Compound) -> str:
+    for conditions in (compound.h1_conditions, compound.c13_conditions):
+        for part in str(conditions or "").split(","):
+            candidate = part.strip()
+            if candidate and not re.search(r"\b\d+(?:\.\d+)?\s*MHz\b", candidate, re.IGNORECASE):
+                return candidate
+    return ""
 
 
 def _product_values(compound: Compound) -> dict[str, str]:
@@ -935,7 +973,8 @@ def _formula_with_isotope_labels(formula: str, isotope_labels: Any) -> str:
     def replace(match: re.Match[str]) -> str:
         element = match.group(0)
         label = isotope_labels.get(element)
-        return f"{label}{element}" if label else element
+        # An explicit marker distinguishes H22 from H2 followed by an isotope.
+        return f"^{label}{element}" if label else element
 
     return re.sub(r"[A-Z][a-z]?", replace, formula)
 

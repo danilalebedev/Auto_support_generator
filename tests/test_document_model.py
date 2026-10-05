@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 import zipfile
+import base64
 from xml.etree import ElementTree
 from pathlib import Path
 
@@ -44,6 +45,69 @@ class DocumentModelTests(unittest.TestCase):
         self.assertEqual(model["metadata"]["spectrum_count"], "1")
         self.assertEqual(model["metadata"]["references_count"], "0")
 
+    def test_renders_two_dimensional_spectrum_images_from_compound_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output_path = root / "support_information.docx"
+            image_path = root / "2a_HSQC.png"
+            image_path.write_bytes(base64.b64decode(_ONE_PIXEL_PNG))
+            structure_path = root / "2a_structure.png"
+            structure_path.write_bytes(base64.b64decode(_ONE_PIXEL_PNG))
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="2D example",
+                structure_path=str(structure_path),
+                h1_conditions="CDCl3, 600 MHz",
+                spectra_2d_folder=str(root),
+                spectra_2d_files=[str(image_path)],
+            )
+            model = build_si_document_model([compound])
+
+            build_document_from_model(model, output_path)
+
+            rendered = Document(output_path)
+            text = "\n".join(paragraph.text for paragraph in rendered.paragraphs)
+            structure_paragraph = next(
+                paragraph for paragraph in rendered.paragraphs if "[[SPECTRUM_STRUCTURE:2a:HSQC]]" in paragraph.text
+            )
+            runs = _document_runs(output_path)
+            spectrum_block = model["sections"][1]["blocks"][0]
+
+        self.assertEqual([section["id"] for section in model["sections"]], ["compound_descriptions", "spectra_appendix"])
+        self.assertEqual(spectrum_block["nucleus"], "HSQC")
+        self.assertEqual(spectrum_block["image_path"], str(image_path))
+        self.assertIn("HSQC 1H\u201313C NMR (CDCl3)", text)
+        self.assertIn("[[SPECTRUM_STRUCTURE:2a:HSQC]]", text)
+        self.assertEqual(structure_paragraph.paragraph_format.space_after.pt, 54)
+        self.assertTrue(_has_run(runs, "1", vert_align="superscript"))
+        self.assertTrue(_has_run(runs, "13", vert_align="superscript"))
+        self.assertTrue(any("NMR" in str(run["text"]) and run["vert_align"] == "" for run in runs))
+        self.assertFalse(any("NMR" in str(run["text"]) and run["vert_align"] == "superscript" for run in runs))
+
+    def test_builds_two_dimensional_mnova_blocks_with_png_preview(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image_path = root / "2a_HMBC.png"
+            image_path.write_bytes(base64.b64decode(_ONE_PIXEL_PNG))
+            mnova_path = root / "2a_HMBC.mnova"
+            mnova_path.write_bytes(b"mnova-placeholder")
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="2D example",
+                spectra_2d_folder=str(root),
+                spectra_2d_files=[str(image_path), str(mnova_path)],
+            )
+
+            model = build_si_document_model([compound], spectra_embed_mode="mnova")
+
+        spectrum_block = model["sections"][1]["blocks"][0]
+        self.assertEqual(spectrum_block["nucleus"], "HMBC")
+        self.assertEqual(spectrum_block["embed_mode"], "mnova")
+        self.assertEqual(spectrum_block["image_path"], str(image_path))
+        self.assertEqual(spectrum_block["mnova_path"], str(mnova_path))
+
     def test_renders_crystallography_appendix_when_cif_is_present(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -75,7 +139,8 @@ class DocumentModelTests(unittest.TestCase):
         )
         self.assertEqual(model["metadata"]["crystallography_count"], "1")
         self.assertIn("X-ray crystallography", text)
-        self.assertIn("Crystallographic data for 2a", text)
+        self.assertEqual(text.count("Crystal example (2a)"), 2)
+        self.assertIn("Crystal data and structure refinement for compound 2a", text)
 
     def test_capitalizes_compound_name_in_description_and_spectrum_titles(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -282,6 +347,7 @@ class DocumentModelTests(unittest.TestCase):
 
 W_NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 W_VAL = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val"
+_ONE_PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
 
 
 def _document_runs(path: Path) -> list[dict[str, str | bool]]:

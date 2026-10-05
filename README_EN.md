@@ -1,10 +1,12 @@
 # Auto Support Generator
 
-## X-ray Crystallography and Multiple Series
+## X-ray Crystallography, 2D NMR and Multiple Series
 
 Generate accepts an optional **CIF source** folder/ZIP with compound-number subfolders; CIFs may cover only a subset of compounds. The integrated reader inserts structure figures, experimental descriptions and crystal/refinement tables, and saves editable DOCX reports, source CIFs, images and JSON under `reports/crystallography`. Add and Patch preserve these artifacts without reprocessing old spectra.
 
-An optional sidecar JSON supplies crystal-growth/refinement text, CCDC, an external ORTEP image/caption and geometry-table selection. Without an external image, the program makes a labelled coordinate preview, not a thermal-ellipsoid plot. Local checks do not replace official checkCIF or CCDC deposition. The default ACS-oriented DOCX is a house template, not an official publisher form.
+An optional sidecar JSON supplies crystal-growth/refinement text, CCDC, an external ORTEP image/caption and geometry-table selection. Without an external image, the program makes a labelled coordinate preview, not a thermal-ellipsoid plot. A custom crystallography template may be selected separately or embedded in all-in-one DOCX. Local checks do not replace official checkCIF or CCDC deposition. The default ACS-oriented DOCX is a house template, not an official publisher form.
+
+Raw Bruker HSQC, HMBC, COSY, NOESY, TOCSY and ROESY experiments are detected from acquisition metadata. Version A uses separately processed 1H/13C external projections, independent 8% trace sizes, contour scaling 4.0 and `ppm` labels on both axes; the 13C projection uses Bernstein baseline correction of order 3.
 
 **Multiple series** assembles a folder of series, each with its own Compound_table, optional SI_template and Reaction_schema/Scope. Processing settings are shared; compound numbers must be unique. See the [field reference and requirements](docs/crystallography.md) and [runnable example](examples/crystallography). Existing installer binaries have not been rebuilt for these source changes.
 
@@ -98,7 +100,7 @@ This section is for developers. Install Python 3.12, run `Setup Auto SI Generato
 | **Publication preset** | Target journal. Selection applies its Word template, MNGP profiles, ppm windows and appendix rules; **Apply** restores preset values after manual edits. |
 | **Input format** | **Separate files** for the conventional document set or **Single all-in-one DOCX** for one combined file. |
 | **Compound table** | `Compound_table.docx`: one row per compound with number, properties, HRMS/IR/Anal and a ChemDraw OLE structure. |
-| **All-in-one input** | `All_in_one_input.docx` containing Compound table, Reaction schema, Scope and a custom SI template. Used only in **Single all-in-one DOCX** mode; bundled examples contain all four parts. |
+| **All-in-one input** | `All_in_one_input.docx` containing Compound table and optional Reaction schema, Scope, SI template and Crystallography template sections. The X-ray template can therefore travel inside the same file. |
 | **Spectra source** | A `Spectra_source` folder or `Spectra_source.zip`, organized by compound number. |
 | **Output folder** | Parent folder for results. The app creates a separate run directory and sorts DOCX files, editable Mnova files, PNG images, input copies, reports and logs into subfolders. |
 
@@ -184,9 +186,20 @@ The file is divided by fixed labels:
 - `[AUTO SI: REACTION SCHEMA]` — optional reagent calculation rules;
 - `[AUTO SI: SCOPE]` — optional series data;
 - `[AUTO SI: SI TEMPLATE]` — optional output text and formatting;
+- `[AUTO SI: CRYSTALLOGRAPHY TEMPLATE]` — optional X-ray description/table template;
 - `[AUTO SI: END]` — end of input data.
 
-Every bundled `All_in_one_input.docx` already contains Compound table, Reaction schema, Scope and SI template. Edit the template directly under `[AUTO SI: SI TEMPLATE]`; the application extracts and uses it in place of a separate file. If this section is removed, the selected **Publication preset** supplies the template. Reaction schema plus Scope enables loading calculations automatically. Publication preset, Spectra source, Output folder, MestReNova, `.mngp` and Processing remain application settings and are not stored in the combined DOCX.
+Standard bundled `All_in_one_input.docx` files contain Compound table, Reaction schema, Scope and SI template. The crystallography example additionally embeds `[AUTO SI: CRYSTALLOGRAPHY TEMPLATE]`; both templates are extracted automatically. If the SI template is absent, the selected publication preset is used. If the X-ray template is absent, the separate field or built-in ACS-oriented template is used. Publication preset, Spectra source, CIF source, Output folder, MestReNova, `.mngp` and Processing remain application settings.
+
+### Reaction and aligned compound scope
+
+Enable **Generate → Show scope** and provide `Reaction_schema.docx` and `Scope.docx`, or their all-in-one sections. Scope contains editable reagent/product structures, matching product numbers and measured masses; yields can also come from percentage yields in the compound table.
+
+The first product row supplies the reaction at the top, with named reagents above the arrow (no equivalents) and solvent below; no `Representative reaction` caption is printed. Enter known conditions in **Reaction conditions**. Each structure has a one-line label such as **2a**, 80%: only the compound number is bold.
+
+The `scope` folder contains editable CDXML, native ChemDraw PNG previews and saved layout data. The PNG overview appears before characterization in Word. Patch updates the overview without NMR processing; Add extends the same series or keeps new methods separate. Installed ChemDraw is required. Turning the option off skips scope generation entirely.
+
+See the [input files and demonstration output](examples/reaction_scope). The demonstration intentionally omits NMR processing; attach the example_1 spectra for a full SI run.
 
 ## Processing
 
@@ -203,12 +216,12 @@ Every bundled `All_in_one_input.docx` already contains Compound table, Reaction 
 | **Apply to 1H/13C** | Select nuclei receiving baseline correction. |
 | **Whittaker / polynomial parameters** | Expert parameters for the selected baseline algorithm. |
 
-During `13C NMR` validation, the program reads the ChemDraw structure and automatically counts graph-symmetric aromatic carbons as one expected signal. Non-aromatic carbons remain separate. If the structure or SMILES is unavailable or inconsistent with the formula, validation falls back to the strict total carbon count.
+During `13C NMR` validation, the program estimates symmetry classes of all carbon atoms from the molecular graph, including specified stereochemistry and isotopes. This is not a complete NMR prediction: mixtures, diastereotopic environments and dynamic exchange require review. If the structure or SMILES is unavailable or inconsistent with the formula, validation uses the full carbon count.
 
 ### Chemical validation logic
 
 - **1H NMR:** integral labels such as `1H`, `2H` and `3H` are summed and compared with the number of H atoms in the molecular formula.
-- **13C NMR:** described signals are counted and compared with the expected count. Symmetry-equivalent aromatic carbons from the structure count as one signal; without structure data, the full formula carbon count is used.
+- **13C NMR:** signals are compared with the graph-equivalence classes of all carbon atoms. With symmetry correction enabled, a single peak annotated `(2C)` counts as one signal, not two. Without structure data, the full formula carbon count is used.
 - **HRMS:** found `m/z` is compared with the calculated value for the formula and adduct. The base tolerance is 5 ppm, while a publication profile may add journal-specific requirements.
 - **Elemental analysis:** experimental element percentages are compared with values calculated from the formula.
 
@@ -227,6 +240,8 @@ Spectra_source/
 ```
 
 Inner experiment names may vary; acquisition metadata identifies 1H and 13C. Top-level compound numbers must match Compound table.
+
+Raw 2D experiment folders contain `ser`. Acquisition metadata identifies HSQC, HMBC, COSY, NOESY, TOCSY and ROESY. Version A uses external 1H/13C projections (8% each), contour scaling 4.0 and `ppm` on both axes; HSQC/HMBC use 13C vertically, while homonuclear experiments use 1H on both axes.
 
 ## Check
 
@@ -289,13 +304,15 @@ The full field-by-field alias table is available under **Instructions → Templa
 
 ## Examples
 
-Only three synchronized example sets are included in the repository and under **Instructions → Example files**:
+The repository and **Instructions → Example files** include base and extended examples:
 
 | Folder | Contents |
 |---|---|
 | [`examples/example_1`](examples/example_1) | First series, compounds 2a–2d; Spectra source folder. |
 | [`examples/example_2`](examples/example_2) | Series continuation, compounds 2e–2f. |
 | [`examples/example_3`](examples/example_3) | New method, compounds 3a, 3b, 3c, 3d, 3i; Spectra source folder and zip. |
+| [`examples/reaction_scope`](examples/reaction_scope) | Reaction and aligned compound scope with editable CDXML. |
+| [`examples/crystallography_all_in_one`](examples/crystallography_all_in_one) | Eight X-ray compounds with raw NMR, CIF/ORTEP files, embedded SI/X-ray templates and a generated reference output. |
 
 Every set uses GUI-matching names: `Compound_table.docx`, `Spectra_source`, `SI_template.docx`, `Reaction_schema.docx`, `Scope.docx`.
 

@@ -67,6 +67,24 @@ class MnovaBatchRecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "no status file"):
                 mnova.extract_reports_batch(tasks, Path(tmp))
 
+    def test_partial_status_after_crash_retries_each_compound(self) -> None:
+        tasks = [MnovaTask(number, '1H', Path(number) / 'fid') for number in ('2a', '2b')]
+        error = MnovaBatchError('START\nOK 2a\nTASK 2b', incomplete=True, returncode=4294967295)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(mnova, '_extract_reports_batch_once', side_effect=[
+            error, {('2a', '1H'): {'report': 'first'}}, {('2b', '1H'): {'report': 'second'}},
+        ]) as mocked:
+            reports = mnova.extract_reports_batch(tasks, Path(tmp))
+        self.assertEqual(set(reports), {('2a', '1H'), ('2b', '1H')})
+        self.assertEqual(mocked.call_count, 3)
+
+    def test_failed_single_compound_retry_stops_without_partial_success(self) -> None:
+        tasks = [MnovaTask(number, '1H', Path(number) / 'fid') for number in ('2a', '2b')]
+        error = MnovaBatchError('START', incomplete=True, returncode=1)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(mnova, '_extract_reports_batch_once', side_effect=[error, error]) as mocked:
+            with self.assertRaisesRegex(RuntimeError, 'compound 2a'):
+                mnova.extract_reports_batch(tasks, Path(tmp))
+        self.assertEqual(mocked.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

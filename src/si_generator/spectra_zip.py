@@ -174,16 +174,71 @@ def _assign_compound_artifact_folders(compound: Compound, compound_dir: Path) ->
     if cif_files and not compound.cif_files:
         compound.cif_files = [str(path) for path in cif_files]
 
+    spectra_root = _optional_child_folder(compound_dir, "spectra")
+    one_d_folder = _first_existing_folder(spectra_root, ("1d", "1D")) if spectra_root else _first_existing_folder(compound_dir, ("1d", "1D"))
+    if one_d_folder is None and _find_bruker_spectra(compound_dir):
+        one_d_folder = compound_dir
+    if one_d_folder and not compound.spectra_1d_folder:
+        compound.spectra_1d_folder = str(one_d_folder)
+    if one_d_folder and not compound.spectra_1d_files:
+        compound.spectra_1d_files = [str(path) for path in _data_files(one_d_folder)]
+
+    two_d_folder = _first_existing_folder(spectra_root, ("2d", "2D")) if spectra_root else _first_existing_folder(compound_dir, ("2d", "2D"))
+    two_d_experiments = _find_bruker_2d_spectra(two_d_folder or compound_dir)
+    if two_d_folder is None and two_d_experiments:
+        two_d_folder = _common_parent(two_d_experiments)
+    if two_d_folder and not compound.spectra_2d_folder:
+        compound.spectra_2d_folder = str(two_d_folder)
+    if two_d_folder and not compound.spectra_2d_files:
+        compound.spectra_2d_files = [str(path) for path in _data_files(two_d_folder)]
+
 
 def _optional_child_folder(root: Path, name: str) -> Path | None:
     path = root / name
     return path if path.is_dir() else None
 
 
+def _first_existing_folder(root: Path, names: tuple[str, ...]) -> Path | None:
+    for name in names:
+        path = root / name
+        if path.is_dir():
+            return path
+    return None
+
+
 def _files_with_suffix(folder: Path | None, suffix: str) -> list[Path]:
     if folder is None:
         return []
     return sorted((path for path in folder.rglob(f"*{suffix}") if path.is_file()), key=lambda path: str(path).casefold())
+
+
+def _data_files(folder: Path) -> list[Path]:
+    ignored_names = {"readme.txt", ".ds_store", "thumbs.db"}
+    return sorted(
+        (path for path in folder.rglob("*") if path.is_file() and path.name.casefold() not in ignored_names),
+        key=lambda path: str(path).casefold(),
+    )
+
+
+def _find_bruker_2d_spectra(compound_dir: Path) -> list[Path]:
+    if not compound_dir.exists():
+        return []
+    experiments: list[Path] = []
+    for ser in compound_dir.rglob("ser"):
+        experiment = ser.parent
+        if (experiment / "acqu2").exists() or (experiment / "acqu2s").exists():
+            experiments.append(experiment)
+    return sorted(experiments, key=lambda path: str(path).casefold())
+
+
+def _common_parent(paths: list[Path]) -> Path:
+    if not paths:
+        raise ValueError("Cannot compute a common parent for an empty path list.")
+    common = Path(paths[0])
+    for path in paths[1:]:
+        while common != path and common not in path.parents:
+            common = common.parent
+    return common
 
 
 def _read_nucleus(experiment: Path) -> str:

@@ -54,6 +54,7 @@ def run_series(request):
     output = dirs["support_docx"]
     manifest_path = output.with_suffix(".manifest.json")
     merged, all_issues, compound_store, configurations = None, [], {}, []
+    scope_series = []
     for index, child in enumerate(requests, 1):
         child.output_path = dirs["output_root"] / "series" / f"series_{index}" / "support_information.docx"
         result = run_generate_si(child)
@@ -80,6 +81,14 @@ def run_series(request):
             for old, compound in result.get("compounds", {}).items():
                 compound.id = mapping[old]
                 compound_store[mapping[old]] = compound
+        if child.show_scope:
+            from ..scope_graphic.lifecycle import read_model
+            scope_model = read_model(generated, path.parent.parent)
+            if scope_model:
+                for group in scope_model.get("series", [scope_model]):
+                    for product in group["products"]:
+                        product["id"] = mapping[product["id"]]
+                    scope_series.append(group)
         for issue in result.get("issues", []):
             copied = deepcopy(issue)
             if copied.get("compound_id") in mapping:
@@ -99,6 +108,10 @@ def run_series(request):
     artifacts.update(manifest=str(manifest_path), support_docx=str(output), run_summary=str(summary_path))
     merged.update(run_id=stamp, artifacts=artifacts, output_paths=artifacts.copy())
     merged["relative_paths"] = {k: str(Path(v).relative_to(dirs["output_root"])) for k, v in artifacts.items()}
+    if scope_series:
+        from ..scope_graphic.lifecycle import save_overview
+        save_overview({"version": 1, "series": scope_series}, merged, output, dirs["output_root"])
+        artifacts["scope_graphic"] = merged["artifacts"]["scope_graphic"]
     manifest_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
     summary = build_run_summary({"run_id": stamp, "compounds": compound_store, "order": merged["order"],
                                  "issues": all_issues}, merged)

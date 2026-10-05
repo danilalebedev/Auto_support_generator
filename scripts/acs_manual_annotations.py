@@ -1,0 +1,126 @@
+"""LLM-authored silver annotations, prepared from ACS SI before parser evaluation.
+
+Each chemical mention/role and procedure boundary below was selected by reading
+the source. No si_generator parser is imported here. The separate compiler only
+serializes these explicit labels, retaining the stated numbers (including errors).
+R=variable substrate, F=fixed reagent, S=solvent. Explicit spans handle prefix
+loadings. This is a reviewable proposal, NOT independently chemist-certified gold.
+"""
+
+
+def case(block, variables, fixed="", solvents="", *, start=None, stop=None, spans=None, note=""):
+    return dict(block=block, variables=variables.split("|"), fixed=fixed.split("|") if fixed else [],
+                solvents=solvents.split("|") if solvents else [], start=start, stop=stop,
+                spans=spans or {}, note=note)
+
+
+CASES = [
+    # S01: EDA cyclization and alkaloid synthesis (15 procedures).
+    case(1, "compound S4|compound S3", "NaH|NaOH", "dry THF", start="Under an argon", stop="S8: mp:", spans={"dry THF":"30 mL dry THF"}, note="Sequential NaOH transformation after initial quench; requires stage review. NaH purity not given."),
+    case(2, "Compound S8", "NHPI|DIC", "dry THF", start="Compound S8", stop="Synthetic Procedure for Compound S9"),
+    case(2, "compound S5|compound S4", "EDCI|NaOH", "dry THF", start="Under an argon", stop="S9: mp:", spans={"dry THF":"30 mL dry THF"}, note="Sequential reaction after initial quench."),
+    case(3, "Compound S9", "NHPI|DIC", "dry THF", start="Compound S9", stop="S2: Rf"),
+    case(4, "aldehyde S10|S11", "NaBH(OAc) 3|AcOH|NaOH", "CH 2Cl2|THF", stop="S11a and S11b", spans={"AcOH":"5 mL of AcOH", "NaOH":"6 M NaOH (10 mL)"}, note="Two stages and repeated reaction/workup solvent mentions; keep each addition separate."),
+    case(5, "compound S12", "LiHMDS|EtOTf|TFA", "Anhydrous THF|CH 2Cl2", stop="S13 :", note="Two reaction stages; LiHMDS solution concentration is not explicitly stated."),
+    case(8, "Compound 12a", "NHPI|DIC", "dry THF", spans={"dry THF":"20 mL dry THF"}),
+    case(9, "Compound 10a", "", "dry DMSO", stop="11a :", spans={"dry DMSO":"3 mL dry DMSO"}),
+    case(10, "Compound 12", "NHPI|DIC", "dry DMSO", spans={"dry DMSO":"3 mL dry DMSO"}),
+    case(11, "12a", "NHPI|DIC", "dry DMSO", start="12a (", spans={"dry DMSO":"25 mL dry DMSO"}),
+    case(14, "compound 14|compound 13", "Et₃N|NaBH(OAc)₃", "dry CH₂Cl₂", stop="15 :"),
+    case(17, "compound 16", "Grubbs second-generation catalyst", "dry CH₂Cl₂", stop="Purification via"),
+    case(18, "compound 17", "CuBr|ligand L1|TMSCl|vinylmagnesium bromide", "dry THF", stop="18 :", note="Source conflict: ligand 0.5 mmol / 4 mmol = 0.125 eq, but text says 1.2 eq. Do not silently correct."),
+    case(19, "18", "LiOH ·H2O", "THF", stop="19 :", spans={"LiOH ·H2O":"3 mol/L LiOH ·H2O (10 mL)"}, note="6 mol/L HCl is acidification workup, not reaction reagent."),
+    case(20, "compound 19", "NHPI|DIC", "dry DMSO", stop="20 :"),
+    # S02: peptide/natural product synthesis (13).
+    case(25, "171|182", "1-chloro-N,N,2-trimethyl-1-propenylamine (Ghosez reagent)|silver cyanide", "toluene", stop="[", note="Footnote digits are fused to compound labels in PDF text. Two separate stages."),
+    case(26, "20", "AcOH|Zn powder|Et3N|Boc2O", "THF", stop="[", note="Reduction followed by protection; repeated THF additions are separate."),
+    case(27, "21", "10% Pd/C", "MeOH", stop="[", note="Supported Pd catalyst mass must not be assigned the molecular weight of palladium."),
+    case(28, "22", "m-CPBA", "CH2Cl2", stop="[", note="75% purity affects mass calculation. PDF contains m mol spacing."),
+    case(29, "23", "Me3SnOH", "1,2-dichloroethane", stop="["),
+    case(31, "24", "DBU|propionaldehyde", "THF", stop="[", note="PDF extraction splits 330 as 3 30; inspect original PDF, do not silently repair."),
+    case(32, "25", "NIS|DABCO", "CHCl3", stop="["),
+    case(33, "26", "Pd-PEPPSI-IPr|Me2Zn", "THF", stop="["),
+    case(35, "S3", "DBU|allyl bromide", "DMF", stop="["),
+    case(36, "28", "Boc2O|DMAP", "CH2Cl2", stop="["),
+    case(37, "29", "Pd(PPh3)4|2-methyl-2- butene|morpholine", "THF", stop="["),
+    case(38, "S4|L-serine methyl ester hydrochloride salt", "i-Pr2NEt|PyBOP", "THF", stop="["),
+    case(39, "tripeptide 16a|Carboxylic acid 15", "TFA|HATU|HOAt|i-Pr2NEt", "CH2Cl2|DMF", stop="[", note="Two-stage deprotection/coupling, different reference scales."),
+    # S03: difluoromethylation and substrate preparation (12).
+    case(57, "serine ester hydrochloride", "Et₃N|benzoyl chloride|DBU", "DCM", stop="The characterization", note="Two-stage protocol; solvent added twice."),
+    case(58, "β-hydroxyamino acid methyl ester hydrochloride", "Triethylamine|benzoyl chloride", "dichloromethane"),
+    case(59, "N-acylamino acid methyl ester", "DMAP|di-tert-butyl dicarbonate|TMG", "dry acetonitrile", start="DMAP (", stop="The analytical", note="TMG given as volume percent with no absolute volume."),
+    case(60, "protected serine derivative", "CuCl|EDCI", "DCM", stop="The characterization"),
+    case(61, "amino acid|aniline", "HOBt|EDCI", "THF", stop="The crude residue"),
+    case(62, "S2|N-Boc-L-serine|S3", "TFA|DIPEA|HBTU|Copper(I) chloride|EDCI", "DCM|DMF", start="To a solution of S2", stop="The characterization", note="Multistage procedure with intermediate S3 and changing reference species."),
+    case(63, "benzyl 2- benzamidoacrylate|2-((difluoromethyl)sulfonyl)benzo[d]thiazole", "PC1|K3PO4|HE-1", "MeCN", stop="Table S1"),
+    case(64, "benzyl 2- benzamidoacrylate|2- ((difluoromethyl)sulfonyl)benzo[d]thiazole", "PC1|CPA|K3PO4|HE-1", "toluene", stop="Chiral HPLC"),
+    case(65, "benzyl 2- benzamidoacrylate|2-((difluoromethyl)sulfonyl)benzo[d]thiazole", "PC1|K3PO4|HE-1", "MeCN", stop="3. Mechanistic", note="Mass of the same substrate differs from smaller-scale procedure; retain source and flag inconsistency."),
+    case(66, "benzyl 2- benzamidoacrylate|2-((difluoromethyl)sulfonyl)benzo[d]thiazole", "PC1|K3PO4|HE-1|TEMPO", "MeCN", stop="Product 3a was not"),
+    case(71, "3a", "PC1|K3PO4|HE-1|D2O", "MeCN", stop="The α-proton"),
+    case(72, "benzyl 2- benzamidoacrylate|2-((difluoromethyl)sulfonyl)benzo[d]thiazole", "PC1|K3PO4|HE-D", "MeCN", stop="Figure S10"),
+    # S04: hydrophosphorylation and transformations (7).
+    case(80, "cyclopropene 1|diarylphosphine oxide", "K2CO3|[Ir(ppy)2(bpy)]PF6", "1,2-dichloroethane", stop="Diastereomeric"),
+    case(81, "1a|2a", "[Ir(ppy)2(bpy)]PF6|K2CO3", "1,2- dichloroethane", stop="8. Synthetic"),
+    case(82, "3ab", "Lawesson’s reagent", "anhydrous toluene", start="To an oven-dried"),
+    case(83, "substrate 3ab", "Cu(OTf)₂|tetramethyldisiloxane", "Anhydrous toluene"),
+    case(84, "cyclopropene 1b|DPPO", "[Ir(ppy)2(bpy)]PF6|K2CO3|TEMPO|BHT", "1,2-dichloroethane", note="Either TEMPO OR BHT; requires selection, not both simultaneously."),
+    case(85, "cyclopropene 1|d-2a", "[Ir(ppy)2(bpy)]PF6|K2CO3", "1,2- Dichloroethane", note="Long parenthetical contains explanatory deuterium percentage; it is not a loading."),
+    case(88, "cyclopropene 1|diphenylphosphine oxide", "K2CO3|[Ir(ppy)2(bpy)]PF6", "1,2-dichloroethane"),
+    # S05: electrophilic amination (12).
+    case(89, "isobutylamine 2a", "base|MsOOMs", "solvent", start="An open", note="Base x eq and solvent identity unspecified; optimization protocol."),
+    case(90, "Amine starting material", "Cs2CO3|Mesylic peroxide /MPO 1", "CHCl3|H2O", spans={"CHCl3":"10 ml of CHCl3", "H2O":"200 µl (0.5/1 ml for 5/10mmol scale) of H2O", "Cs2CO3":"1.0 eq Cs2CO3"}, note="Alternative 1/5/10/20 mmol scales and conditional base; user must select scale. Preserve alternatives."),
+    case(91, "mesitylene|aminating agent", "Rh2(esp)2", "DCM|TFE", spans={"mesitylene":"120 mg (1.0 mmol, 1.0 equiv.) mesitylene", "Rh2(esp)2":"15.2 mg (0.02 mmol, 0.02 equiv.) Rh2(esp)2", "DCM":"2 ml DCM", "TFE":"8 ml TFE"}),
+    case(92, "2-methoxynaphthalene|aminating agent", "Rh2(esp)2", "DCM|TFE", spans={"2-methoxynaphthalene":"79 mg (0.5 mmol, 1.0 equiv.) 2-methoxynaphthalene", "Rh2(esp)2":"3.8 mg (0.005 mmol, 0.01 equiv.) Rh2(esp)2", "DCM":"1 ml DCM", "TFE":"4 ml TFE"}),
+    case(93, "methylestrone|methyl ((methylsulfonyl)oxy)-L- leucinate (3ab)", "Rh2(esp)2", "TFE|DCM", spans={"methylestrone":"142 mg (0.5 mmol, 1.0 equiv.) methylestrone", "Rh2(esp)2":"7.6 mg (0.01 mmol, 0.02 equiv.) Rh2(esp)2", "TFE":"4 ml TFE", "DCM":"1 ml DCM"}),
+    case(94, "Methyl (2S)-2-(5-(1-hydroxyethyl)-6-methoxynaphthalen-2-yl)propanoate (10)|aminating agent (3a or 3h)", "", "HFIP", note="Choose aminating-agent variant before preparing a scope."),
+    case(95, "geranyl acetate (12)|N-isobutyl O-methanesulfonyl hydroxylamine (3a)", "Rh2(esp)2", "2,2,2 -TFE|DCM"),
+    case(96, "geranyl acetate (12)|methyl ((methylsulfonyl)oxy)-L-leucinate (3ab)", "Rh2(esp)2", "2,2,2-TFE|DCM"),
+    case(97, "1-methylcyclohexene (15)|O-(methylsulfonyl)-N-(phenethyl)hydroxylamine (3h)", "Rh2(esp)2", "2,2,2 -TFE|DCM"),
+    case(98, "(+)-3-carene (17)|methyl ((methylsulfonyl)oxy)-L-leucinate (3ab)", "Rh2(esp)2", "2,2,2-TFE|DCM"),
+    case(101, "methyl (S)-2-(((methylsulfonyl)oxy)amino)hexanoate (3ae)", "Rh2(esp)2", "HFIP", spans={"methyl (S)-2-(((methylsulfonyl)oxy)amino)hexanoate (3ae)":"200 mg (0.84 mmol, 1.0 equiv.) methyl (S)-2-(((methylsulfonyl)oxy)amino)hexanoate (3ae)", "Rh2(esp)2":"6.33 mg (0.0084 mmol, 0.01 equiv.) Rh2(esp)2", "HFIP":"2 ml HFIP"}),
+    case(105, "methyl (2-methyl-1-oxo-1-phenylpropan-2-yl)-L-leucinate", "sodium borohydride", "THF|MeOH", spans={"methyl (2-methyl-1-oxo-1-phenylpropan-2-yl)-L-leucinate":"74 mg (0.25 mmol, 1.0 equiv) methyl (2-methyl-1-oxo-1-phenylpropan-2-yl)-L-leucinate", "sodium borohydride":"14 mg (0.375 mmol, 1.5 equiv.) sodium borohydride", "THF":"1 ml THF", "MeOH":"1 ml MeOH"}),
+    # S08: helicenes (6).
+    case(112, "5,11-Bis(3,5-dibromophenyl)-5,11-dihydroindolo[3,2-b]carbazole|2,4,6-trimethyl-N-arylaniline", "Pd2(dba)3/Sphos|t-BuONa", "o-xylene", start="5,11-Bis", note="Catalyst and ligand have separate masses within a combined label; requires splitting."),
+    case(114, "starting material S2b-S2c or S4a-S4g", "BBr3", "TCB", start="The starting", note="Equivalents, temperature and time are ranges; choose specific conditions."),
+    case(115, "quadruply-borylated precursors 1a-1c and 3a-3g", "DDQ|HOTf", "Anhydrous DCM", start="To a 20 mL vial", stop="The reaction mixture was poured"),
+    case(116, "compound 3c", "DDQ|HOTf", "Anhydrous DCM", start="compound 3c (1.52"),
+    case(117, "Compound 3c", "NBS|DDQ|HOTf", "DCM|DMSO|anhydrous DCM", start="Compound 3c", note="Two stages; DMSO in drops, no reliable absolute volume."),
+    case(118, "Compound 4c-Br|(3,5-Di-tert-butylphenyl)boronic acid", "Pd(OAc)2/Sphos|TBAB|K3PO4", "toluene", note="Combined Pd/ligand loading needs separate entities."),
+    # S11: asymmetric hydrodifluoroalkylation (14).
+    case(131, "1,3,5-trimethoxybenzene", "N-Iodosuccinimide (NIS)", "MeCN", start="An oven dried"),
+    case(135, "S1|S3", "PdCl 2(dppf)|K3PO4", "N,N-Dimethylformamide (DMF)|H 2O"),
+    case(136, "S4", "N-Iodosuccinimide (NIS)", "MeCN"),
+    case(137, "S5|(S)-(-)-lactate", "PPh3|DIAD", "THF"),
+    case(138, "S6", "CuI|1,10-phen|potassium thioacetate", "toluene", stop="After complete conversion", note="Two stock portions both 0.5 M; combined reaction concentration is ambiguous."),
+    case(139, "S7|aryl Grignard reagent", "", "THF", stop="2.2 Experimental", note="0.3 M is attached to S7 rather than a solvent mention."),
+    case(140, "thiosalicylic acid|amine", "SOCl2|Et3N", "CH2Cl2", start="An oven-dried", note="Acid chloride formation then amidation; separate stages."),
+    case(141, "1a|2a", "HAT cat.|Hantzsch diethyl ester|NaBArF", "C6HF5", start="Reaction conditions:", stop="Yields were", spans={"C6HF5":"1.0 mL C6HF5"}),
+    case(147, "amine", "ethyl bromodifluoroacetate|La(OTf)3", "", start="An oven-dried"),
+    case(148, "1-indanone", "NaH|methyl iodide", "Dry THF", start="An oven-dried", note="NaH is 60% dispersion; pure-material mass and weighed mass differ."),
+    case(149, "α, α-disubstituted indanone.", "Methyltriphenylphosphonium bromide (PPh3MeBr)|KOtBu", "dry THF"),
+    case(150, "indanone|dibromoalkanes", "NaH", "Dry THF", start="An oven-dried", note="NaH is a 60% dispersion."),
+    case(152, "Bromodifluoroacetamide substrate 1|α,α-disubstituted alkene 2", "Hantzsch diethyl ester|NaBAr F|arylthiol catalyst ArS1", "C6HF5|C6F5CF3", stop="NaBAr F ="),
+    case(153, "Bromodifluoroacetamide substrate 1|α, α-disubstituted alkene 2", "Hantzsch diethyl ester|NaBAr F|arylthiol catalyst ArS4", "C6HF5|C6F5CF3", start="In a nitrogen", stop="NaBAr F ="),
+    # S14/S15/S16 form the paper-disjoint held-out set (21).
+    case(158, "2,6- Dibromopyridine|8-quinolineboronic acid", "potassium carbonate|tetrakis(triphenylphosphine)palladium", "ethanol and water", start="2,6- Dibromopyridine", stop="1H measurement", note="Mixed solvent 12 mL at 4:1 needs component allocation."),
+    case(161, "Py-PA|8 -quinolineboronic acid", "potassium carbonate|XPhos Pd G3", "ethanol and water", start="Py-PA (", stop="1H and", note="Solvent mixture, ratio 4:1."),
+    case(162, "CrCl3 × 3 THF|ligand dqp", "", "isopropanol and toluene", start="In a round-bottom", note="Complex synthesis with 1:1 mixed solvent."),
+    case(164, "CrCl3 × 3 THF|ligand dqp-PA", "", "isopropanol and toluene", start="CrCl3 × 3 THF", note="Complex synthesis with 1:1 mixed solvent."),
+    case(165, "Cr(dqp-PA)Cl3", "silver triflate", "Acetonitrile", start="The obtained"),
+    case(167, "9,10- Dibromoanthracene|(triisopropylsilyl)acetylene", "CuI|Pd(PPh3)2Cl2", "Deaerated NH(i-propyl)2", start="9,10- Dibromoanthracene", stop="The obtained", note="Duplicated catalyst quantity in source; should not be counted twice."),
+    case("S15:6", "corresponding sulfamide|alkene", "DBU", "DCM|HFIP", start="A reaction tube", stop="4.2 Scale-up", note="Sulfamide loading shown in scheme, absent from prose; manual structure/scale needed."),
+    case("S15:6-7", "corresponding sulfamide|alkene", "DBU", "DCM|HFIP", start="Figure S3. Scale-up reaction", stop="4.3 Synthetic", note="Cross-page method; sulfamide amount missing in prose."),
+    case("S15:7", "substrate 8", "LiOH·H2O", "THF|H2O", start="A reaction tube", stop="Charge a flame-dried"),
+    case(175, "compound S1a", "acetic acid|Tetrabutylammonium fluoride", "tetrahydrofuran", start="The compound", stop="___"),
+    case(174, "2-(isopropoxycarbonyl)benzoic acid|4-bromo-1-trimethylsilyl-1-butyne", "thionyl chloride|N,N-dimethylformamide|Magnesium turnings|iodine|copper iodide", "toluene|tetrahydrofuran", start="To a solution", stop="___", note="Separate Grignard preparation and acylation; mL/mmol values are ratios, not extra loadings."),
+    case(176, "4,5-dichloro-2-(isopropoxycarbonyl)benzoic acid", "thionyl chloride|N,N-dimethylformamide", "toluene", start="To a solution", stop="Magnesium turnings"),
+    case(178, "intermediate S2a|Iodobenzene", "Pd(PPh3)2Cl2|copper(I) iodide|triethylamine", "dichloro- methane", start="The intermediate", stop="The volatiles"),
+    case(181, "alkyne-tethered ketoesters 1|aryl boronic acids 2", "catalyst precursor chlorobis(ethylene)rho- dium dimer|chiral ligand L8|potassium carbonate", "ethyl acetate", start="In a glove box", stop="The racemates", note="7 mol% Rh refers to Rh atoms: dimer amount gives 3.5 mol% molecules."),
+    case(182, "alkyne-tethered ketoester 1g|p-tolylboronic acid 2a", "catalyst precursor chlorobis(ethylene)rhodium dimer|chiral ligand L8|potassium carbonate", "ethyl acetate", stop="The racemates"),
+    case(183, "3ga", "RuCl3·xH2O|NaIO4", "dichloroethane|water", stop="___", note="Hydration number x is unknown, MW cannot be inferred as a universal constant."),
+    case(186, "4", "Methyltriphenylphosphonium bromide|potassium tert-butoxide", "dry tetrahy- drofuran"),
+    case(187, "3ga", "diisobutylalumi- nium hydride|boron trifluoride diethyl etherate|triethylsilane|RuCl3·xH2O|NaIO4", "dry dichloromethane|dichloroethane|water", note="Three stages and variable hydrate, repeated solvent addition."),
+    case(188, "methyl 5-(p-tolyl)pent-4-ynoate|p-tolylboronic acid", "[Rh(COD)Cl]2|chiral ligand DM-BINAP|KOH", "toluene|water", stop="S26"),
+    case(191, "intermediate S5", "sodium dihydrogen phosphate|sodium chlorite|potassium carbonate|2-iodopropane", "dimethyl sulfoxide/acetonitrile/water|N,N-dimethylfor- mamide", stop="___", note="Two stages; 25/25/65 mL solvent components require decomposition."),
+    case(193, "alkyne-tethered ketoester 1a|aryl boronic acid d5-2b", "catalyst precursor chlorobis(ethylene)rhodium dimer|chiral ligand L8|potassium carbonate", "ethyl acetate"),
+]

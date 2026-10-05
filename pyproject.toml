@@ -11,6 +11,8 @@ dependencies = [
     "rdkit",
     "gemmi>=0.7,<0.8",
     "matplotlib>=3.8,<4",
+    "numpy>=1.26",
+    "Pillow>=10",
     "pypdf>=5,<7",
 ]
 
@@ -22,11 +24,13 @@ build = [
 [project.scripts]
 si-generator = "si_generator.cli:main"
 si-generator-gui = "si_generator.gui:main"
+si-procedure-import = "si_generator.procedure_import_cli:main"
 
 [tool.setuptools.package-data]
 "si_generator" = [
     "resources/scripts/*.qs",
     "resources/assets/*.png",
+    "resources/reagents/*.json",
     "resources/mngp_styles/*.mngp",
     "templates/*.docx",
     "templates/journals/*.docx",

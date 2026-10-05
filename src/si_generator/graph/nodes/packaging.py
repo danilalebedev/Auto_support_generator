@@ -87,12 +87,11 @@ def build_manifest(state: GenerateSIState) -> dict:
             "structure": {
                 "has_word_structure": compound.has_word_structure,
                 "path": compound.structure_path,
-                **({"cif_folder": compound.cif_folder,
-                    "cif_files": list(compound.cif_files),
-                    "has_cif": bool(compound.cif_files),
-                    "crystallography_report_path": compound.crystallography_report_path,
-                    "crystallography_data_path": compound.crystallography_data_path}
-                   if compound.cif_files or compound.crystallography_data_path else {}),
+                "cif_folder": compound.cif_folder,
+                "cif_files": list(compound.cif_files),
+                "has_cif": bool(compound.cif_files),
+                "crystallography_report_path": compound.crystallography_report_path,
+                "crystallography_data_path": compound.crystallography_data_path,
             },
             "analytical_blocks": _analytical_blocks(compound),
             "structure_placeholder": f"STRUCTURE:{compound.number}",
@@ -295,6 +294,9 @@ def _run_config(request, artifacts: dict[str, str], output_root: Path) -> dict:
         "whittaker_asymmetry": request.whittaker_asymmetry,
         "highlight_solvent_peaks": bool(request.highlight_solvent_peaks),
         "generate_loadings": bool(request.generate_loadings),
+        "show_scope": request.show_scope,
+        "scope_conditions": request.scope_conditions,
+        "scope_title": request.scope_title,
         "calculate_elemental_analysis": bool(request.calculate_elemental_analysis),
         "no_check_support": bool(request.no_check_support),
     }
@@ -345,9 +347,7 @@ def _relative_paths(base_dir: Path, paths: dict[str, str]) -> dict[str, str]:
 
 def _relative_path(base_dir: Path, value: str) -> str:
     path = Path(value)
-    if not path.is_absolute():
-        return str(path)
     try:
-        return str(path.resolve().relative_to(base_dir))
+        return str(path.resolve().relative_to(base_dir.resolve()))
     except ValueError:
         return str(path)

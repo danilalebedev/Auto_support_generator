@@ -5,6 +5,7 @@ import unittest
 from si_generator.domain.types import SpectraConfig
 from si_generator.domain.spectra_config import (
     DEFAULT_C13_PEAK_THRESHOLD_FRACTION,
+    DEFAULT_C13_TARGET_SIGNAL_HEIGHT_FRACTION,
     DEFAULT_H1_PEAK_THRESHOLD_FRACTION,
     DEFAULT_PEAK_PICKING,
     DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION,
@@ -21,6 +22,7 @@ class SpectraConfigTests(unittest.TestCase):
         self.assertTrue(config["extract_nmr"])
         self.assertEqual(config["insert_spectra_as"], "png")
         self.assertEqual(config["target_signal_height_fraction"], DEFAULT_TARGET_SIGNAL_HEIGHT_FRACTION)
+        self.assertEqual(config["target_signal_height_fraction_13c"], DEFAULT_C13_TARGET_SIGNAL_HEIGHT_FRACTION)
         self.assertEqual(config["peak_threshold_fraction_1h"], DEFAULT_H1_PEAK_THRESHOLD_FRACTION)
         self.assertEqual(config["peak_threshold_fraction_13c"], DEFAULT_C13_PEAK_THRESHOLD_FRACTION)
         self.assertEqual(config["baseline_mode"], "auto")
@@ -46,6 +48,7 @@ class SpectraConfigTests(unittest.TestCase):
             mnova_graphics_profile_1h_path="C:/profiles/classic_1H.mngp",
             mnova_graphics_profile_13c_path="C:/profiles/classic_13C.mngp",
             target_signal_height_fraction=0.72,
+            target_signal_height_fraction_13c=0.48,
             peak_threshold_fraction_1h=0.08,
             peak_threshold_fraction_13c=0.035,
             baseline_mode="whittaker",
@@ -66,6 +69,7 @@ class SpectraConfigTests(unittest.TestCase):
         self.assertEqual(config["mnova_graphics_profile_1h_path"], "C:/profiles/classic_1H.mngp")
         self.assertEqual(config["mnova_graphics_profile_13c_path"], "C:/profiles/classic_13C.mngp")
         self.assertEqual(config["target_signal_height_fraction"], 0.72)
+        self.assertEqual(config["target_signal_height_fraction_13c"], 0.48)
         self.assertEqual(config["peak_threshold_fraction_1h"], 0.08)
         self.assertEqual(config["peak_threshold_fraction_13c"], 0.035)
         self.assertEqual(config["baseline_mode"], "whittaker")
@@ -107,6 +111,15 @@ class SpectraConfigTests(unittest.TestCase):
 
         self.assertEqual(config["peak_threshold_fraction_1h"], 0.09)
         self.assertEqual(config["peak_threshold_fraction_13c"], 0.09)
+
+    def test_default_render_targets_keep_13c_peaks_lower_than_1h(self) -> None:
+        config = build_spectra_config()
+
+        h1 = build_spectrum_render_spec("1H", config)
+        c13 = build_spectrum_render_spec("13C", config)
+
+        self.assertEqual(h1["target_signal_height_fraction"], 0.80)
+        self.assertEqual(c13["target_signal_height_fraction"], 0.50)
 
     def test_target_signal_height_is_clamped_to_supported_range(self) -> None:
         low = build_spectra_config(target_signal_height_fraction=0.1)

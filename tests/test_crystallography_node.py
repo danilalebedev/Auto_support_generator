@@ -6,6 +6,9 @@ import shutil
 import zipfile
 
 from docx import Document
+from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
 import pytest
 
 from si_generator.crystallography.service import discover_source
@@ -95,6 +98,15 @@ def test_node_has_real_rows_image_and_temperature_priority(tmp_path):
     assert rows['a'] == '10.0(1)'
     report = Document(compound.crystallography_report_path)
     assert len(report.inline_shapes) == 1 and len(report.tables) == 1
+    table = report.tables[0]
+    assert table.alignment == WD_TABLE_ALIGNMENT.CENTER
+    assert table.cell(0, 0).text == 'Identification code'
+    assert all(p.alignment == WD_ALIGN_PARAGRAPH.CENTER for row in table.rows for cell in row.cells for p in cell.paragraphs)
+    borders = table._tbl.xpath('./w:tblPr/w:tblBorders')[0]
+    assert borders.find(qn('w:top')).get(qn('w:val')) == 'single'
+    assert borders.find(qn('w:bottom')).get(qn('w:val')) == 'single'
+    assert borders.find(qn('w:insideV')).get(qn('w:val')) == 'nil'
+    assert table_numbers(report) == ['1']
     assert not compounds[order[1]].crystallography_data_path
     assert any(i['code'] == 'CIF_ELLIPSOID_PLOT_REQUIRED' for i in result['issues'])
 
@@ -176,3 +188,25 @@ def test_add_keeps_distinct_cif_bundles_and_custom_template(tmp_path):
     data = [json.loads(Path(e['artifacts']['crystallography_data']).read_text(encoding='utf-8')) for e in entries]
     assert 'New crystals from ethanol.' not in data[0]['records'][0]['description']
     assert 'New crystals from ethanol.' in data[1]['records'][0]['description']
+    assert table_numbers(doc) == ['1', '2']
+    reordered = run_patch_si(PatchSIRequest(Path(added['artifacts']['manifest']), reorder=('2a', '1a'), output_folder=tmp_path/'reordered'))
+    assert reordered['status'] == 'pass', reordered['issues']
+    assert table_numbers(Document(reordered['artifacts']['support_docx'])) == ['1', '2']
+    removed = run_patch_si(PatchSIRequest(Path(reordered['artifacts']['manifest']), remove=('2a',), output_folder=tmp_path/'removed'))
+    assert removed['status'] == 'pass', removed['issues']
+    assert table_numbers(Document(removed['artifacts']['support_docx'])) == ['1']
+
+
+def table_numbers(document):
+    return document.element.xpath('.//w:fldSimple[contains(@w:instr, "SEQ ASGCrystalTable")]/w:r/w:t/text()')
+
+
+@pytest.mark.parametrize('headers,values', [
+    (['HRMS found', 'HRMS adduct'], ['438.1911', '[M+NH4]+']),
+    (['HRMS adduct', 'HRMS [M+H]+'], ['[M+Na]+', '449.1359']),
+])
+def test_per_compound_hrms_adduct(headers, values):
+    from si_generator.word_input import _map_row
+    result = _map_row(headers, values)
+    assert result['hrms_adduct'] in {'[M+NH4]+', '[M+Na]+'}
+    assert result['hrms_found'] in {'438.1911', '449.1359'}

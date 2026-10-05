@@ -842,16 +842,175 @@ function _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec, graphics
     }
 
     try {
-        _prepareSpectrumForExport(spectrum, nucleus, renderSpec || {}, graphicsProfilePath || "", statusPath);
-        mainWindow.activeWindow().update();
-
-        var page = mainWindow.activeDocument.curPage();
-        var pixmap = draw.toPixmap(page, 300);
-        pixmap.save(imagePath, "PNG");
-        return imagePath;
+        if (_isTwoDimensionalNucleus(nucleus)) {
+            _prepareTwoDimensionalSpectrumForExport(spectrum, nucleus, renderSpec || {}, statusPath);
+        } else {
+            _prepareSpectrumForExport(spectrum, nucleus, renderSpec || {}, graphicsProfilePath || "", statusPath);
+        }
+        return _exportCurrentPageImage(imagePath);
     } catch (e) {
         return "";
     }
+}
+
+function _exportCurrentPageImage(imagePath)
+{
+    if (!imagePath) {
+        return "";
+    }
+    mainWindow.activeWindow().update();
+    var page = mainWindow.activeDocument.curPage();
+    var pixmap = draw.toPixmap(page, 300);
+    pixmap.save(imagePath, "PNG");
+    return imagePath;
+}
+
+function _isTwoDimensionalNucleus(nucleus)
+{
+    return nucleus === "HSQC" || nucleus === "HMBC" || nucleus === "NOESY" || nucleus === "COSY" || nucleus === "TOCSY" || nucleus === "ROESY" || nucleus === "2D";
+}
+
+function _setSpectrumProperty(spectrum, propertyName, value, statusPath)
+{
+    try {
+        spectrum.setProperty(propertyName, value);
+        return true;
+    } catch (e) {
+        _appendText(statusPath, "WARNING 2D property not applied: " + propertyName + " (" + e + ")\n");
+        return false;
+    }
+}
+
+function _twoDimensionalContourScaling(renderSpec)
+{
+    var value = renderSpec && renderSpec.contour_scaling !== undefined ? Number(renderSpec.contour_scaling) : 4.0;
+    if (isNaN(value) || value < 0.1) {
+        return 4.0;
+    }
+    if (value > 100) {
+        return 100;
+    }
+    return value;
+}
+
+function _twoDimensionalTraceSize(renderSpec, orientation)
+{
+    var key = orientation === "vertical" ? "vertical_trace_size" : "horizontal_trace_size";
+    var value = renderSpec && renderSpec[key] !== undefined ? Number(renderSpec[key]) : 0.08;
+    if (isNaN(value) || value < 0.005) {
+        return 0.08;
+    }
+    if (value > 0.25) {
+        return 0.25;
+    }
+    return value;
+}
+
+function _prepareTwoDimensionalSpectrumForExport(spectrum, nucleus, renderSpec, statusPath)
+{
+    var contourScaling = _twoDimensionalContourScaling(renderSpec || {});
+    var horizontalTraceSize = _twoDimensionalTraceSize(renderSpec || {}, "horizontal");
+    var verticalTraceSize = _twoDimensionalTraceSize(renderSpec || {}, "vertical");
+
+    _setSpectrumProperty(spectrum, "traces.horizontal.isExternal", false, statusPath);
+    _setSpectrumProperty(spectrum, "traces.vertical.isExternal", false, statusPath);
+    _setSpectrumProperty(spectrum, "traces.horizontal.type", "Proj", statusPath);
+    _setSpectrumProperty(spectrum, "traces.vertical.type", "Proj", statusPath);
+    _setSpectrumProperty(spectrum, "traces.horizontal.visible", true, statusPath);
+    _setSpectrumProperty(spectrum, "traces.vertical.visible", true, statusPath);
+    _setSpectrumProperty(spectrum, "traces.same_size", false, statusPath);
+    _setSpectrumProperty(spectrum, "traces.horizontal.size", horizontalTraceSize, statusPath);
+    _setSpectrumProperty(spectrum, "traces.vertical.size", verticalTraceSize, statusPath);
+    _setSpectrumProperty(spectrum, "contours.scaling", contourScaling, statusPath);
+    _setSpectrumProperty(spectrum, "grid.showtracesframe", false, statusPath);
+    _setSpectrumProperty(spectrum, "axes.horizontal.visible", true, statusPath);
+    _setSpectrumProperty(spectrum, "axes.vertical.visible", true, statusPath);
+    _setSpectrumProperty(spectrum, "axes.horizontal.units", "ppm", statusPath);
+    _setSpectrumProperty(spectrum, "axes.vertical.units", "ppm", statusPath);
+    _setSpectrumProperty(spectrum, "axes.horizontal.showlabel", true, statusPath);
+    _setSpectrumProperty(spectrum, "axes.vertical.showlabel", true, statusPath);
+    _setSpectrumProperty(spectrum, "axes.horizontal.label", "ppm", statusPath);
+    _setSpectrumProperty(spectrum, "axes.vertical.label", "ppm", statusPath);
+    try {
+        spectrum.updateTraces();
+    } catch (e) {
+        _appendText(statusPath, "WARNING 2D traces not updated: " + e + "\n");
+    }
+    spectrum.update();
+    _appendText(statusPath, "2D_TRACES " + nucleus + " horizontal=Proj vertical=Proj horizontal_size=" + horizontalTraceSize + " vertical_size=" + verticalTraceSize + " contour_scaling=" + contourScaling + "\n");
+}
+
+function _twoDimensionalVerticalNucleus(nucleus)
+{
+    return nucleus === "NOESY" || nucleus === "COSY" || nucleus === "TOCSY" || nucleus === "ROESY" ? "1H" : "13C";
+}
+
+function _traceRenderSpec(renderSpec, orientation)
+{
+    var key = orientation === "vertical" ? "vertical_trace_render_spec" : "horizontal_trace_render_spec";
+    return renderSpec && renderSpec[key] ? renderSpec[key] : {};
+}
+
+function _importAndPrepareTrace(path, nucleus, renderSpec, statusPath)
+{
+    if (!path) {
+        return undefined;
+    }
+    var doc = mainWindow.activeDocument;
+    doc.newPage(true);
+    serialization.importFile(_importableNmrPath(path), "", doc);
+    var trace = new NMRSpectrum(nmr.activeSpectrum());
+    if (!trace.isValid()) {
+        throw "No imported " + nucleus + " trace spectrum from " + path;
+    }
+    _processForReport(trace, nucleus, undefined, true, false, renderSpec || {}, statusPath);
+    _prepareSpectrumForExport(trace, nucleus, renderSpec || {}, "", statusPath);
+    return trace;
+}
+
+function _attachTraceSpectra(spectrum, horizontalTrace, verticalTrace, statusPath)
+{
+    if (horizontalTrace && horizontalTrace.isValid()) {
+        spectrum.setTrace(horizontalTrace, true);
+        _setSpectrumProperty(spectrum, "traces.horizontal.visible", true, statusPath);
+    }
+    if (verticalTrace && verticalTrace.isValid()) {
+        spectrum.setTrace(verticalTrace, false);
+        _setSpectrumProperty(spectrum, "traces.vertical.visible", true, statusPath);
+    }
+    _setSpectrumProperty(spectrum, "traces.same_size", false, statusPath);
+    spectrum.update();
+}
+
+function _attachExternalTraces(spectrum, nucleus, horizontalTracePath, verticalTracePath, renderSpec, statusPath)
+{
+    if (!horizontalTracePath && !verticalTracePath) {
+        return false;
+    }
+    var doc = mainWindow.activeDocument;
+    var spectrumPage = doc.curPage();
+    var horizontalTrace = _importAndPrepareTrace(
+        horizontalTracePath,
+        "1H",
+        _traceRenderSpec(renderSpec || {}, "horizontal"),
+        statusPath
+    );
+    var verticalTrace;
+    if (verticalTracePath && verticalTracePath === horizontalTracePath && horizontalTrace) {
+        verticalTrace = horizontalTrace;
+    } else {
+        verticalTrace = _importAndPrepareTrace(
+            verticalTracePath,
+            _twoDimensionalVerticalNucleus(nucleus),
+            _traceRenderSpec(renderSpec || {}, "vertical"),
+            statusPath
+        );
+    }
+    doc.setCurPage(spectrumPage);
+    doc.setActiveItem(spectrum);
+    _attachTraceSpectra(spectrum, horizontalTrace, verticalTrace, statusPath);
+    _appendText(statusPath, "2D_EXTERNAL_TRACES " + nucleus + " horizontal=" + (horizontalTracePath || "none") + " vertical=" + (verticalTracePath || "none") + "\n");
+    return true;
 }
 
 function _prepareSpectrumForExport(spectrum, nucleus, renderSpec, graphicsProfilePath, statusPath)
@@ -863,9 +1022,9 @@ function _prepareSpectrumForExport(spectrum, nucleus, renderSpec, graphicsProfil
     } else {
         _hideProtonImageClutter(spectrum);
     }
-    _filterPeaksForImage(spectrum, nucleus, renderSpec || {});
     spectrum.horzZoom(range[0], range[1]);
     _fitVerticalScaleForImage(spectrum, nucleus, renderSpec || {});
+    _filterPeaksForImage(spectrum, nucleus, renderSpec || {});
     spectrum.update();
 }
 
@@ -949,7 +1108,9 @@ function extractSpectrumReportsBatch(tasksPath, outputJsonPath, statusPath)
             var renderSpec = parts.length >= 6 ? _parseRenderSpec(parts[5]) : {};
             var singleMnovaPath = parts.length >= 7 ? parts[6] : "";
             var graphicsProfilePath = parts.length >= 8 ? parts[7] : "";
-            tasks.push({compound: compound, nucleus: nucleus, inputPath: inputPath, imagePath: imagePath, mnovaPath: mnovaPath, renderSpec: renderSpec, singleMnovaPath: singleMnovaPath, graphicsProfilePath: graphicsProfilePath});
+            var horizontalTracePath = parts.length >= 9 ? parts[8] : "";
+            var verticalTracePath = parts.length >= 10 ? parts[9] : "";
+            tasks.push({compound: compound, nucleus: nucleus, inputPath: inputPath, imagePath: imagePath, mnovaPath: mnovaPath, renderSpec: renderSpec, singleMnovaPath: singleMnovaPath, graphicsProfilePath: graphicsProfilePath, horizontalTracePath: horizontalTracePath, verticalTracePath: verticalTracePath});
             _appendText(statusPath, "TASK " + compound + " " + nucleus + " " + inputPath + "\n");
 
             var dw = mainWindow.newWindow();
@@ -973,15 +1134,22 @@ function extractSpectrumReportsBatch(tasksPath, outputJsonPath, statusPath)
                     if (!spectrum.isValid()) {
                         error = "No active NMR spectrum after opening " + inputPath;
                     } else {
-                        _processForReport(spectrum, nucleus, undefined, true, false, renderSpec, statusPath);
-                        report = _spectrumReport(spectrum, nucleus, renderSpec);
-                        referenceOffset = _referenceOffsetFromPeaks(spectrum, nucleus);
-                        if (nucleus === "13C") {
-                            _processForReport(spectrum, nucleus, 1, false, true, renderSpec, statusPath);
-                            peakReport = _plainPeakReport(spectrum, nucleus, renderSpec);
+                        if (_isTwoDimensionalNucleus(nucleus)) {
+                            _prepareTwoDimensionalSpectrumForExport(spectrum, nucleus, renderSpec || {}, statusPath);
+                            _attachExternalTraces(spectrum, nucleus, horizontalTracePath, verticalTracePath, renderSpec || {}, statusPath);
+                            image = _exportCurrentPageImage(imagePath);
+                            singleMnova = _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath, renderSpec, graphicsProfilePath, statusPath, true);
+                        } else {
+                            _processForReport(spectrum, nucleus, undefined, true, false, renderSpec, statusPath);
+                            report = _spectrumReport(spectrum, nucleus, renderSpec);
+                            referenceOffset = _referenceOffsetFromPeaks(spectrum, nucleus);
+                            if (nucleus === "13C") {
+                                _processForReport(spectrum, nucleus, 1, false, true, renderSpec, statusPath);
+                                peakReport = _plainPeakReport(spectrum, nucleus, renderSpec);
+                            }
+                            image = _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec, graphicsProfilePath, statusPath);
+                            singleMnova = _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath, renderSpec, graphicsProfilePath, statusPath, false);
                         }
-                        image = _exportSpectrumImage(spectrum, nucleus, imagePath, renderSpec, graphicsProfilePath, statusPath);
-                        singleMnova = _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath, renderSpec, graphicsProfilePath, statusPath);
                     }
                 }
             } catch (taskError) {
@@ -1031,7 +1199,7 @@ function _importableNmrPath(path)
     return text.replace(/\/fid$/i, "");
 }
 
-function _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath, renderSpec, graphicsProfilePath, statusPath)
+function _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaPath, renderSpec, graphicsProfilePath, statusPath, prepared)
 {
     if (!singleMnovaPath) {
         return "";
@@ -1039,7 +1207,13 @@ function _saveSingleProcessedMnovaFile(compound, nucleus, spectrum, singleMnovaP
 
     try {
         _appendText(statusPath, "SAVE_SINGLE_MNOVA " + compound + " " + nucleus + " " + singleMnovaPath + "\n");
-        _prepareSpectrumForExport(spectrum, nucleus, renderSpec || {}, graphicsProfilePath || "", statusPath);
+        if (!prepared) {
+            if (_isTwoDimensionalNucleus(nucleus)) {
+                _prepareTwoDimensionalSpectrumForExport(spectrum, nucleus, renderSpec || {}, statusPath);
+            } else {
+                _prepareSpectrumForExport(spectrum, nucleus, renderSpec || {}, graphicsProfilePath || "", statusPath);
+            }
+        }
         mainWindow.activeWindow().update();
         serialization.save(singleMnovaPath, "mnova");
         _appendText(statusPath, "OK_SINGLE_MNOVA " + compound + " " + nucleus + "\n");
@@ -1078,7 +1252,7 @@ function _saveProcessedMnovaFiles(tasks, statusPath)
 function _saveProcessedMnovaFile(compound, tasks, statusPath)
 {
     var mnovaPath = tasks.length ? tasks[0].mnovaPath : "";
-    var doc, i, nmrItems, spectrum, nucleus;
+    var doc, i, nmrItems, spectrum, nucleus, spectraByTask, spectraByNucleus, verticalNucleus;
 
     if (!mnovaPath) {
         return;
@@ -1096,17 +1270,34 @@ function _saveProcessedMnovaFile(compound, tasks, statusPath)
         }
 
         nmrItems = doc.itemsByName("NMR Spectrum");
+        spectraByTask = [];
+        spectraByNucleus = {};
         for (i = 0; i < nmrItems.length && i < tasks.length; i++) {
             nucleus = tasks[i].nucleus;
             spectrum = new NMRSpectrum(nmrItems[i]);
+            spectraByTask.push(spectrum);
             if (!spectrum.isValid()) {
                 continue;
             }
-            _processForReport(spectrum, nucleus, undefined, true, false, tasks[i].renderSpec || {}, statusPath);
-            if (nucleus === "13C") {
-                _processForReport(spectrum, nucleus, 1, false, true, tasks[i].renderSpec || {}, statusPath);
+            if (!_isTwoDimensionalNucleus(nucleus)) {
+                _processForReport(spectrum, nucleus, undefined, true, false, tasks[i].renderSpec || {}, statusPath);
+                if (nucleus === "13C") {
+                    _processForReport(spectrum, nucleus, 1, false, true, tasks[i].renderSpec || {}, statusPath);
+                }
+                _prepareSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {}, tasks[i].graphicsProfilePath || "", statusPath);
+                spectraByNucleus[nucleus] = spectrum;
             }
-            _prepareSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {}, tasks[i].graphicsProfilePath || "", statusPath);
+        }
+
+        for (i = 0; i < spectraByTask.length && i < tasks.length; i++) {
+            nucleus = tasks[i].nucleus;
+            spectrum = spectraByTask[i];
+            if (!spectrum || !spectrum.isValid() || !_isTwoDimensionalNucleus(nucleus)) {
+                continue;
+            }
+            _prepareTwoDimensionalSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {}, statusPath);
+            verticalNucleus = _twoDimensionalVerticalNucleus(nucleus);
+            _attachTraceSpectra(spectrum, spectraByNucleus["1H"], spectraByNucleus[verticalNucleus], statusPath);
         }
 
         serialization.save(mnovaPath, "mnova");
@@ -1179,6 +1370,12 @@ function dumpSpectrumProperties(inputPath, outputPath, statusPath)
             spectrum = new NMRSpectrum(mainWindow.activeDocument.getActiveItem("NMR Spectrum"));
         }
         var names = [
+            "contours.scaling",
+            "contours.positivenumber",
+            "contours.negativenumber",
+            "contours.linewidth",
+            "traces.horizontal.size",
+            "traces.vertical.size",
             "integrals.show",
             "integrals.label.show",
             "integrals.label.position",

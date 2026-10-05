@@ -179,6 +179,8 @@ def _apply_patch_node(state: PatchSIState) -> dict:
                     spectrum_bookmarks,
                     include_previous_page_break=True,
                 )
+        from ...crystallography.numbering import renumber_docx_tables
+        renumber_docx_tables(temp_docx)
         patch_result = {
             "operation": operation,
             "renumbered": applied_numbers,
@@ -202,6 +204,9 @@ def _apply_patch_node(state: PatchSIState) -> dict:
         from ...crystallography.artifacts import preserve_crystallography
         from ...output_layout import output_root_for
         preserve_crystallography(patched_manifest, _manifest_output_root(source_manifest, request.manifest_path), output_root_for(output_docx))
+        from ...scope_graphic.lifecycle import refresh_patch
+        refresh_patch(source_manifest, patched_manifest, _manifest_output_root(source_manifest, request.manifest_path),
+                      temp_docx, output_root_for(output_docx))
         write_patched_manifest(patched_manifest, temp_manifest)
         temp_docx.replace(output_docx)
         temp_manifest.replace(output_manifest)
@@ -363,6 +368,9 @@ def _reformat_for_journal(
     from ...crystallography.artifacts import preserve_crystallography
     from ...output_layout import output_root_for
     preserve_crystallography(patched_manifest, _manifest_output_root(source_manifest, request.manifest_path), output_root_for(output_docx))
+    from ...scope_graphic.lifecycle import refresh_patch
+    refresh_patch(source_manifest, patched_manifest, _manifest_output_root(source_manifest, request.manifest_path),
+                  temp_docx, output_root_for(output_docx))
     write_patched_manifest(patched_manifest, temp_manifest)
     temp_docx.replace(output_docx)
     temp_manifest.replace(output_manifest)

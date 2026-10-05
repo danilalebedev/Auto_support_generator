@@ -86,6 +86,7 @@ def _spectrum_blocks(compounds: list[Compound], embed_mode: SpectrumEmbedMode) -
             blocks.append(_spectrum_block(compound, "1H", embed_mode))
         if _should_include_spectrum(compound, "13C", embed_mode):
             blocks.append(_spectrum_block(compound, "13C", embed_mode))
+        blocks.extend(_two_d_spectrum_blocks(compound, embed_mode))
     return blocks
 
 
@@ -121,6 +122,70 @@ def _spectrum_block(compound: Compound, nucleus: str, embed_mode: SpectrumEmbedM
         "mnova_path": mnova_path,
         "expected_artifact_path": image_path if embed_mode in {"png", "mnova"} and image_path else mnova_path,
     }
+
+
+def _two_d_spectrum_blocks(compound: Compound, embed_mode: SpectrumEmbedMode) -> list[DocumentBlock]:
+    blocks: list[DocumentBlock] = []
+    compound_id = _compound_id(compound)
+    for index, image_path in enumerate(_two_d_spectrum_images(compound), start=1):
+        nucleus = _two_d_label(image_path)
+        mnova_path = _two_d_spectrum_mnova_path(compound, image_path)
+        if embed_mode == "mnova" and not mnova_path:
+            continue
+        block_id = f"spectrum:{compound_id}:2D:{index}"
+        blocks.append(
+            {
+                "kind": "spectrum_page",
+                "block_id": block_id,
+                "bookmark": bookmark_name_for_block_id(block_id),
+                "compound_id": compound_id,
+                "display_number": compound.number,
+                "title_text": f"{compound.display_name} {compound.label}",
+                "content": compound,
+                "structure_placeholder": f"SPECTRUM_STRUCTURE:{compound.number}:{nucleus}",
+                "nucleus": nucleus,
+                "embed_mode": embed_mode,
+                "image_path": str(image_path),
+                "mnova_path": mnova_path,
+                "expected_artifact_path": str(image_path),
+            }
+        )
+    return blocks
+
+
+def _two_d_spectrum_images(compound: Compound) -> list[Path]:
+    return [
+        Path(path)
+        for path in compound.spectra_2d_files
+        if _is_supported_image(Path(path)) and Path(path).exists()
+    ]
+
+
+def _two_d_spectrum_mnova_path(compound: Compound, image_path: Path) -> str:
+    candidates = [
+        Path(path)
+        for path in compound.spectra_2d_files
+        if Path(path).suffix.lower() == ".mnova" and Path(path).exists()
+    ]
+    for candidate in candidates:
+        if candidate.stem.casefold() == image_path.stem.casefold():
+            return str(candidate)
+
+    image_label = _two_d_label(image_path)
+    label_matches = [candidate for candidate in candidates if _two_d_label(candidate) == image_label]
+    return str(label_matches[0]) if len(label_matches) == 1 else ""
+
+
+def _is_supported_image(path: Path) -> bool:
+    return path.suffix.lower() in {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"}
+
+
+def _two_d_label(path: Path) -> str:
+    name = path.stem.upper()
+    for label in ("HSQC", "HMBC", "NOESY", "COSY", "TOCSY", "ROESY"):
+        if label in name:
+            return label
+    return "2D"
 
 
 def _spectrum_image_path(compound: Compound, nucleus: str) -> str:

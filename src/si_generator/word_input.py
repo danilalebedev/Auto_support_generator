@@ -94,6 +94,8 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
                     rf=fields.get("rf", ""),
                     formula=formula,
                     smiles=metadata.smiles if metadata else "",
+                    cif_folder=fields.get("cif_folder", ""),
+                    cif_files=_split_path_list(fields.get("cif_files", "")),
                     hrms_label=fields.get("hrms_label") or "HRMS (ESI-TOF) m/z",
                     hrms_adduct=fields.get("hrms_adduct") or _adduct_from_headers(headers) or "[M+H]+",
                     hrms_found=fields.get("hrms_found", ""),
@@ -103,6 +105,10 @@ def read_word_compounds(path: str | Path, extract_structure_metadata: bool = Fal
                     c13_nmr=fields.get("c13_nmr", ""),
                     c13_conditions=fields.get("c13_conditions", ""),
                     c13_spectrum_path=fields.get("c13_spectrum_path", ""),
+                    spectra_1d_folder=fields.get("spectra_1d_folder", ""),
+                    spectra_1d_files=_split_path_list(fields.get("spectra_1d_files", "")),
+                    spectra_2d_folder=fields.get("spectra_2d_folder", ""),
+                    spectra_2d_files=_split_path_list(fields.get("spectra_2d_files", "")),
                     extra_nmr=fields.get("extra_nmr", ""),
                     ir=fields.get("ir", ""),
                     elemental_analysis=_elemental_analysis_from_fields(fields),
@@ -159,6 +165,8 @@ def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Comp
                 rf=fields.get("rf", ""),
                 formula=formula,
                 smiles=metadata.smiles if metadata else "",
+                cif_folder=fields.get("cif_folder", ""),
+                cif_files=_split_path_list(fields.get("cif_files", "")),
                 hrms_label=fields.get("hrms_label") or "HRMS (ESI-TOF) m/z",
                 hrms_adduct=fields.get("hrms_adduct") or _adduct_from_headers(headers) or "[M+H]+",
                 hrms_found=fields.get("hrms_found", ""),
@@ -168,6 +176,10 @@ def _read_word_compounds_without_com(path: str, structure_metadata) -> list[Comp
                 c13_nmr=fields.get("c13_nmr", ""),
                 c13_conditions=fields.get("c13_conditions", ""),
                 c13_spectrum_path=fields.get("c13_spectrum_path", ""),
+                spectra_1d_folder=fields.get("spectra_1d_folder", ""),
+                spectra_1d_files=_split_path_list(fields.get("spectra_1d_files", "")),
+                spectra_2d_folder=fields.get("spectra_2d_folder", ""),
+                spectra_2d_files=_split_path_list(fields.get("spectra_2d_files", "")),
                 extra_nmr=fields.get("extra_nmr", ""),
                 ir=fields.get("ir", ""),
                 elemental_analysis=_elemental_analysis_from_fields(fields),
@@ -353,6 +365,18 @@ def _map_row(headers: list[str], values: list[str]) -> dict[str, str]:
             result["preparation"] = value
         elif "yield" in key:
             result["yield_text"] = value
+        elif key in {"ciffolder", "cifpath", "cifsfolder"}:
+            result["cif_folder"] = value
+        elif key in {"ciffiles", "ciffile"}:
+            result["cif_files"] = value
+        elif key in {"spectra1dfolder", "spectra1dpath", "onedimensionalspectrafolder", "onednmrpath"}:
+            result["spectra_1d_folder"] = value
+        elif key in {"spectra1dfiles", "spectra1dfile"}:
+            result["spectra_1d_files"] = value
+        elif key in {"spectra2dfolder", "spectra2dpath", "twodimensionalspectrafolder", "twodnmrpath"}:
+            result["spectra_2d_folder"] = value
+        elif key in {"spectra2dfiles", "spectra2dfile"}:
+            result["spectra_2d_files"] = value
         elif key in {"1hspectrumpath", "1hspectrum", "1hpath", "hnmrspectrumpath", "hnmrspectrum", "protonpath"}:
             result["h1_spectrum_path"] = value
         elif key in {"13cspectrumpath", "13cspectrum", "13cpath", "cnmrspectrumpath", "cnmrspectrum", "carbonpath"}:
@@ -363,12 +387,15 @@ def _map_row(headers: list[str], values: list[str]) -> dict[str, str]:
         elif key.startswith("13c") or "cnmr" in key:
             result["c13_nmr"] = value
             result["c13_conditions"] = _conditions_from_header(header)
+        elif key in {"hrmsadduct", "adduct"}:
+            if value:
+                result["hrms_adduct"] = value
         elif "hrms" in key:
             result["hrms_label"] = _hrms_label_from_header(header)
             result["hrms_found"] = _first_number(value)
             adduct = re.search(r"\[M[+-][A-Za-z0-9]+\]\+", header)
             if adduct:
-                result["hrms_adduct"] = adduct.group(0)
+                result.setdefault("hrms_adduct", adduct.group(0))
         elif key in {"mp", "meltingpoint"}:
             result["melting_point"] = value
         elif key in {"color", "state", "appearance"}:
@@ -409,6 +436,10 @@ def _elemental_analysis_from_fields(fields: dict[str, str]) -> dict[str, str]:
         return {"skip": True}
     value = fields.get("elemental_analysis", "")
     return {"found": value} if value else {}
+
+
+def _split_path_list(value: str) -> list[str]:
+    return [item.strip() for item in re.split(r"[;\n]+", value or "") if item.strip()]
 
 
 def _reaction_field_key(key: str) -> str:
@@ -578,7 +609,7 @@ def _paste_structure_objects_in_package(
             source_object = source_objects.get(number)
             if source_object is None:
                 continue
-            markers = [f"[[STRUCTURE:{number}]]", f"[[SPECTRUM_STRUCTURE:{number}:1H]]", f"[[SPECTRUM_STRUCTURE:{number}:13C]]"]
+            markers = _structure_markers_for_number(document, number)
             for marker in markers:
                 while True:
                     run = _run_with_text(document, marker)
@@ -819,6 +850,16 @@ def _run_with_text(document, text: str):
             if text in collected:
                 return _collapse_marker_runs(group, text, parents)
     return None
+
+
+def _structure_markers_for_number(document, number: str) -> list[str]:
+    main_marker = f"[[STRUCTURE:{number}]]"
+    visible_text = "".join(document.itertext())
+    spectrum_pattern = re.compile(
+        rf"\[\[SPECTRUM_STRUCTURE:{re.escape(number)}:[^\[\]]+\]\]"
+    )
+    spectrum_markers = sorted(set(spectrum_pattern.findall(visible_text)))
+    return [main_marker, *spectrum_markers]
 
 
 def _collapse_marker_runs(runs, text: str, parents):

@@ -36,6 +36,9 @@ def prepare_unified_input_node(state: GenerateSIState) -> dict:
         request,
         resolved_compound_table_docx=bundle.compound_table,
         template_docx=bundle.si_template or request.template_docx,
+        crystallography_template_docx=(
+            bundle.crystallography_template or request.crystallography_template_docx
+        ),
         loadings_schema_docx=bundle.reaction_schema if bundle.has_complete_loadings else None,
         loadings_scope_docx=bundle.scope if bundle.has_complete_loadings else None,
         generate_loadings=bundle.has_complete_loadings,
@@ -49,5 +52,8 @@ def prepare_unified_input_node(state: GenerateSIState) -> dict:
             "reaction_schema": str(bundle.reaction_schema) if bundle.reaction_schema else "",
             "scope": str(bundle.scope) if bundle.scope else "",
             "si_template": str(bundle.si_template) if bundle.si_template else "",
+            "crystallography_template": (
+                str(bundle.crystallography_template) if bundle.crystallography_template else ""
+            ),
         },
     }

@@ -27,6 +27,9 @@ def render_docx_node(state: GenerateSIState) -> dict:
         render_options=get_journal_profile(request.journal_profile_id).data,
     )
     artifacts = {**state.get("artifacts", {}), "support_docx": str(output_path)}
+    if artifacts.get("scope_graphic"):
+        from ...scope_graphic.document import insert_overview
+        insert_overview(output_path, artifacts["scope_graphic"])
     return {"output_path": output_path, "artifacts": artifacts}
 
 

@@ -39,10 +39,49 @@ class NmrValidationTests(unittest.TestCase):
 
         self.assertEqual(compound.validation_issues, [])
 
-    def test_aromatic_symmetry_keeps_non_aromatic_carbons_individual(self) -> None:
+    def test_symmetry_includes_non_aromatic_ring_carbons(self) -> None:
         smiles = "O=S=Nc1ccccc1C(=O)N1CCCCCC1"
 
-        self.assertEqual(expected_c13_signal_count(smiles, 13), 13)
+        self.assertEqual(expected_c13_signal_count(smiles, 13), 10)
+
+    def test_symmetry_covers_all_carbon_hybridizations(self) -> None:
+        for smiles, atoms, signals in (
+            ("CC", 2, 1), ("CCC", 3, 2), ("CC(C)(C)O", 4, 2),
+            ("CC(=O)C", 3, 2), ("C1CCCCC1", 6, 1),
+            ("C=CC=C", 4, 2), ("CC#CC", 4, 2),
+            ("O=C(O)C(=O)O", 2, 1), ("COC", 2, 1), ("CCO", 2, 2),
+        ):
+            with self.subTest(smiles=smiles):
+                self.assertEqual(expected_c13_signal_count(smiles, atoms), signals)
+
+    def test_symmetry_preserves_isotopes_and_specified_stereochemistry(self) -> None:
+        self.assertEqual(expected_c13_signal_count("[13CH3]C(=O)C", 3), 3)
+        self.assertEqual(expected_c13_signal_count("C[C@H](O)CC[C@H](O)C", 6), 6)
+
+    def test_symmetry_ignores_atom_map_labels(self) -> None:
+        self.assertEqual(expected_c13_signal_count("[CH3:1][CH3:2]", 2), 1)
+
+    def test_symmetry_falls_back_for_invalid_or_mismatched_structure(self) -> None:
+        for smiles, atoms in (("", 4), ("invalid", 4), ("CC", 5), ("CC", 0)):
+            with self.subTest(smiles=smiles, atoms=atoms):
+                self.assertEqual(expected_c13_signal_count(smiles, atoms), atoms)
+
+    def test_symmetry_counts_assigned_equivalent_atoms_as_one_signal(self) -> None:
+        for peaks in ("70.0, 28.0", "70.0 (C), 28.0 (3C)", "70.0 (C), 28.0 (3 x CH3)"):
+            with self.subTest(peaks=peaks):
+                compound = Compound(number="x", name="tert-Butanol", formula="C4H10O",
+                                    smiles="CC(C)(C)O", c13_nmr=peaks)
+                validate_support([compound])
+                self.assertEqual(compound.validation_issues, [])
+
+    def test_symmetry_still_warns_for_extra_or_missing_signals(self) -> None:
+        for peaks, found in (("70.0", 1), ("70.0, 28.0, 20.0", 3)):
+            with self.subTest(peaks=peaks):
+                compound = Compound(number="x", name="tert-Butanol", formula="C4H10O",
+                                    smiles="CC(C)(C)O", c13_nmr=peaks)
+                validate_support([compound])
+                self.assertIn(f"C signals expected 2 after molecular symmetry correction (4 C atoms in formula), found {found}",
+                              compound.nmr_check_warning)
 
     def test_13c_validation_falls_back_to_formula_without_structure(self) -> None:
         compound = Compound(

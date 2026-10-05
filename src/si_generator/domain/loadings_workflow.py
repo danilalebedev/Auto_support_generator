@@ -159,7 +159,7 @@ def read_reaction_schema(path: str | Path) -> dict[str, SchemaEntry]:
         entries[key] = SchemaEntry(
             key=key,
             label=label,
-            equivalents=_float_or_none(_cell_text(cells, equiv_col)),
+            equivalents=_equivalents_or_none(_cell_text(cells, equiv_col)),
             mw=_float_or_none(_cell_text(cells, mw_col)),
             density_g_mL=_float_or_none(_cell_text(cells, density_col)),
             concentration_M=_float_or_none(_cell_text(cells, concentration_col)),
@@ -434,7 +434,11 @@ def _amount_from_equivalents(
 ) -> dict[str, Any]:
     mmol = target_mmol * schema_entry.equivalents if schema_entry.equivalents is not None else None
     mass_mg = mmol * mw if mmol is not None and mw is not None else None
-    volume_mL = _safe_div(target_mmol, schema_entry.concentration_M)
+    # A reagent stock solution is scaled by its own mmol (target × equivalents),
+    # while a solvent row without equivalents represents the overall reaction
+    # concentration and therefore uses the target amount directly.
+    volume_basis_mmol = mmol if mmol is not None else target_mmol
+    volume_mL = _safe_div(volume_basis_mmol, schema_entry.concentration_M)
     return _compact_amount(
         {
             "name": _metadata_display(metadata, schema_entry.label),
@@ -798,6 +802,16 @@ def _float_or_none(value: str | float | int | None) -> float | None:
         return None
 
 
+def _equivalents_or_none(value: str | float | int | None) -> float | None:
+    if value in {None, ""}:
+        return None
+    text = str(value).strip().replace(",", ".")
+    mol_percent = re.fullmatch(r"([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*mol\s*%", text, flags=re.IGNORECASE)
+    if mol_percent:
+        return float(mol_percent.group(1)) / 100.0
+    return _float_or_none(text)
+
+
 def _split_rf(value: str) -> tuple[str, str]:
     text = value.strip()
     match = re.match(r"(.+?)\s*\((.+)\)\s*$", text)
@@ -838,7 +852,7 @@ def _format_mass(value: Any) -> str:
     parsed = _to_float(value)
     if parsed is None:
         return ""
-    if abs(parsed) >= 10:
+    if abs(parsed) >= 100:
         return f"{parsed:.0f}"
     return _format_decimal(parsed, 1)
 

@@ -72,7 +72,42 @@ class UnifiedWordInputTests(unittest.TestCase):
         self.assertIsNone(bundle.reaction_schema)
         self.assertIsNone(bundle.scope)
         self.assertIsNone(bundle.si_template)
+        self.assertIsNone(bundle.crystallography_template)
         self.assertFalse(bundle.has_complete_loadings)
+
+    def test_embedded_crystallography_template_is_materialized_and_used(self) -> None:
+        compound_table = REPO_ROOT / "examples" / "example_1" / "Compound_table.docx"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            crystallography_template = root / "Crystallography_template.docx"
+            document = Document()
+            document.add_paragraph("Embedded crystallography template")
+            document.save(crystallography_template)
+            unified = build_unified_input_docx(
+                compound_table,
+                root / "All_in_one_input.docx",
+                crystallography_template=crystallography_template,
+            )
+            bundle = materialize_unified_input(unified, root / "parts")
+            request = GenerateSIRequest(
+                input_path=unified,
+                input_kind="word",
+                output_path=root / "support.docx",
+                unified_input_docx=unified,
+            )
+            result = prepare_unified_input_node({"run_id": "test", "request": request, "issues": []})
+
+            self.assertIsNotNone(bundle.crystallography_template)
+            extracted = Document(bundle.crystallography_template)
+            self.assertIn("Embedded crystallography template", "\n".join(p.text for p in extracted.paragraphs))
+            resolved_template = result["request"].crystallography_template_docx
+            self.assertIsNotNone(resolved_template)
+            resolved = Document(resolved_template)
+            self.assertIn("Embedded crystallography template", "\n".join(p.text for p in resolved.paragraphs))
+            self.assertEqual(
+                result["unified_input_components"]["crystallography_template"],
+                str(resolved_template),
+            )
 
     def test_incomplete_optional_loadings_sections_are_skipped_with_warning(self) -> None:
         example = REPO_ROOT / "examples" / "example_1"
@@ -101,7 +136,8 @@ class UnifiedWordInputTests(unittest.TestCase):
     def test_example_contains_human_readable_section_markers(self) -> None:
         document = Document(REPO_ROOT / "examples" / "example_1" / "All_in_one_input.docx")
         text = "\n".join(paragraph.text for paragraph in document.paragraphs)
-        for marker in SECTION_MARKERS.values():
+        for key in ("compound_table", "reaction_schema", "scope", "si_template"):
+            marker = SECTION_MARKERS[key]
             self.assertIn(marker, text)
 
     def test_every_bundled_all_in_one_example_contains_an_si_template(self) -> None:
@@ -111,6 +147,13 @@ class UnifiedWordInputTests(unittest.TestCase):
                 source = REPO_ROOT / "examples" / example_name / "All_in_one_input.docx"
                 bundle = materialize_unified_input(source, staging_root / example_name)
                 self.assertIsNotNone(bundle.si_template, example_name)
+
+    def test_crystallography_example_embeds_both_templates(self) -> None:
+        source = REPO_ROOT / "examples" / "crystallography_all_in_one" / "All_in_one_input.docx"
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = materialize_unified_input(source, Path(tmp) / "parts")
+            self.assertIsNotNone(bundle.si_template)
+            self.assertIsNotNone(bundle.crystallography_template)
 
     def test_minimal_all_in_one_input_runs_without_optional_sections(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

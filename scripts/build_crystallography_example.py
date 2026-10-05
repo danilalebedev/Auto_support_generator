@@ -24,7 +24,7 @@ CRYSTALS = {'3c':('3e, 2383313/da8828.cif', 104, 270, '2383313'),
 
 def create_template(path):
     d = Document()
-    d.add_paragraph('Crystallographic data for {Product.number}', 'Heading 1')
+    d.add_paragraph('{Product.name} ({Product.number})', 'Heading 1')
     d.add_paragraph('{Crystal.description}')
     d.add_paragraph('{Crystal.table}')
     d.add_paragraph('{Crystal.geometry}')

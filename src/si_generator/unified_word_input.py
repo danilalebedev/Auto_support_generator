@@ -21,6 +21,7 @@ SECTION_MARKERS = {
     "reaction_schema": "[AUTO SI: REACTION SCHEMA]",
     "scope": "[AUTO SI: SCOPE]",
     "si_template": "[AUTO SI: SI TEMPLATE]",
+    "crystallography_template": "[AUTO SI: CRYSTALLOGRAPHY TEMPLATE]",
 }
 END_MARKER = "[AUTO SI: END]"
 
@@ -36,6 +37,7 @@ class UnifiedInputBundle:
     reaction_schema: Path | None = None
     scope: Path | None = None
     si_template: Path | None = None
+    crystallography_template: Path | None = None
 
     @property
     def has_complete_loadings(self) -> bool:
@@ -67,6 +69,7 @@ def materialize_unified_input(source: str | Path, output_dir: str | Path) -> Uni
         "reaction_schema": "Reaction_schema.docx",
         "scope": "Scope.docx",
         "si_template": "SI_template.docx",
+        "crystallography_template": "Crystallography_template.docx",
     }
     for key, filename in filenames.items():
         elements = sections.get(key, [])
@@ -83,6 +86,7 @@ def materialize_unified_input(source: str | Path, output_dir: str | Path) -> Uni
         reaction_schema=paths["reaction_schema"],
         scope=paths["scope"],
         si_template=paths["si_template"],
+        crystallography_template=paths["crystallography_template"],
     )
 
 
@@ -99,6 +103,7 @@ def build_unified_input_docx(
     reaction_schema: str | Path | None = None,
     scope: str | Path | None = None,
     si_template: str | Path | None = None,
+    crystallography_template: str | Path | None = None,
 ) -> Path:
     compound_path = Path(compound_table).resolve()
     output = Path(output_path).resolve()
@@ -117,7 +122,7 @@ def build_unified_input_docx(
     title_run.font.size = Pt(18)
     note = document.add_paragraph(
         "Edit the tables and template below. Keep the section labels unchanged. "
-        "Reaction schema, Scope and SI template are optional."
+        "Reaction schema, Scope, SI template and Crystallography template are optional."
     )
     marker = document.add_paragraph(SECTION_MARKERS["compound_table"])
     _format_section_marker(marker)
@@ -126,6 +131,7 @@ def build_unified_input_docx(
         ("reaction_schema", reaction_schema),
         ("scope", scope),
         ("si_template", si_template),
+        ("crystallography_template", crystallography_template),
     )
     for index, (key, source) in enumerate(section_sources):
         if not source:

@@ -10,6 +10,8 @@ from si_generator.cli import _build_parser
 from si_generator.docx_builder import build_document_from_model
 from si_generator.domain.loadings_workflow import (
     LoadingsWorkflowPaths,
+    SchemaEntry,
+    _amount_from_equivalents,
     apply_loadings_workflow,
     read_characterization_template,
     read_reaction_schema,
@@ -26,7 +28,7 @@ from si_generator.graph.nodes.loadings import (
 from si_generator.input_table import read_compounds
 from si_generator.domain.compound import Compound
 from si_generator.render.document_model import build_si_document_model
-from si_generator.structure_metadata import extract_structure_metadata_by_cell
+from si_generator.structure_metadata import StructureMetadata, extract_structure_metadata_by_cell
 from si_generator.journal_profiles import get_journal_profile
 from si_generator.workflows.generate_si import request_from_args
 
@@ -37,6 +39,17 @@ LOADINGS_DIR = EXAMPLES_DIR / "example_3"
 
 
 class ReactionLoadingsTests(unittest.TestCase):
+    def test_workflow_solution_volume_uses_reagent_equivalents(self) -> None:
+        amount = _amount_from_equivalents(
+            SchemaEntry("Base_solution", "Base solution", equivalents=2.0, concentration_M=0.5),
+            target_mmol=1.0,
+            metadata=StructureMetadata(),
+            mw=None,
+        )
+
+        self.assertEqual(amount["mmol"], 2.0)
+        self.assertEqual(amount["volume_mL"], 4.0)
+
     def test_calculates_mmol_mass_and_density_volume(self) -> None:
         reaction = {
             "target_mmol": 1.5,
@@ -170,6 +183,21 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertEqual(schema["K2CO3"].mw, 138.21)
         self.assertEqual(schema["AcOH"].density_g_mL, 1.049)
         self.assertEqual(schema["Solvent_MeCN"].concentration_M, 0.75)
+
+    def test_reaction_schema_converts_mol_percent_to_equivalents(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Reaction_schema.docx"
+            document = Document()
+            table = document.add_table(rows=2, cols=5)
+            for index, value in enumerate(["Reagents", "equiv.", "MW, g/mol", "Density, g/ml", "Concentration, M"]):
+                table.rows[0].cells[index].text = value
+            for index, value in enumerate(["Sn(OTf)2", "10 mol%", "416.85", "", ""]):
+                table.rows[1].cells[index].text = value
+            document.save(path)
+
+            schema = read_reaction_schema(path)
+
+        self.assertEqual(schema["SnOTf2"].equivalents, 0.1)
 
     def test_scope_can_attach_generated_names_by_cell(self) -> None:
         rows = read_scope(

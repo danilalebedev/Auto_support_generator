@@ -6,6 +6,7 @@ import zipfile
 from pathlib import Path
 
 from .domain.types import SpectrumRenderSpec
+from .domain.spectra_config import build_spectrum_render_spec
 from .chemistry import parse_formula
 from .mnova import MnovaTask, extract_reports_batch
 from .domain.compound import Compound
@@ -42,6 +43,8 @@ def fill_nmr_from_mnova(
     )
     for compound in compounds:
         compound_specs = (render_specs_by_compound or {}).get(compound.id or compound.number, {})
+        h1_source = _resolve_path(compound.h1_spectrum_path, base_dir) if compound.h1_spectrum_path else None
+        c13_source = _resolve_path(compound.c13_spectrum_path, base_dir) if compound.c13_spectrum_path else None
         mnova_path = processed_root / compound.number / f"{compound.number}.mnova"
         compound.mnova_path = str(mnova_path)
         if compound.h1_spectrum_path:
@@ -53,7 +56,7 @@ def fill_nmr_from_mnova(
                 MnovaTask(
                     compound.number,
                     "1H",
-                    _resolve_path(compound.h1_spectrum_path, base_dir),
+                    h1_source,
                     image_path,
                     mnova_path,
                     dict(compound_specs.get("1H", {})),
@@ -70,12 +73,38 @@ def fill_nmr_from_mnova(
                 MnovaTask(
                     compound.number,
                     "13C",
-                    _resolve_path(compound.c13_spectrum_path, base_dir),
+                    c13_source,
                     image_path,
                     mnova_path,
                     dict(compound_specs.get("13C", {})),
                     single_mnova_path,
                     mnova_graphics_profile_13c,
+                )
+            )
+        for nucleus, input_path in discover_2d_experiments(compound):
+            image_path = image_root / f"{compound.number}_{nucleus}" / f"{compound.number}_{nucleus}.png"
+            single_mnova_path = processed_root / compound.number / f"{compound.number}_{nucleus}.mnova"
+            render_spec = dict(compound_specs.get(nucleus, build_spectrum_render_spec(nucleus, {})))
+            vertical_nucleus = "1H" if nucleus in {"NOESY", "COSY", "TOCSY", "ROESY"} else "13C"
+            render_spec["horizontal_trace_render_spec"] = dict(
+                compound_specs.get("1H", build_spectrum_render_spec("1H", {}))
+            )
+            render_spec["vertical_trace_render_spec"] = dict(
+                compound_specs.get(vertical_nucleus, build_spectrum_render_spec(vertical_nucleus, {}))
+            )
+            use_external_traces = bool(render_spec.get("use_external_traces", True))
+            tasks.append(
+                MnovaTask(
+                    compound=compound.number,
+                    nucleus=nucleus,
+                    input_path=input_path,
+                    image_path=image_path,
+                    mnova_path=mnova_path,
+                    render_spec=render_spec,
+                    single_mnova_path=single_mnova_path,
+                    graphics_profile_path=None,
+                    horizontal_trace_path=h1_source if use_external_traces else None,
+                    vertical_trace_path=(h1_source if vertical_nucleus == "1H" else c13_source) if use_external_traces else None,
                 )
             )
 
@@ -114,6 +143,18 @@ def fill_nmr_from_mnova(
                 if c13.get("single_mnova"):
                     compound.c13_mnova_path = c13["single_mnova"]
                 _write_report(reports_root, compound.number, "13C", report)
+
+        for nucleus, _ in discover_2d_experiments(compound):
+            two_d = reports.get((compound.number, nucleus))
+            if not two_d:
+                continue
+            if two_d["error"]:
+                print(f"[Mnova] {compound.number} {nucleus}: {two_d['error']}", flush=True)
+                continue
+            for key in ("image", "single_mnova"):
+                path = two_d.get(key, "")
+                if path and path not in compound.spectra_2d_files:
+                    compound.spectra_2d_files.append(path)
 
         report_mnova = next(
             (item.get("mnova", "") for key, item in reports.items() if key[0] == compound.number and item.get("mnova")),
@@ -160,6 +201,13 @@ def _build_processed_spectra_package(compounds: list[Compound], output_root: Pat
             target = folder / f"{compound.number}_{suffix}" if suffix != "mnova" else folder / f"{compound.number}.mnova"
             shutil.copy2(source_path, target)
             wrote_any = True
+        for source in compound.spectra_2d_files:
+            source_path = Path(source)
+            if source_path.suffix.lower() not in {".png", ".mnova"} or not source_path.exists():
+                continue
+            folder.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, folder / source_path.name)
+            wrote_any = True
         if not wrote_any and folder.exists():
             folder.rmdir()
 
@@ -171,6 +219,52 @@ def _build_processed_spectra_package(compounds: list[Compound], output_root: Pat
             if path.is_file():
                 archive.write(path, path.relative_to(package_root))
     return zip_path
+
+
+def discover_2d_experiments(compound: Compound) -> list[tuple[str, Path]]:
+    roots: list[Path] = []
+    if compound.spectra_2d_folder:
+        roots.append(Path(compound.spectra_2d_folder))
+    for value in compound.spectra_2d_files:
+        path = Path(value)
+        roots.append(path if path.is_dir() else path.parent)
+
+    experiments: dict[str, Path] = {}
+    seen_roots: set[Path] = set()
+    for root in roots:
+        try:
+            resolved = root.resolve()
+        except OSError:
+            continue
+        if resolved in seen_roots or not resolved.exists():
+            continue
+        seen_roots.add(resolved)
+        candidates = [resolved] if (resolved / "ser").is_file() else [path.parent for path in resolved.rglob("ser")]
+        for candidate in sorted(candidates, key=lambda path: str(path).casefold()):
+            if not ((candidate / "acqu2").exists() or (candidate / "acqu2s").exists()):
+                continue
+            nucleus = _infer_2d_nucleus(candidate)
+            if nucleus and nucleus not in experiments:
+                experiments[nucleus] = candidate
+    order = {name: index for index, name in enumerate(("HSQC", "HMBC", "NOESY", "COSY", "TOCSY", "ROESY"))}
+    return sorted(experiments.items(), key=lambda item: (order.get(item[0], 999), str(item[1]).casefold()))
+
+
+def _infer_2d_nucleus(experiment: Path) -> str:
+    fragments = [experiment.name]
+    for relative in (Path("pulseprogram"), Path("pdata") / "1" / "title"):
+        path = experiment / relative
+        if not path.is_file():
+            continue
+        try:
+            fragments.append(path.read_text(encoding="utf-8", errors="ignore")[:8192])
+        except OSError:
+            continue
+    text = " ".join(fragments).upper()
+    for label in ("HSQC", "HMBC", "NOESY", "TOCSY", "ROESY", "COSY"):
+        if label in text:
+            return label
+    return ""
 
 
 def _resolve_path(value: str, base_dir: Path) -> Path:

@@ -67,7 +67,7 @@ CIF_source/
 
 ## Шаблон и результат
 
-Поле **Crystallography template .docx** необязательно. Встроенный файл и редактируемая копия находятся в `src/si_generator/templates/Crystallography_template.docx` и `examples/crystallography/Crystallography_template.docx`.
+Поле **Crystallography template .docx** необязательно. Встроенный файл и редактируемая копия находятся в `src/si_generator/templates/Crystallography_template.docx` и `examples/crystallography/Crystallography_template.docx`. В режиме Single all-in-one тот же шаблон можно поместить после метки `[AUTO SI: CRYSTALLOGRAPHY TEMPLATE]`; встроенная секция извлекается автоматически и имеет приоритет над отдельным полем.
 
 | Алиас | Содержимое |
 | --- | --- |
@@ -109,6 +109,8 @@ Multiple_series/
 ## Проверочный пример
 
 `examples/crystallography` содержит 3a, 3c, 3f и 3s из предоставленного `Supporting_inf+ACHT.docx`, соответствующие raw NMR из `fid.zip` и CIF для трёх соединений. Это компактный интеграционный пример, не полная копия статьи. Совпадение CIF проверено по формуле и соответствию CCDC в исходном SI. Номера старых папок РСА не всегда совпадают с финальными номерами статьи.
+
+`examples/crystallography_all_in_one` содержит восемь соединений с РСА, raw 1H/13C, CIF, авторскими ORTEP и готовым reference DOCX. `All_in_one_input.docx` включает одновременно SI template и Crystallography template, поэтому для воспроизведения отдельно выбираются только Spectra source и CIF source.
 
 [Reference_output.docx](../examples/crystallography/Reference_output.docx) содержит фактический результат контрольного запуска: 15 страниц, восемь ЯМР-спектров и три блока РСА. Красные предупреждения ЯМР сохранены: пики и интегралы требуют проверки. Это проверочный черновик, не готовый к публикации SI. Для Add/Patch заново соберите пример и используйте всю папку output, а не только этот DOCX.
 

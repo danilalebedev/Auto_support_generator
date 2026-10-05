@@ -53,6 +53,10 @@ class Compound:
     crystallography_report_path: str = ""
     crystallography_data_path: str = ""
     has_word_structure: bool = False
+    spectra_1d_folder: str = ""
+    spectra_1d_files: list[str] = field(default_factory=list)
+    spectra_2d_folder: str = ""
+    spectra_2d_files: list[str] = field(default_factory=list)
     nmr_check_warning: str = ""
     validation_issues: list[Issue] = field(default_factory=list)
 
@@ -91,7 +95,10 @@ def compound_to_domain_dict(compound: Compound) -> CompoundSnapshot:
     _put(data, "hrms", _hrms_block(compound))
     _put(data, "ir", _ir_block(compound.ir))
     _put(data, "elemental_analysis", compound.elemental_analysis)
-    _put(data, "reaction", compound.reaction)
+    reaction = dict(compound.reaction)
+    if compound.preparation:
+        reaction["preparation"] = compound.preparation
+    _put(data, "reaction", reaction)
     _put(data, "references", list(compound.references))
     _put(data, "issues", list(compound.validation_issues))
     return data
@@ -133,12 +140,17 @@ def compound_from_domain_dict(data: dict[str, Any]) -> Compound:
         cif_files=_string_list(structure.get("cif_files", [])),
         crystallography_report_path=str(structure.get("crystallography_report_path") or ""),
         crystallography_data_path=str(structure.get("crystallography_data_path") or ""),
+        spectra_1d_folder=str(dict(spectra.get("1D", {}) or {}).get("source_folder") or ""),
+        spectra_1d_files=_string_list(dict(spectra.get("1D", {}) or {}).get("files", [])),
+        spectra_2d_folder=str(dict(spectra.get("2D", {}) or {}).get("source_folder") or ""),
+        spectra_2d_files=_string_list(dict(spectra.get("2D", {}) or {}).get("files", [])),
         h1_nmr=str(h1.get("formatted_text") or ""),
         h1_conditions=str(h1.get("conditions") or ""),
         c13_nmr=str(c13.get("formatted_text") or ""),
         c13_conditions=str(c13.get("conditions") or ""),
         nmr_spectra=nmr_spectra,
         extra_nmr=str(nmr.get("extra_text") or ""),
+        nmr_check_warning="; ".join(_string_list(nmr.get("warnings", []))),
         hrms_label=str(hrms.get("label") or "HRMS (ESI-TOF) m/z"),
         hrms_adduct=str(hrms.get("adduct") or "[M+H]+"),
         hrms_found=str(hrms.get("found_text") or ""),
@@ -201,6 +213,22 @@ def _spectra_block(compound: Compound) -> dict[str, dict[str, str]]:
     )
     if c13:
         spectra["13C"] = c13
+    one_d = _compact(
+        {
+            "source_folder": compound.spectra_1d_folder,
+            "files": _string_list(compound.spectra_1d_files),
+        }
+    )
+    if one_d:
+        spectra["1D"] = one_d
+    two_d = _compact(
+        {
+            "source_folder": compound.spectra_2d_folder,
+            "files": _string_list(compound.spectra_2d_files),
+        }
+    )
+    if two_d:
+        spectra["2D"] = two_d
     return spectra
 
 

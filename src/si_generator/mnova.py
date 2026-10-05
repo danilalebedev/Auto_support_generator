@@ -36,6 +36,8 @@ class MnovaTask:
     render_spec: dict[str, object] | None = None
     single_mnova_path: Path | None = None
     graphics_profile_path: Path | None = None
+    horizontal_trace_path: Path | None = None
+    vertical_trace_path: Path | None = None
 
 
 class MnovaBatchError(RuntimeError):
@@ -44,11 +46,13 @@ class MnovaBatchError(RuntimeError):
         message: str,
         *,
         no_status: bool = False,
+        incomplete: bool = False,
         returncode: int | None = None,
         launch_log: Path | None = None,
     ) -> None:
         super().__init__(message)
         self.no_status = no_status
+        self.incomplete = incomplete
         self.returncode = returncode
         self.launch_log = launch_log
 
@@ -87,12 +91,12 @@ def extract_reports_batch(
         return _extract_reports_batch_once(tasks, output_dir, timeout=timeout, mnova_exe=mnova_exe)
     except MnovaBatchError as exc:
         grouped_tasks = _group_tasks_by_compound(tasks)
-        if not exc.no_status or len(grouped_tasks) <= 1:
+        if not (exc.no_status or exc.incomplete) or len(grouped_tasks) <= 1:
             raise RuntimeError(str(exc)) from exc
 
         launch_log = f" See {exc.launch_log}." if exc.launch_log else ""
         print(
-            "[Mnova warning] batch did not create a status file; retrying compound-by-compound."
+            "[Mnova warning] batch did not complete; retrying compound-by-compound."
             + launch_log,
             flush=True,
         )
@@ -106,7 +110,7 @@ def extract_reports_batch(
                 reports.update(_extract_reports_batch_once(compound_tasks, group_dir, timeout=timeout, mnova_exe=mnova_exe))
             except MnovaBatchError as group_exc:
                 group_log = f" See {group_exc.launch_log}." if group_exc.launch_log else ""
-                raise RuntimeError(f"Mnova failed before status file for compound {compound}.{group_log}") from group_exc
+                raise RuntimeError(f"Mnova batch failed for compound {compound}.{group_log}") from group_exc
         return reports
 
 
@@ -128,6 +132,7 @@ def _extract_reports_batch_once(
     run_status_path = run_dir / "mnova_batch.status.txt"
     output_map: dict[tuple[str, str], dict[str, Path]] = {}
     graphics_profile_map: dict[Path, Path] = {}
+    staged_input_map: dict[Path, Path] = {}
     registry_snapshot = _snapshot_mnova_spectrum_properties(tasks)
 
     for path in [tasks_path, output_json_path, status_path, launch_log_path]:
@@ -138,7 +143,17 @@ def _extract_reports_batch_once(
         lines = []
         for index, task in enumerate(tasks, start=1):
             key = (task.compound, task.nucleus)
-            staged_input = _stage_spectrum_input(_resolve_spectrum_input(task.input_path), run_dir / "inputs", index)
+            staged_input = _stage_spectrum_input_once(task.input_path, run_dir / "inputs", staged_input_map)
+            staged_horizontal_trace = (
+                _stage_spectrum_input_once(task.horizontal_trace_path, run_dir / "inputs", staged_input_map)
+                if task.horizontal_trace_path
+                else None
+            )
+            staged_vertical_trace = (
+                _stage_spectrum_input_once(task.vertical_trace_path, run_dir / "inputs", staged_input_map)
+                if task.vertical_trace_path
+                else None
+            )
             staged_image = run_dir / "images" / f"{_safe_token(task.compound)}_{task.nucleus}.png" if task.image_path else None
             staged_mnova = run_dir / "mnova" / _safe_token(task.compound) / f"{_safe_token(task.compound)}.mnova" if task.mnova_path else None
             staged_single_mnova = (
@@ -178,6 +193,8 @@ def _extract_reports_batch_once(
                     render_spec=task.render_spec,
                     single_mnova_path=single_mnova_path,
                     graphics_profile_path=graphics_profile_path,
+                    horizontal_trace_path=_mnova_arg(staged_horizontal_trace) if staged_horizontal_trace else "",
+                    vertical_trace_path=_mnova_arg(staged_vertical_trace) if staged_vertical_trace else "",
                 )
             )
         run_tasks_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -246,7 +263,7 @@ def _extract_reports_batch_once(
                 launch_log=launch_log_path,
             )
         if "DONE" not in status:
-            raise MnovaBatchError(status.strip(), returncode=completed.returncode, launch_log=launch_log_path)
+            raise MnovaBatchError(status.strip(), incomplete=True, returncode=completed.returncode, launch_log=launch_log_path)
         if not run_output_json_path.exists():
             raise RuntimeError(f"Mnova did not create batch report file: {output_json_path}")
 
@@ -470,6 +487,13 @@ def _stage_spectrum_input(input_path: Path, inputs_root: Path, index: int) -> Pa
     return target
 
 
+def _stage_spectrum_input_once(input_path: Path, inputs_root: Path, staged_inputs: dict[Path, Path]) -> Path:
+    source = _resolve_spectrum_input(input_path).resolve()
+    if source not in staged_inputs:
+        staged_inputs[source] = _stage_spectrum_input(source, inputs_root, len(staged_inputs) + 1)
+    return staged_inputs[source]
+
+
 def _stage_graphics_profile(
     profile_path: Path,
     profiles_root: Path,
@@ -540,6 +564,8 @@ def _format_task_line(
     render_spec: dict[str, object] | None = None,
     single_mnova_path: str = "",
     graphics_profile_path: str = "",
+    horizontal_trace_path: str = "",
+    vertical_trace_path: str = "",
 ) -> str:
     return "\t".join(
         [
@@ -551,6 +577,8 @@ def _format_task_line(
             _render_spec_arg(render_spec),
             single_mnova_path,
             graphics_profile_path,
+            horizontal_trace_path,
+            vertical_trace_path,
         ]
     )
 
