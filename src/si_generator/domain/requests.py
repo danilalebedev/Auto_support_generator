@@ -19,10 +19,13 @@ class GenerateSIRequest:
     output_path: Path
     unified_input_docx: Path | None = None
     resolved_compound_table_docx: Path | None = None
+    series_folder: Path | None = None
     template_docx: Path | None = None
     references_path: Path | None = None
     spectra_source: Path | None = None
     spectra_zip: Path | None = None
+    crystallography_template_docx: Path | None = None
+    cif_source: Path | None = None
     loadings_schema_docx: Path | None = None
     loadings_scope_docx: Path | None = None
     mnova_exe: Path | None = None
@@ -105,6 +108,8 @@ class AddCompoundsRequest:
     loadings_scope_docx: Path | None = None
     spectra_source: Path | None = None
     spectra_zip: Path | None = None
+    cif_source: Path | None = None
+    crystallography_template_docx: Path | None = None
     mnova_exe: Path | None = None
     mnova_graphics_profile: Path | None = None
     mnova_graphics_profile_1h: Path | None = None

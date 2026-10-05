@@ -66,6 +66,7 @@ def assign_spectra_from_folder(compounds: list[Compound], spectra_root: str | Pa
         if not compound_dir.exists():
             continue
 
+        _assign_compound_artifact_folders(compound, compound_dir)
         spectra = _find_bruker_spectra(compound_dir)
         if not compound.h1_spectrum_path and spectra.get("1H"):
             compound.h1_spectrum_path = str(spectra["1H"])
@@ -163,6 +164,26 @@ def _find_bruker_spectra(compound_dir: Path) -> dict[str, Path]:
     if candidates["13C"]:
         result["13C"] = _prefer_by_name(candidates["13C"], ["13c"], ["apt", "dept"])
     return result
+
+
+def _assign_compound_artifact_folders(compound: Compound, compound_dir: Path) -> None:
+    cif_folder = _optional_child_folder(compound_dir, "cif")
+    cif_files = _files_with_suffix(cif_folder, ".cif")
+    if cif_folder and not compound.cif_folder:
+        compound.cif_folder = str(cif_folder)
+    if cif_files and not compound.cif_files:
+        compound.cif_files = [str(path) for path in cif_files]
+
+
+def _optional_child_folder(root: Path, name: str) -> Path | None:
+    path = root / name
+    return path if path.is_dir() else None
+
+
+def _files_with_suffix(folder: Path | None, suffix: str) -> list[Path]:
+    if folder is None:
+        return []
+    return sorted((path for path in folder.rglob(f"*{suffix}") if path.is_file()), key=lambda path: str(path).casefold())
 
 
 def _read_nucleus(experiment: Path) -> str:

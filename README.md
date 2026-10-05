@@ -30,6 +30,8 @@ To uninstall, open **Windows Settings → Apps → Installed apps → Auto Suppo
 
 ## Choose language
 
+Optional **CIF source** adds X-ray structure figures, experimental descriptions and crystal/refinement tables to SI. **Multiple series** combines several methods with separate inputs and templates in one run. See the [crystallography guide](docs/crystallography.md) and [ready example](examples/crystallography). Source changes require a new build; existing installer binaries are not automatically updated.
+
 - [Русская версия](README_RU.md)
 - [English version](README_EN.md)
 

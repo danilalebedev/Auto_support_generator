@@ -18,6 +18,7 @@ from .nodes.add_compounds import (
 )
 from .nodes.elemental_analysis import calculate_elemental_analysis_node
 from .nodes.check import check_manifest_node, load_manifest_node
+from .nodes.crystallography import process_crystallography_node
 from .nodes.ingest import read_input_table_node
 from .nodes.hrms import calculate_hrms_node
 from .nodes.loadings import calculate_loadings_node
@@ -61,6 +62,7 @@ def build_generate_si_graph():
     builder.add_node("calculate_hrms", calculate_hrms_node)
     builder.add_node("calculate_loadings", calculate_loadings_node)
     builder.add_node("calculate_elemental_analysis", calculate_elemental_analysis_node)
+    builder.add_node("process_crystallography", process_crystallography_node)
     builder.add_node("validate_support", validate_support_node)
     builder.add_node("build_document_model", build_document_model_node)
     builder.add_node("render_docx", render_docx_node)
@@ -76,7 +78,7 @@ def build_generate_si_graph():
         "prepare_spectra_source",
         route_generate_after_required_input_check,
         {
-            "continue": "plan_nmr_processing",
+            "continue": "process_crystallography",
             "fail": "write_manifest",
         },
     )
@@ -102,6 +104,8 @@ def build_generate_si_graph():
         },
     )
     builder.add_edge("calculate_elemental_analysis", "validate_support")
+    builder.add_conditional_edges("process_crystallography", route_generate_after_required_input_check,
+                                  {"continue": "plan_nmr_processing", "fail": "write_manifest"})
     builder.add_edge("validate_support", "build_document_model")
     builder.add_edge("build_document_model", "render_docx")
     builder.add_edge("render_docx", "postprocess_word_objects")

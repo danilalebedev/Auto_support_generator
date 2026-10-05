@@ -47,6 +47,8 @@ def build_manifest(state: GenerateSIState) -> dict:
                 "unified_input": request.unified_input_docx,
                 "compound_table": request.compound_table_path,
                 "spectra_source": request.resolved_spectra_source,
+                "cif_source": request.cif_source,
+                "crystallography_template_docx": request.crystallography_template_docx,
                 "template_docx": request.template_docx,
                 "references": request.references_path,
                 "loadings_schema_docx": request.loadings_schema_docx,
@@ -85,6 +87,12 @@ def build_manifest(state: GenerateSIState) -> dict:
             "structure": {
                 "has_word_structure": compound.has_word_structure,
                 "path": compound.structure_path,
+                **({"cif_folder": compound.cif_folder,
+                    "cif_files": list(compound.cif_files),
+                    "has_cif": bool(compound.cif_files),
+                    "crystallography_report_path": compound.crystallography_report_path,
+                    "crystallography_data_path": compound.crystallography_data_path}
+                   if compound.cif_files or compound.crystallography_data_path else {}),
             },
             "analytical_blocks": _analytical_blocks(compound),
             "structure_placeholder": f"STRUCTURE:{compound.number}",
@@ -171,6 +179,10 @@ def _output_paths(output_path: Path, artifacts: dict[str, str]) -> dict[str, str
         "docx_dir",
         "input_dir",
         "spectra_dir",
+        "crystallography_report",
+        "crystallography_data",
+        "crystallography_input_dir",
+        "crystallography_log",
         "processed_spectra_zip",
         "processed_spectra_dir",
         "processed_mnova_dir",
@@ -232,6 +244,18 @@ def _compound_artifacts(compound) -> dict[str, str]:
         artifacts["c13_mnova"] = compound.c13_mnova_path
     if compound.mnova_path:
         artifacts["mnova"] = compound.mnova_path
+    if compound.crystallography_report_path:
+        artifacts["crystallography_report"] = compound.crystallography_report_path
+    if compound.crystallography_data_path:
+        artifacts["crystallography_data"] = compound.crystallography_data_path
+    for index, path in enumerate(compound.cif_files, start=1):
+        artifacts[f"cif_{index}"] = path
+    if compound.crystallography_data_path:
+        known = {Path(value).resolve() for value in artifacts.values()}
+        bundle = Path(compound.crystallography_data_path).parent
+        for index, path in enumerate(sorted(bundle.rglob("*")), start=1):
+            if path.is_file() and path.resolve() not in known:
+                artifacts[f"crystal_file_{index}"] = str(path)
     return artifacts
 
 
@@ -246,6 +270,10 @@ def _run_config(request, artifacts: dict[str, str], output_root: Path) -> dict:
         ),
         "template_docx": _artifact_or_request_path("template_docx_copy", request.template_docx, artifacts, output_root),
         "references_path": _artifact_or_request_path("references_copy", request.references_path, artifacts, output_root),
+        "crystallography_template_docx": _artifact_or_request_path(
+            "crystallography_template_docx_copy", request.crystallography_template_docx, artifacts, output_root
+        ),
+        "cif_source": str(request.cif_source or ""),
         "loadings_schema_docx": _artifact_or_request_path("loadings_schema_copy", request.loadings_schema_docx, artifacts, output_root),
         "loadings_scope_docx": _artifact_or_request_path("loadings_scope_copy", request.loadings_scope_docx, artifacts, output_root),
         "mnova_graphics_profile": _artifact_or_request_path("mnova_graphics_profile_copy", request.mnova_graphics_profile, artifacts, output_root),

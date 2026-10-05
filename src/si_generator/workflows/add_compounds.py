@@ -39,6 +39,8 @@ def add_compounds_request_from_args(args: Namespace) -> AddCompoundsRequest:
         loadings_schema_docx=Path(args.loadings_schema_docx) if getattr(args, "loadings_schema_docx", None) else None,
         loadings_scope_docx=Path(args.loadings_scope_docx) if getattr(args, "loadings_scope_docx", None) else None,
         spectra_source=Path(args.spectra_source) if getattr(args, "spectra_source", None) else None,
+        cif_source=Path(args.cif_source) if getattr(args, "cif_source", None) else None,
+        crystallography_template_docx=Path(args.crystallography_template_docx) if getattr(args, "crystallography_template_docx", None) else None,
         spectra_zip=Path(args.spectra_zip) if getattr(args, "spectra_zip", None) else None,
         mnova_exe=Path(args.mnova_exe) if getattr(args, "mnova_exe", None) else None,
         mnova_graphics_profile=Path(args.mnova_graphics_profile) if getattr(args, "mnova_graphics_profile", None) else None,

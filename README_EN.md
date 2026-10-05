@@ -1,5 +1,13 @@
 # Auto Support Generator
 
+## X-ray Crystallography and Multiple Series
+
+Generate accepts an optional **CIF source** folder/ZIP with compound-number subfolders; CIFs may cover only a subset of compounds. The integrated reader inserts structure figures, experimental descriptions and crystal/refinement tables, and saves editable DOCX reports, source CIFs, images and JSON under `reports/crystallography`. Add and Patch preserve these artifacts without reprocessing old spectra.
+
+An optional sidecar JSON supplies crystal-growth/refinement text, CCDC, an external ORTEP image/caption and geometry-table selection. Without an external image, the program makes a labelled coordinate preview, not a thermal-ellipsoid plot. Local checks do not replace official checkCIF or CCDC deposition. The default ACS-oriented DOCX is a house template, not an official publisher form.
+
+**Multiple series** assembles a folder of series, each with its own Compound_table, optional SI_template and Reaction_schema/Scope. Processing settings are shared; compound numbers must be unique. See the [field reference and requirements](docs/crystallography.md) and [runnable example](examples/crystallography). Existing installer binaries have not been rebuilt for these source changes.
+
 **English** | [Русский](README_RU.md)
 
 Auto Support Generator is an open-source project licensed under the Apache License 2.0.

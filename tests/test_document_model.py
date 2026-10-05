@@ -44,6 +44,39 @@ class DocumentModelTests(unittest.TestCase):
         self.assertEqual(model["metadata"]["spectrum_count"], "1")
         self.assertEqual(model["metadata"]["references_count"], "0")
 
+    def test_renders_crystallography_appendix_when_cif_is_present(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output_path = root / "support_information.docx"
+            cif_path = root / "2a.cif"
+            cif_path.write_text("data_2a", encoding="utf-8")
+            report_path = root / "crystallography_report.docx"
+            from tests.test_crystallography_node import CIF
+            from si_generator.crystallography.service import process_compound
+            cif_path.write_text(CIF, encoding="utf-8")
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="Crystal example",
+                cif_folder=str(root),
+                cif_files=[str(cif_path)],
+                crystallography_report_path=str(report_path),
+            )
+            process_compound(compound, root / "processed_cif")
+            model = build_si_document_model([compound])
+
+            build_document_from_model(model, output_path)
+
+            text = "\n".join(paragraph.text for paragraph in Document(output_path).paragraphs)
+
+        self.assertEqual(
+            [section["id"] for section in model["sections"]],
+            ["compound_descriptions", "crystallography_appendix"],
+        )
+        self.assertEqual(model["metadata"]["crystallography_count"], "1")
+        self.assertIn("X-ray crystallography", text)
+        self.assertIn("Crystallographic data for 2a", text)
+
     def test_capitalizes_compound_name_in_description_and_spectrum_titles(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             image_path = Path(tmp) / "2a_1H.png"

@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 import json
+import shutil
 from pathlib import Path
 
 from docx import Document
@@ -18,10 +19,13 @@ class GenerateWorkflowTests(unittest.TestCase):
     def test_graph_generates_docx_without_mnova_or_support_check(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             requested_output_path = Path(tmp) / "support_information.docx"
+            spectra = Path(tmp) / "Spectra_source"
+            shutil.copytree(REPO_ROOT / "examples" / "example_1" / "Spectra_source", spectra,
+                            ignore=shutil.ignore_patterns("cif", "CIF"))
             request = GenerateSIRequest(
                 input_path=REPO_ROOT / "examples" / "example_1" / "Compound_table.docx",
                 input_kind="word",
-                spectra_zip=REPO_ROOT / "examples" / "example_1" / "Spectra_source",
+                spectra_zip=spectra,
                 output_path=requested_output_path,
                 no_extract_nmr=True,
                 no_check_support=True,

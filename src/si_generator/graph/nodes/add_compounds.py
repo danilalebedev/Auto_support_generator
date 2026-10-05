@@ -30,6 +30,7 @@ OFFICE_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relations
 CONTENT_TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
 PATH_CONFIG_KEYS = (
     "template_docx",
+    "crystallography_template_docx",
     "references_path",
     "loadings_schema_docx",
     "loadings_scope_docx",
@@ -214,7 +215,7 @@ def generate_new_support_node(state: AddCompoundsState) -> dict:
     request = state["request"]
     method_config = state.get("add_method_config") or _method_config_from_request(request)
     output_docx = _add_output_docx(state)
-    temp_dir = output_docx.parent / "_add_compounds_work" / (state.get("run_id") or "run")
+    temp_dir = output_dirs(output_docx)["output_root"] / "_new"
     temp_output = temp_dir / "new_compounds.docx"
     temp_dir.mkdir(parents=True, exist_ok=True)
 
@@ -227,6 +228,8 @@ def generate_new_support_node(state: AddCompoundsState) -> dict:
         loadings_schema_docx=method_config.get("loadings_schema_docx"),
         loadings_scope_docx=method_config.get("loadings_scope_docx"),
         spectra_source=request.resolved_spectra_source,
+        cif_source=request.cif_source,
+        crystallography_template_docx=request.crystallography_template_docx or method_config.get("crystallography_template_docx"),
         mnova_exe=method_config.get("mnova_exe"),
         mnova_graphics_profile=method_config.get("mnova_graphics_profile"),
         mnova_graphics_profile_1h=method_config.get("mnova_graphics_profile_1h"),
@@ -347,6 +350,10 @@ def write_add_manifest_node(state: AddCompoundsState) -> dict:
         method_config=state.get("add_method_config", {}),
     )
     output_manifest.parent.mkdir(parents=True, exist_ok=True)
+    from ...crystallography.artifacts import preserve_crystallography
+    preserve_crystallography(merged_manifest, _manifest_output_root(state.get("manifest", {}), request.manifest_path),
+                            output_dirs(output_docx)["output_root"])
+    _rebase_merged_artifacts(merged_manifest, request.manifest_path, output_docx)
     output_manifest.write_text(json.dumps(merged_manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     artifacts = {
         **state.get("artifacts", {}),
@@ -460,6 +467,7 @@ def _method_config_from_request(request) -> dict[str, Any]:
         "source": "request",
         "journal_profile_id": request.journal_profile_id or "organic.default",
         "template_docx": request.template_docx,
+        "crystallography_template_docx": request.crystallography_template_docx,
         "references_path": request.references_path,
         "loadings_schema_docx": request.loadings_schema_docx,
         "loadings_scope_docx": request.loadings_scope_docx,
@@ -495,6 +503,7 @@ def _overlay_request_method_config(config: dict[str, Any], request) -> None:
         config["journal_profile_id"] = request.journal_profile_id
     for key in (
         "template_docx",
+        "crystallography_template_docx",
         "references_path",
         "loadings_schema_docx",
         "loadings_scope_docx",
@@ -636,6 +645,8 @@ def _resolve_manifest_config_path(
 
 
 def _manifest_output_root(manifest: dict[str, Any], manifest_path: Path) -> Path:
+    if manifest_path.parent.name.lower() == "docx":
+        return manifest_path.resolve().parent.parent
     for section_name in ("output_paths", "artifacts"):
         section = manifest.get(section_name, {})
         if not isinstance(section, dict):
@@ -650,6 +661,26 @@ def _manifest_output_root(manifest: dict[str, Any], manifest_path: Path) -> Path
     if manifest_path.parent.name.lower() == "docx":
         return manifest_path.parent.parent.resolve()
     return manifest_path.parent.resolve()
+
+
+def _rebase_merged_artifacts(manifest: dict, source_manifest: Path, output_docx: Path) -> None:
+    old_root = _manifest_output_root(manifest, source_manifest)
+    target_root = output_dirs(output_docx)["output_root"].resolve()
+    for entry in manifest.get("compounds", {}).values():
+        relative = entry.setdefault("relative_artifacts", {})
+        for key, raw in entry.get("artifacts", {}).items():
+            candidates = [target_root / relative[key], old_root / relative[key]] if relative.get(key) else []
+            candidates.append(Path(raw))
+            path = next((p for p in candidates if p.exists()), Path(raw)).resolve()
+            entry["artifacts"][key] = str(path)
+            relative[key] = str(path.relative_to(target_root)) if path.is_relative_to(target_root) else str(path)
+    artifacts = manifest.setdefault("artifacts", {})
+    artifacts.update(output_root=str(target_root), docx_dir=str(output_docx.parent))
+    manifest.setdefault("output_paths", {}).update(artifacts)
+    manifest["relative_paths"] = {
+        key: str(Path(raw).resolve().relative_to(target_root)) if Path(raw).resolve().is_relative_to(target_root) else raw
+        for key, raw in artifacts.items()
+    }
 
 
 def _spectrum_embed_mode(value: Any) -> SpectrumEmbedMode:
@@ -743,6 +774,20 @@ def _append_generated_docx_blocks(
             source_children = list(source_body)
             compound_elements = _compound_range_elements(source_children, source_ranges, new_manifest)
             spectrum_elements = _spectrum_range_elements(source_children, source_ranges, new_manifest)
+            crystal_elements = []
+            for compound_id in new_manifest.get("order", []):
+                name = bookmark_name_for_block_id(f"crystallography:{compound_id}")
+                if name in source_ranges:
+                    start, end = source_ranges[name]
+                    crystal_elements.extend(deepcopy(source_children[start:end + 1]))
+            if crystal_elements:
+                old_crystals = [bookmark_name_for_block_id(f"crystallography:{cid}") for cid in old_manifest.get("order", [])]
+                if not any(name in _bookmark_body_ranges(target_body) for name in old_crystals):
+                    heading = ET.Element(f"{{{WORD_NS}}}p")
+                    run = ET.SubElement(heading, f"{{{WORD_NS}}}r")
+                    ET.SubElement(run, f"{{{WORD_NS}}}br", {f"{{{WORD_NS}}}type": "page"})
+                    ET.SubElement(run, f"{{{WORD_NS}}}t").text = "X-ray crystallography"
+                    crystal_elements.insert(0, heading)
 
             extra_files: dict[str, bytes] = {}
             rel_counter = _next_rel_counter(target_rels)
@@ -773,9 +818,29 @@ def _append_generated_docx_blocks(
                 bookmark_counter=bookmark_counter,
                 bookmark_name_map=bookmark_name_map,
             )
+            crystal_elements, rel_counter, bookmark_counter = _prepare_inserted_elements(
+                crystal_elements, source_zip=source_zip, source_rels=source_rels,
+                source_content_types=source_content_types, target_rels=target_rels,
+                target_content_types=target_content_types, existing_names=existing_names,
+                extra_files=extra_files, rel_counter=rel_counter, bookmark_counter=bookmark_counter,
+                bookmark_name_map=bookmark_name_map,
+            )
 
             if compound_elements:
                 _insert_body_elements(target_body, _compound_insert_index(target_body, old_manifest), compound_elements)
+            if crystal_elements:
+                ranges = _bookmark_body_ranges(target_body)
+                old_crystals = [ranges[name] for cid in old_manifest.get("order", [])
+                                if (name := bookmark_name_for_block_id(f"crystallography:{cid}")) in ranges]
+                if old_crystals:
+                    crystal_index = max(end for _, end in old_crystals) + 1
+                else:
+                    spectrum_ranges = [ranges[name] for cid in old_manifest.get("order", []) for nucleus in ("1H", "13C")
+                                       if (name := bookmark_name_for_block_id(f"spectrum:{cid}:{nucleus}")) in ranges]
+                    crystal_index = min(start for start, _ in spectrum_ranges) if spectrum_ranges else _before_section_properties_index(target_body)
+                    if crystal_index and _has_page_break(list(target_body)[crystal_index - 1]):
+                        crystal_index -= 1
+                _insert_body_elements(target_body, crystal_index, crystal_elements)
             if spectrum_elements:
                 _insert_body_elements(target_body, _spectra_insert_index(target_body), spectrum_elements)
 
@@ -880,6 +945,7 @@ def _bookmark_name_map(id_map: dict[str, str]) -> dict[str, str]:
     mapping: dict[str, str] = {}
     for source_id, target_id in id_map.items():
         mapping[bookmark_name_for_block_id(f"compound:{source_id}")] = bookmark_name_for_block_id(f"compound:{target_id}")
+        mapping[bookmark_name_for_block_id(f"crystallography:{source_id}")] = bookmark_name_for_block_id(f"crystallography:{target_id}")
         for nucleus in ("1H", "13C"):
             mapping[bookmark_name_for_block_id(f"spectrum:{source_id}:{nucleus}")] = bookmark_name_for_block_id(
                 f"spectrum:{target_id}:{nucleus}"

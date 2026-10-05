@@ -73,6 +73,8 @@ def render_document_from_template(
             _render_compound_blocks(output_document, segments["compound"], blocks)
         elif section.get("id") == "spectra_appendix" and blocks:
             _render_spectrum_blocks(output_document, segments, blocks, mnova_ole_targets, render_options or {})
+        elif section.get("id") == "crystallography_appendix" and blocks:
+            _render_crystallography_blocks(output_document, blocks)
         elif section.get("id") == "references" and blocks:
             _render_reference_blocks(output_document, blocks, render_options or {})
 
@@ -113,6 +115,9 @@ def _render_compound_blocks(document: DocumentObject, template_paragraphs: list[
         )
         values = _compound_values(compound, include_preparation=include_preparation)
         _render_template_paragraphs(document, template_paragraphs, values, compound=compound)
+        if compound.crystallography_data_path:
+            from .crystallography.render import append_figures
+            append_figures(document, compound)
         _add_bookmark_range(document.paragraphs[first_index], document.paragraphs[-1], block.get("bookmark", ""))
 
 
@@ -166,6 +171,22 @@ def _render_reference_blocks(document: DocumentObject, blocks: list[DocumentBloc
         paragraph.paragraph_format.space_after = Pt(0)
         _add_bookmark_range(paragraph, paragraph, block.get("bookmark", ""))
         paragraph.add_run(format_reference(content["reference"], int(content["index"])))
+
+
+def _render_crystallography_blocks(document: DocumentObject, blocks: list[DocumentBlock]) -> None:
+    from .crystallography.render import append_details
+    document.add_page_break()
+    title = document.add_paragraph()
+    title.paragraph_format.space_after = Pt(0)
+    title.add_run("X-ray crystallography").bold = True
+    for index, block in enumerate(blocks):
+        compound: Compound = block["content"]
+        first_index = len(document.paragraphs)
+        append_details(document, compound)
+        first = document.paragraphs[first_index]
+        first.paragraph_format.page_break_before = bool(index)
+        last = document.add_paragraph()
+        _add_bookmark_range(first, last, block.get("bookmark", ""))
 
 
 def _add_oriented_section(document: DocumentObject, orientation: str) -> None:

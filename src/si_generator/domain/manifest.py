@@ -323,6 +323,8 @@ def _resolve_manifest_path(path: str | Path, base_dir: Path) -> Path:
 
 
 def _manifest_base_dir(manifest: dict[str, Any], manifest_path: Path | None) -> Path:
+    if manifest_path and manifest_path.parent.name.lower() == "docx":
+        return manifest_path.resolve().parent.parent
     for source in (manifest.get("artifacts", {}), manifest.get("output_paths", {})):
         if not isinstance(source, dict):
             continue

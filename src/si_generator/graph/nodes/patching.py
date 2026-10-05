@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 
 from ...domain.issues import compound_issue_counts, count_issues
+from ...domain.bookmarks import bookmark_name_for_block_id
 from ...domain.manifest import check_manifest, load_manifest, manifest_has_errors
 from ...domain.patching import (
     bookmark_order_for_compounds,
@@ -159,9 +160,13 @@ def _apply_patch_node(state: PatchSIState) -> dict:
                 include_previous_page_break=True,
             )
             removed_bookmarks = compound_bookmarks + existing_spectrum_bookmarks
+            crystal_bookmarks = [bookmark_name_for_block_id(f"crystallography:{cid}") for cid in removed_ids]
+            remove_docx_blocks(temp_docx, temp_docx, [b for b in crystal_bookmarks if b in available_bookmarks])
         if reordered_ids:
             compound_bookmarks = _required_compound_bookmarks(patched_manifest, reordered_ids, available_bookmarks)
             reorder_docx_blocks(temp_docx, temp_docx, compound_bookmarks)
+            crystal_bookmarks = [bookmark_name_for_block_id(f"crystallography:{cid}") for cid in reordered_ids]
+            reorder_docx_blocks(temp_docx, temp_docx, [b for b in crystal_bookmarks if b in available_bookmarks])
             spectrum_bookmarks = [
                 bookmark
                 for bookmark in spectrum_bookmark_order_for_compounds(patched_manifest, reordered_ids)
@@ -182,6 +187,8 @@ def _apply_patch_node(state: PatchSIState) -> dict:
             "reordered_ids": reordered_ids,
             "swapped_pairs": swapped_pairs,
         }
+        _copy_reformat_source_artifacts(source_manifest, request.manifest_path, artifacts)
+        _set_reformat_layout_paths(patched_manifest, artifacts, output_docx, output_manifest)
         set_manifest_output_paths(patched_manifest, support_docx=output_docx, manifest_path=output_manifest)
         _append_patch_history(
             patched_manifest,
@@ -192,6 +199,9 @@ def _apply_patch_node(state: PatchSIState) -> dict:
             operations=_patch_operations(request),
             patch_result=patch_result,
         )
+        from ...crystallography.artifacts import preserve_crystallography
+        from ...output_layout import output_root_for
+        preserve_crystallography(patched_manifest, _manifest_output_root(source_manifest, request.manifest_path), output_root_for(output_docx))
         write_patched_manifest(patched_manifest, temp_manifest)
         temp_docx.replace(output_docx)
         temp_manifest.replace(output_manifest)
@@ -350,6 +360,9 @@ def _reformat_for_journal(
         operations=_patch_operations(request),
         patch_result=patch_result,
     )
+    from ...crystallography.artifacts import preserve_crystallography
+    from ...output_layout import output_root_for
+    preserve_crystallography(patched_manifest, _manifest_output_root(source_manifest, request.manifest_path), output_root_for(output_docx))
     write_patched_manifest(patched_manifest, temp_manifest)
     temp_docx.replace(output_docx)
     temp_manifest.replace(output_manifest)
@@ -391,6 +404,8 @@ def _hydrate_compound_artifacts(compound: Compound, entry: dict, manifest: dict,
         "h1_mnova": "h1_mnova_path",
         "c13_mnova": "c13_mnova_path",
         "mnova": "mnova_path",
+        "crystallography_data": "crystallography_data_path",
+        "crystallography_report": "crystallography_report_path",
     }
     base_dir = _manifest_output_root(manifest, manifest_path)
     for key, attribute in mappings.items():
@@ -401,13 +416,15 @@ def _hydrate_compound_artifacts(compound: Compound, entry: dict, manifest: dict,
 
 
 def _manifest_output_root(manifest: dict, manifest_path: Path) -> Path:
+    parent = Path(manifest_path).resolve().parent
+    if parent.name.lower() == "docx":
+        return parent.parent
     for source_name in ("artifacts", "output_paths"):
         source = manifest.get(source_name, {})
         if isinstance(source, dict) and source.get("output_root"):
             candidate = Path(source["output_root"])
             if candidate.is_absolute() and candidate.exists():
                 return candidate.resolve()
-    parent = Path(manifest_path).resolve().parent
     return parent.parent if parent.name.lower() == "docx" else parent
 
 

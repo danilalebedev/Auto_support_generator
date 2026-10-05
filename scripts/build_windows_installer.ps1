@@ -52,6 +52,9 @@ Write-Host "Building AutoSupportGenerator.exe..."
     --windowed `
     --name AutoSupportGenerator `
     --paths (Join-Path $root "src") `
+    --collect-all gemmi `
+    --collect-all matplotlib `
+    --collect-all pypdf `
     --add-data "$mnovaScript;scripts" `
     --add-data "$assets;assets" `
     --add-data "$mngpStyles;mngp_styles" `

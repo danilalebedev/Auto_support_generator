@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 from typing import Any
 
 from .ir import parse_ir_block
@@ -47,6 +48,10 @@ class Compound:
     reaction: ReactionBlock = field(default_factory=dict)
     references: list[str] = field(default_factory=list)
     structure_path: str = ""
+    cif_folder: str = ""
+    cif_files: list[str] = field(default_factory=list)
+    crystallography_report_path: str = ""
+    crystallography_data_path: str = ""
     has_word_structure: bool = False
     nmr_check_warning: str = ""
     validation_issues: list[Issue] = field(default_factory=list)
@@ -124,6 +129,10 @@ def compound_from_domain_dict(data: dict[str, Any]) -> Compound:
         c13_spectrum_path=str(c13_artifacts.get("source_path") or ""),
         c13_image_path=str(c13_artifacts.get("image_path") or ""),
         c13_mnova_path=str(c13_artifacts.get("mnova_path") or ""),
+        cif_folder=str(structure.get("cif_folder") or ""),
+        cif_files=_string_list(structure.get("cif_files", [])),
+        crystallography_report_path=str(structure.get("crystallography_report_path") or ""),
+        crystallography_data_path=str(structure.get("crystallography_data_path") or ""),
         h1_nmr=str(h1.get("formatted_text") or ""),
         h1_conditions=str(h1.get("conditions") or ""),
         c13_nmr=str(c13.get("formatted_text") or ""),
@@ -163,6 +172,11 @@ def _structure_block(compound: Compound) -> dict[str, Any]:
             "has_word_structure": compound.has_word_structure,
             "formula": compound.formula,
             "smiles": compound.smiles,
+            "cif_folder": compound.cif_folder,
+            "cif_files": _string_list(compound.cif_files),
+            "has_cif": bool(compound.cif_files),
+            "crystallography_report_path": compound.crystallography_report_path,
+            "crystallography_data_path": compound.crystallography_data_path,
         }
     )
 
@@ -254,3 +268,9 @@ def _put(target: dict[str, Any], key: str, value: Any) -> None:
 
 def _compact(mapping: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in mapping.items() if value not in ("", None, {}, [])}
+
+
+def _string_list(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [item.strip() for item in re.split(r"[;\n]+", value) if item.strip()]
+    return [str(item) for item in (value or []) if str(item)]

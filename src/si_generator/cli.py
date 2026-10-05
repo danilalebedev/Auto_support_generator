@@ -57,6 +57,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate Supporting Information DOCX from a Word compound table.")
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument("--word-input", help="Path to a Word table with ChemDraw/ChemSketch OLE structures.")
+    input_group.add_argument("--series-folder", help="Folder of series, each with Compound_table.docx and optional SI_template, Reaction_schema, Scope, Spectra_source and CIF_source.")
     input_group.add_argument(
         "--all-in-one-input",
         help="Path to one DOCX containing the compound table and optional reaction schema, scope, and SI template sections.",
@@ -116,6 +117,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--spectra-zip",
         help="Alias for --spectra-source. Zip archive with compound-number folders containing NMR spectra.",
+    )
+    parser.add_argument(
+        "--crystallography-template-docx",
+        help="Optional crystallography DOCX template with Crystal.description/table/geometry paragraphs.",
+    )
+    parser.add_argument(
+        "--cif-source",
+        help="Optional folder or ZIP with CIF files in compound-number subfolders (a subset is allowed).",
     )
     parser.add_argument(
         "--mnova-exe",

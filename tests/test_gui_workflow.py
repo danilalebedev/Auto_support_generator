@@ -32,6 +32,34 @@ from si_generator.graph.state import CheckSIRequest
 
 
 class GuiWorkflowTests(unittest.TestCase):
+    def test_cif_input_is_optional_and_independent_of_spectra(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            table = root / "Compound_table.docx"
+            table.touch()
+            cif = root / "CIF_source"
+            cif.mkdir()
+            arguments = dict(input_kind="word", input_path_text=str(table), output_docx_text=str(root / "si.docx"))
+            empty = _build_generate_request(**arguments)
+            filled = _build_generate_request(**arguments, cif_source_text=str(cif))
+            self.assertIsNone(empty.cif_source)
+            self.assertEqual(filled.cif_source, cif)
+            self.assertIsNone(filled.resolved_spectra_source)
+
+    def test_series_mode_ignores_hidden_separate_input_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            request = _build_generate_request(
+                input_kind="word", input_mode="series", series_folder_text=str(root),
+                input_path_text="missing.docx", template_docx_text="missing_template.docx",
+                spectra_source_text="missing_spectra", cif_source_text="missing_cifs",
+                output_docx_text=str(root / "si.docx"), generate_loadings=True,
+            )
+            self.assertEqual(request.series_folder, root)
+            self.assertIsNone(request.cif_source)
+            self.assertIsNone(request.resolved_spectra_source)
+            self.assertIsNone(request.template_docx)
+
     def test_build_generate_request_accepts_single_all_in_one_docx(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -795,7 +823,7 @@ class GuiWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             examples_root = root / "examples"
-            for example_name in ("example_1", "example_2", "example_3"):
+            for example_name in ("example_1", "example_2", "example_3", "crystallography"):
                 example = examples_root / example_name
                 example.mkdir(parents=True)
                 (example / "Compound_table.docx").write_text("placeholder", encoding="utf-8")
@@ -803,7 +831,7 @@ class GuiWorkflowTests(unittest.TestCase):
             first = copy_starter_files_to(root, examples_root=examples_root)
             second = copy_starter_files_to(root, examples_root=examples_root)
 
-            for example_name in ("example_1", "example_2", "example_3"):
+            for example_name in ("example_1", "example_2", "example_3", "crystallography"):
                 self.assertTrue((first / example_name / "Compound_table.docx").exists())
             self.assertEqual(second.name, "AutoSupportGenerator_examples_2")
 

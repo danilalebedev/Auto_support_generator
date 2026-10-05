@@ -40,6 +40,11 @@ class StructureBlock(TypedDict, total=False):
     has_word_structure: bool
     smiles: str
     formula: str
+    cif_folder: str
+    cif_files: list[str]
+    has_cif: bool
+    crystallography_data_path: str
+    crystallography_report_path: str
 
 
 class SpectrumRenderSpec(TypedDict, total=False):

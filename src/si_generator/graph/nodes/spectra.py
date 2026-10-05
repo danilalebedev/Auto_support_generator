@@ -80,6 +80,7 @@ def _copy_input_artifacts(request, input_dir: Path) -> dict[str, str]:
         "unified_input_copy": request.unified_input_docx,
         "compound_table_copy": request.compound_table_path,
         "template_docx_copy": request.template_docx,
+        "crystallography_template_docx_copy": request.crystallography_template_docx,
         "references_copy": request.references_path,
         "loadings_schema_copy": request.loadings_schema_docx,
         "loadings_scope_copy": request.loadings_scope_docx,

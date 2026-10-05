@@ -9,6 +9,9 @@ dependencies = [
     "python-docx",
     "pywin32; platform_system == 'Windows'",
     "rdkit",
+    "gemmi>=0.7,<0.8",
+    "matplotlib>=3.8,<4",
+    "pypdf>=5,<7",
 ]
 
 [project.optional-dependencies]

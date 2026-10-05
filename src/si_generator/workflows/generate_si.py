@@ -16,6 +16,9 @@ def make_initial_generate_state(request: GenerateSIRequest) -> GenerateSIState:
 
 
 def run_generate_si(request: GenerateSIRequest) -> GenerateSIState:
+    if request.series_folder:
+        from .series import run_series
+        return run_series(request)
     graph = build_generate_si_graph()
     return graph.invoke(make_initial_generate_state(request))
 
@@ -32,7 +35,8 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
     profile_defaults = journal_profile_defaults(profile_id)
     unified_input = Path(args.all_in_one_input) if getattr(args, "all_in_one_input", None) else None
     return GenerateSIRequest(
-        input_path=unified_input or Path(args.word_input),
+        input_path=unified_input or Path(getattr(args, "series_folder", None) or args.word_input),
+        series_folder=Path(args.series_folder) if getattr(args, "series_folder", None) else None,
         input_kind="word",
         output_path=Path(args.output),
         unified_input_docx=unified_input,
@@ -40,6 +44,8 @@ def request_from_args(args: Namespace) -> GenerateSIRequest:
         references_path=Path(args.references) if args.references else None,
         spectra_source=Path(args.spectra_source) if getattr(args, "spectra_source", None) else None,
         spectra_zip=Path(args.spectra_zip) if args.spectra_zip else None,
+        crystallography_template_docx=Path(args.crystallography_template_docx) if getattr(args, "crystallography_template_docx", None) else None,
+        cif_source=Path(args.cif_source) if getattr(args, "cif_source", None) else None,
         loadings_schema_docx=Path(args.loadings_schema_docx) if getattr(args, "loadings_schema_docx", None) else None,
         loadings_scope_docx=Path(args.loadings_scope_docx) if getattr(args, "loadings_scope_docx", None) else None,
         mnova_exe=Path(args.mnova_exe) if args.mnova_exe else None,

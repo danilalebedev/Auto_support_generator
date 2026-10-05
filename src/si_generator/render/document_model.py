@@ -31,6 +31,13 @@ def build_si_document_model(
             "title": "Spectra appendix",
             "blocks": spectra_blocks,
         }
+    crystallography_blocks = _crystallography_blocks(compounds)
+    if crystallography_blocks:
+        sections_by_id["crystallography_appendix"] = {
+            "id": "crystallography_appendix",
+            "title": "X-ray crystallography",
+            "blocks": crystallography_blocks,
+        }
     reference_blocks = _reference_blocks(compounds, reference_store)
     if reference_blocks:
         sections_by_id["references"] = {
@@ -38,7 +45,7 @@ def build_si_document_model(
             "title": "References",
             "blocks": reference_blocks,
         }
-    section_order = ["compound_descriptions", "spectra_appendix", "references"]
+    section_order = ["compound_descriptions", "crystallography_appendix", "spectra_appendix", "references"]
     sections = [sections_by_id[section_id] for section_id in section_order if section_id in sections_by_id]
     sections.extend(section for section_id, section in sections_by_id.items() if section_id not in section_order)
 
@@ -48,6 +55,7 @@ def build_si_document_model(
         "metadata": {
             "compound_count": str(len(compounds)),
             "spectrum_count": str(len(spectra_blocks)),
+            "crystallography_count": str(len(crystallography_blocks)),
             "references_count": str(len(reference_blocks)),
         },
     }
@@ -133,6 +141,28 @@ def _has_spectrum_source(compound: Compound, nucleus: str) -> bool:
 
 def _compound_id(compound: Compound) -> str:
     return compound.id or compound.number
+
+
+def _crystallography_blocks(compounds: list[Compound]) -> list[DocumentBlock]:
+    blocks: list[DocumentBlock] = []
+    for compound in compounds:
+        if not (compound.cif_files or compound.crystallography_report_path):
+            continue
+        compound_id = _compound_id(compound)
+        block_id = f"crystallography:{compound_id}"
+        blocks.append(
+            {
+                "kind": "crystallography_entry",
+                "block_id": block_id,
+                "bookmark": bookmark_name_for_block_id(block_id),
+                "compound_id": compound_id,
+                "display_number": compound.number,
+                "title_text": f"{compound.display_name} {compound.label}",
+                "content": compound,
+                "expected_artifact_path": compound.crystallography_report_path or (compound.cif_files[0] if compound.cif_files else ""),
+            }
+        )
+    return blocks
 
 
 def _reference_blocks(compounds: list[Compound], reference_store: ReferenceStore | None) -> list[DocumentBlock]:

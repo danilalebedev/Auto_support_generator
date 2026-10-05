@@ -439,6 +439,13 @@ def _is_removable_trailing_paragraph(element: ET.Element) -> bool:
 def support_docx_from_manifest(manifest: dict[str, Any], manifest_path: str | Path, override: str | Path | None = None) -> Path:
     if override:
         return Path(override)
+    parent = Path(manifest_path).resolve().parent
+    relative = manifest.get("relative_paths", {}).get("support_docx")
+    if relative and not Path(relative).is_absolute():
+        root = parent.parent if parent.name.lower() == "docx" else parent
+        relocated = root / relative
+        if relocated.is_file():
+            return relocated
     artifacts = manifest.get("artifacts", {}) or {}
     output_paths = manifest.get("output_paths", {}) or {}
     value = artifacts.get("support_docx") or output_paths.get("support_docx")

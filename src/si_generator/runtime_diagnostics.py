@@ -22,10 +22,19 @@ def preflight_generate_request(
     mnova_script_path: str | Path = SCRIPT_PATH,
 ) -> list[Issue]:
     """Run cheap checks that catch common setup failures before a long run."""
+    if request.series_folder:
+        from .workflows.series import series_requests
+        try:
+            children = series_requests(request)
+        except (ValueError, OSError) as exc:
+            return [_issue("PREFLIGHT_SERIES_INVALID", "error", str(exc), request.series_folder)]
+        return [issue for child in children for issue in preflight_generate_request(
+            child, mnova_finder=mnova_finder, mnova_script_path=mnova_script_path)]
     issues: list[Issue] = []
     issues.extend(_check_input_path(request))
     issues.extend(_check_output_path(request.output_path))
     issues.extend(_check_loadings_files(request))
+    issues.extend(_check_crystallography_files(request))
     issues.extend(_check_mnova_graphics_profile(request))
     spectra_source = request.resolved_spectra_source
     if spectra_source:
@@ -140,6 +149,23 @@ def _check_loadings_files(request: GenerateSIRequest) -> list[Issue]:
             issues.append(_issue("PREFLIGHT_LOADINGS_FILE_NOT_FILE", "error", f"{label} path must be a file.", path))
         elif path.suffix.lower() != ".docx":
             issues.append(_issue("PREFLIGHT_LOADINGS_FILE_EXTENSION", "error", f"{label} file must be a .docx file.", path))
+    return issues
+
+
+def _check_crystallography_files(request: GenerateSIRequest) -> list[Issue]:
+    issues: list[Issue] = []
+    if request.crystallography_template_docx:
+        path = request.crystallography_template_docx
+        if not path.exists():
+            issues.append(_issue("PREFLIGHT_CRYSTALLOGRAPHY_TEMPLATE_MISSING", "error", "Crystallography template does not exist.", path))
+        elif not path.is_file():
+            issues.append(_issue("PREFLIGHT_CRYSTALLOGRAPHY_TEMPLATE_NOT_FILE", "error", "Crystallography template must be a file.", path))
+        elif path.suffix.lower() != ".docx":
+            issues.append(_issue("PREFLIGHT_CRYSTALLOGRAPHY_TEMPLATE_EXTENSION", "error", "Crystallography template must be a .docx file.", path))
+    if request.cif_source:
+        for issue in _check_spectra_source(request.cif_source):
+            issues.append({**issue, "code": issue["code"].replace("SPECTRA", "CIF"),
+                           "message": issue["message"].replace("Spectra", "CIF").replace("spectra", "CIF")})
     return issues
 
 

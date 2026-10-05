@@ -46,6 +46,8 @@ from .workflows.patch_si import run_patch_si
 
 
 INSTRUCTION_TEMPLATE_FILES = (
+    ("Crystallography - Complete folder", Path("crystallography"), "Four compounds, three CIF structures and original ORTEP images; includes a two-method example."),
+    ("Crystallography template", Path("crystallography") / "Crystallography_template.docx", "Editable crystallography section headings, description, table and optional geometry."),
     ("Example 1 - All-in-one input", Path("example_1") / "All_in_one_input.docx", "Four products with a complete reaction schema, scope and SI template in one editable Word file."),
     ("Example 1 - Compound table", Path("example_1") / "Compound_table.docx", "Four compounds for the first synthetic series."),
     ("Example 1 - Spectra source", Path("example_1") / "Spectra_source", "Matching raw 1H and 13C spectra as a folder."),
@@ -57,7 +59,7 @@ INSTRUCTION_TEMPLATE_FILES = (
     ("Example 3 - All-in-one input", Path("example_3") / "All_in_one_input.docx", "A different reaction method with two variable reagents and five products."),
     ("Example 3 - Complete folder", Path("example_3"), "The same new-method input as separate files, including spectra as a folder and zip."),
 )
-STARTER_EXAMPLE_DIRS = (Path("example_1"), Path("example_2"), Path("example_3"))
+STARTER_EXAMPLE_DIRS = (Path("example_1"), Path("example_2"), Path("example_3"), Path("crystallography"))
 
 
 THEME_PALETTES = {
@@ -110,7 +112,10 @@ class SIGeneratorApp:
         self.input_path = StringVar()
         self.unified_input_docx = StringVar()
         self.input_mode = StringVar(value="separate")
+        self.series_folder = StringVar()
         self.spectra_source = StringVar()
+        self.cif_source = StringVar()
+        self.crystallography_template_docx = StringVar()
         self.spectra_zip = self.spectra_source
         self.template_docx = StringVar()
         self.loadings_schema_docx = StringVar()
@@ -169,6 +174,7 @@ class SIGeneratorApp:
         self.add_loadings_scope_docx = StringVar(value="")
         self.add_input_path = StringVar(value="")
         self.add_spectra_source = StringVar(value="")
+        self.add_cif_source = StringVar(value="")
         self.add_output_docx = StringVar(value="")
         self.add_output_folder = StringVar(value=str(default_output_path().parent))
         self.add_input_kind = StringVar(value="word")
@@ -398,10 +404,18 @@ class SIGeneratorApp:
             variable=self.input_mode,
             value="all_in_one",
         ).pack(side="left", padx=(16, 0))
+        ttk.Radiobutton(input_modes, text="Multiple series", variable=self.input_mode, value="series").pack(side="left", padx=(16, 0))
         self._separate_input_widgets = self._file_row(simple, 2, "Compound table", self.input_path, self._browse_input)
         self._unified_input_widgets = self._file_row(simple, 3, "All-in-one input", self.unified_input_docx, self._browse_unified_input)
-        self._source_row(simple, 4, "Spectra source", self.spectra_source, self._browse_spectra_source, self._browse_spectra_folder)
+        self._spectra_widgets = self._source_row(simple, 4, "Spectra source", self.spectra_source, self._browse_spectra_source, self._browse_spectra_folder)
         self._folder_row(simple, 5, "Output folder", self.output_folder, self._browse_output_folder)
+        self._cif_widgets = self._source_row(simple, 6, "CIF source", self.cif_source,
+                         lambda: self._browse_file(self.cif_source, [("ZIP archives", "*.zip")]),
+                         lambda: self._browse_folder(self.cif_source), optional=True)
+        self._file_row(simple, 7, "Crystallography template .docx", self.crystallography_template_docx,
+                       lambda: self._browse_file(self.crystallography_template_docx, [("Word documents", "*.docx")]), optional=True)
+        self._series_widgets = self._folder_row(simple, 8, "Series folder", self.series_folder,
+                                                lambda: self._browse_folder(self.series_folder))
 
         self._optional_inputs_frame = self._build_optional_inputs_block(content, 1)
         self._loadings_frame = self._build_loadings_block(content, 2)
@@ -726,6 +740,9 @@ class SIGeneratorApp:
         self._file_row(add_box, 10, "New Reaction_schema.docx", self.add_loadings_schema_docx, lambda: self._browse_file(self.add_loadings_schema_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
         self._file_row(add_box, 11, "New Scope.docx", self.add_loadings_scope_docx, lambda: self._browse_file(self.add_loadings_scope_docx, [("Word documents", "*.docx"), ("All files", "*.*")]), optional=True)
         self._folder_row(add_box, 12, "Output folder", self.add_output_folder, self._browse_add_output_folder, optional=True)
+        self._source_row(add_box, 13, "New CIF source", self.add_cif_source,
+                         lambda: self._browse_file(self.add_cif_source, [("ZIP archives", "*.zip")]),
+                         lambda: self._browse_folder(self.add_cif_source), optional=True)
 
     def _build_instructions_page(self, parent: ttk.Frame) -> None:
         page = self._make_page(parent, "instructions")
@@ -1035,6 +1052,26 @@ class SIGeneratorApp:
         ).grid(row=0, column=0, sticky="ew")
 
         contact = self._instruction_block(content, 13, "Contact", "Report a problem or contact the author.")
+        crystals = self._instruction_block(content, 14, "X-ray crystallography", "Optional CIF data, structure pictures and refinement tables.")
+        ttk.Label(crystals, text=(
+            "1. In Generate, choose CIF source: a folder or ZIP with numbered subfolders, e.g. CIF_source/3c/3c.cif.\n"
+            "2. Only include compounds with X-ray data. Other compounds need no CIF; unknown folder numbers stop generation.\n"
+            "3. The default ACS-oriented section contains a structure figure, experimental description and crystal/refinement table.\n"
+            "4. Beside sample.cif, optionally provide sample.json: growth, refinement, ccdc, notes, image, caption and include_geometry.\n"
+            "5. image names an ORTEP PNG/JPEG; caption must state the actual probability level. Without it, the program draws a clearly identified coordinate preview, not thermal ellipsoids.\n"
+            "6. Crystallography template .docx is optional. Start from the downloadable example; keep {Crystal.description}, {Crystal.table} and {Crystal.geometry} in separate paragraphs.\n"
+            "7. Output reports/crystallography stores original CIFs, figures, extracted JSON and individual DOCX reports. Add and Patch preserve these bundles.\n"
+            "8. Local checks do not replace checkCIF. Optional sample.checkcif.pdf imports official alerts; CCDC deposition and responses remain the author's responsibility."
+        ), wraplength=760, justify="left").grid(row=0, column=0, sticky="ew")
+        series = self._instruction_block(content, 15, "Multiple series", "Generate one SI from several methods in one run.")
+        ttk.Label(series, text=(
+            "1. Select Multiple series in Generate, then choose Series folder.\n"
+            "2. Each subfolder is one series. Prefix names with 01_, 02_ etc. to set the order.\n"
+            "3. Each series needs Compound_table.docx. Optional files are SI_template.docx, Reaction_schema.docx, Scope.docx, Spectra_source (folder/ZIP), CIF_source (folder/ZIP) and Crystallography_template.docx.\n"
+            "4. Supply Reaction_schema and Scope together to calculate loadings for that series. Each series can use a different method and Word template.\n"
+            "5. Compound numbers must be unique across all series. Processing settings stay shared.\n"
+            "6. The final output contains the combined SI and the individual series runs. The crystallography example includes a ready Multiple_series folder."
+        ), wraplength=760, justify="left").grid(row=0, column=0, sticky="ew")
         ttk.Label(
             contact,
             text=(
@@ -1283,12 +1320,18 @@ class SIGeneratorApp:
         if not hasattr(self, "_separate_input_widgets"):
             return
         all_in_one = self.input_mode.get() == "all_in_one"
+        series_mode = self.input_mode.get() == "series"
         self._set_grid_widgets_visible(self._journal_profile_widgets, True)
-        self._set_grid_widgets_visible(self._separate_input_widgets, not all_in_one)
+        self._set_grid_widgets_visible(self._separate_input_widgets, not all_in_one and not series_mode)
         self._set_grid_widgets_visible(self._unified_input_widgets, all_in_one)
+        if hasattr(self, "_series_widgets"):
+            self._set_grid_widgets_visible(self._series_widgets, series_mode)
         self._optional_inputs_frame.grid()
-        self._set_grid_widgets_visible(self._si_template_widgets, not all_in_one)
-        if all_in_one:
+        self._set_grid_widgets_visible(self._si_template_widgets, not all_in_one and not series_mode)
+        for name in ("_spectra_widgets", "_cif_widgets"):
+            if hasattr(self, name):
+                self._set_grid_widgets_visible(getattr(self, name), not series_mode)
+        if all_in_one or series_mode:
             self._loadings_frame.grid_remove()
         else:
             self._loadings_frame.grid()
@@ -1626,6 +1669,8 @@ class SIGeneratorApp:
                 output_folder_text=self.add_output_folder.get() or self.output_folder.get(),
                 output_docx_text="",
                 spectra_source_text=self.add_spectra_source.get(),
+                cif_source_text=self.add_cif_source.get(),
+                crystallography_template_text=self.crystallography_template_docx.get(),
                 template_docx_text=self.add_template_docx.get(),
                 references_text="",
                 loadings_schema_docx_text=self.add_loadings_schema_docx.get(),
@@ -1690,8 +1735,11 @@ class SIGeneratorApp:
             input_mode=self.input_mode.get(),
             input_path_text=self.input_path.get(),
             unified_input_text=self.unified_input_docx.get(),
+            series_folder_text=self.series_folder.get(),
             output_docx_text=_output_docx_from_folder(self.output_folder.get(), self.output_docx.get()),
             spectra_source_text=self.spectra_source.get(),
+            cif_source_text=self.cif_source.get(),
+            crystallography_template_text=self.crystallography_template_docx.get(),
             template_docx_text=self.template_docx.get(),
             references_text="",
             loadings_schema_text=self.loadings_schema_docx.get(),
@@ -1934,7 +1982,10 @@ class SIGeneratorApp:
             "input_path": self.input_path,
             "unified_input_docx": self.unified_input_docx,
             "input_mode": self.input_mode,
+            "series_folder": self.series_folder,
             "spectra_source": self.spectra_source,
+            "cif_source": self.cif_source,
+            "crystallography_template_docx": self.crystallography_template_docx,
             "spectra_zip": self.spectra_source,
             "template_docx": self.template_docx,
             "loadings_schema_docx": self.loadings_schema_docx,
@@ -1973,6 +2024,7 @@ class SIGeneratorApp:
             "add_loadings_scope_docx": self.add_loadings_scope_docx,
             "add_input_path": self.add_input_path,
             "add_spectra_source": self.add_spectra_source,
+            "add_cif_source": self.add_cif_source,
             "add_output_docx": self.add_output_docx,
             "add_output_folder": self.add_output_folder,
             "add_input_kind": self.add_input_kind,
@@ -2346,6 +2398,9 @@ def _build_generate_request(
     output_docx_text: str,
     input_mode: str = "separate",
     unified_input_text: str = "",
+    series_folder_text: str = "",
+    cif_source_text: str = "",
+    crystallography_template_text: str = "",
     spectra_source_text: str = "",
     spectra_zip_text: str = "",
     template_docx_text: str = "",
@@ -2378,7 +2433,10 @@ def _build_generate_request(
     journal_profile_text: str = DEFAULT_JOURNAL_PROFILE_ID,
 ) -> GenerateSIRequest:
     unified_input = None
-    if input_mode == "all_in_one":
+    if input_mode == "series":
+        input_path = _required_existing_folder(series_folder_text, "Choose an existing series folder.")
+        spectra_source_text = spectra_zip_text = cif_source_text = template_docx_text = ""
+    elif input_mode == "all_in_one":
         unified_input = _required_existing_file(
             unified_input_text,
             "Choose an existing all-in-one input DOCX.",
@@ -2392,7 +2450,7 @@ def _build_generate_request(
         raise ValueError("Output file must be a .docx file.")
     shared_peak_threshold = _optional_peak_threshold_fraction(peak_threshold_percent_text)
     loadings_schema = loadings_scope = None
-    if generate_loadings and not unified_input:
+    if generate_loadings and not unified_input and input_mode != "series":
         loadings_schema = _optional_existing_file(loadings_schema_text, "Reaction schema .docx", suffixes=(".docx",))
         loadings_scope = _optional_existing_file(loadings_scope_text, "Scope .docx", suffixes=(".docx",))
         if any((loadings_schema, loadings_scope)) and not all((loadings_schema, loadings_scope)):
@@ -2403,6 +2461,9 @@ def _build_generate_request(
         input_kind="word",
         output_path=output_docx,
         unified_input_docx=unified_input,
+        series_folder=input_path if input_mode == "series" else None,
+        cif_source=_optional_spectra_source(cif_source_text),
+        crystallography_template_docx=_optional_existing_file(crystallography_template_text, "Crystallography template", suffixes=(".docx",)),
         spectra_source=_optional_spectra_source(spectra_source_text or spectra_zip_text),
         template_docx=_optional_existing_file(template_docx_text, "SI template .docx", suffixes=(".docx",)),
         references_path=_optional_existing_file(references_text, "References .yml", suffixes=(".yml", ".yaml")),
@@ -2468,6 +2529,8 @@ def _build_add_compounds_request(
     input_path_text: str,
     output_folder_text: str = "",
     output_docx_text: str = "",
+    cif_source_text: str = "",
+    crystallography_template_text: str = "",
     spectra_source_text: str = "",
     template_docx_text: str = "",
     references_text: str = "",
@@ -2520,6 +2583,8 @@ def _build_add_compounds_request(
         output_docx=output_docx,
         output_folder=output_folder,
         method_mode=_validated_add_method_mode(method_mode_text),
+        cif_source=_optional_spectra_source(cif_source_text),
+        crystallography_template_docx=_optional_existing_file(crystallography_template_text, "Crystallography template", suffixes=(".docx",)),
         spectra_source=_optional_spectra_source(spectra_source_text),
         template_docx=_optional_existing_file(template_docx_text, "SI template .docx", suffixes=(".docx",)),
         references_path=_optional_existing_file(references_text, "References .yml", suffixes=(".yml", ".yaml")),
