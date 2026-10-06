@@ -39,27 +39,28 @@ class NmrValidationTests(unittest.TestCase):
 
         self.assertEqual(compound.validation_issues, [])
 
-    def test_symmetry_includes_non_aromatic_ring_carbons(self) -> None:
+    def test_symmetry_does_not_collapse_non_phenyl_ring_carbons(self) -> None:
         smiles = "O=S=Nc1ccccc1C(=O)N1CCCCCC1"
 
-        self.assertEqual(expected_c13_signal_count(smiles, 13), 10)
+        self.assertEqual(expected_c13_signal_count(smiles, 13), 13)
 
-    def test_symmetry_covers_all_carbon_hybridizations(self) -> None:
-        for smiles, atoms, signals in (
-            ("CC", 2, 1), ("CCC", 3, 2), ("CC(C)(C)O", 4, 2),
-            ("CC(=O)C", 3, 2), ("C1CCCCC1", 6, 1),
-            ("C=CC=C", 4, 2), ("CC#CC", 4, 2),
-            ("O=C(O)C(=O)O", 2, 1), ("COC", 2, 1), ("CCO", 2, 2),
+    def test_symmetry_leaves_non_phenyl_carbon_hybridizations_uncorrected(self) -> None:
+        for smiles, atoms in (
+            ("CC", 2), ("CCC", 3), ("CC(C)(C)O", 4),
+            ("CC(=O)C", 3), ("C1CCCCC1", 6),
+            ("C=CC=C", 4), ("CC#CC", 4),
+            ("O=C(O)C(=O)O", 2), ("COC", 2), ("CCO", 2),
         ):
             with self.subTest(smiles=smiles):
-                self.assertEqual(expected_c13_signal_count(smiles, atoms), signals)
+                self.assertEqual(expected_c13_signal_count(smiles, atoms), atoms)
 
     def test_symmetry_preserves_isotopes_and_specified_stereochemistry(self) -> None:
         self.assertEqual(expected_c13_signal_count("[13CH3]C(=O)C", 3), 3)
         self.assertEqual(expected_c13_signal_count("C[C@H](O)CC[C@H](O)C", 6), 6)
 
     def test_symmetry_ignores_atom_map_labels(self) -> None:
-        self.assertEqual(expected_c13_signal_count("[CH3:1][CH3:2]", 2), 1)
+        mapped_benzene = "[cH:1]1[cH:2][cH:3][cH:4][cH:5][cH:6]1"
+        self.assertEqual(expected_c13_signal_count(mapped_benzene, 6), 1)
 
     def test_symmetry_falls_back_for_invalid_or_mismatched_structure(self) -> None:
         for smiles, atoms in (("", 4), ("invalid", 4), ("CC", 5), ("CC", 0)):
@@ -67,21 +68,37 @@ class NmrValidationTests(unittest.TestCase):
                 self.assertEqual(expected_c13_signal_count(smiles, atoms), atoms)
 
     def test_symmetry_counts_assigned_equivalent_atoms_as_one_signal(self) -> None:
-        for peaks in ("70.0, 28.0", "70.0 (C), 28.0 (3C)", "70.0 (C), 28.0 (3 x CH3)"):
+        self.assertEqual(expected_c13_signal_count("CC(C)(C)O", 4), 4)
+        for peaks in ("70.0 (C), 28.0 (3C)", "70.0 (C), 28.0 (3 x CH3)"):
             with self.subTest(peaks=peaks):
                 compound = Compound(number="x", name="tert-Butanol", formula="C4H10O",
                                     smiles="CC(C)(C)O", c13_nmr=peaks)
                 validate_support([compound])
                 self.assertEqual(compound.validation_issues, [])
 
-    def test_symmetry_still_warns_for_extra_or_missing_signals(self) -> None:
+    def test_non_phenyl_symmetry_uses_formula_count_in_warnings(self) -> None:
         for peaks, found in (("70.0", 1), ("70.0, 28.0, 20.0", 3)):
             with self.subTest(peaks=peaks):
                 compound = Compound(number="x", name="tert-Butanol", formula="C4H10O",
                                     smiles="CC(C)(C)O", c13_nmr=peaks)
                 validate_support([compound])
-                self.assertIn(f"C signals expected 2 after molecular symmetry correction (4 C atoms in formula), found {found}",
-                              compound.nmr_check_warning)
+                self.assertIn(f"C expected 4, found {found}", compound.nmr_check_warning)
+
+    def test_phenyl_symmetry_warning_names_the_limited_correction(self) -> None:
+        compound = Compound(
+            number="x",
+            name="Toluene",
+            formula="C7H8",
+            smiles="Cc1ccccc1",
+            c13_nmr="140.0, 130.0, 129.0, 126.0, 21.0, 10.0",
+        )
+
+        validate_support([compound])
+
+        self.assertIn(
+            "C signals expected 5 after phenyl-ring symmetry correction (7 C atoms in formula), found 6",
+            compound.nmr_check_warning,
+        )
 
     def test_13c_validation_falls_back_to_formula_without_structure(self) -> None:
         compound = Compound(

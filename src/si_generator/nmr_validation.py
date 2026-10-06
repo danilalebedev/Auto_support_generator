@@ -204,7 +204,12 @@ def count_c_from_13c_nmr(text: str) -> int:
 
 
 def expected_c13_signal_count(smiles: str, formula_carbon_count: int) -> int:
-    """Estimate carbon environments from graph symmetry, not a shift prediction."""
+    """Apply graph-symmetry correction only to isolated phenyl rings.
+
+    Symmetric aliphatic and other non-phenyl carbons are deliberately counted
+    individually. Their apparent equivalence is too often removed by local
+    stereochemistry or conformation that is not represented in the input graph.
+    """
     if not smiles or formula_carbon_count <= 0:
         return formula_carbon_count
     molecule = Chem.MolFromSmiles(smiles)
@@ -220,13 +225,35 @@ def expected_c13_signal_count(smiles: str, formula_carbon_count: int) -> int:
         includeIsotopes=True,
         includeAtomMaps=False,
     )
-    return len({symmetry_classes[atom.GetIdx()] for atom in carbon_atoms})
+    rings = molecule.GetRingInfo().AtomRings()
+    ring_memberships = {
+        atom.GetIdx(): sum(atom.GetIdx() in ring for ring in rings)
+        for atom in molecule.GetAtoms()
+    }
+    phenyl_carbons: set[int] = set()
+    for ring in rings:
+        if len(ring) != 6:
+            continue
+        if not all(
+            molecule.GetAtomWithIdx(index).GetAtomicNum() == 6
+            and molecule.GetAtomWithIdx(index).GetIsAromatic()
+            and ring_memberships[index] == 1
+            for index in ring
+        ):
+            continue
+        phenyl_carbons.update(ring)
+
+    if not phenyl_carbons:
+        return formula_carbon_count
+    non_phenyl_count = len(carbon_atoms) - len(phenyl_carbons)
+    phenyl_signal_count = len({symmetry_classes[index] for index in phenyl_carbons})
+    return non_phenyl_count + phenyl_signal_count
 
 
 def _c13_count_mismatch_text(formula_carbons: int, expected_signals: int, found_signals: int) -> str:
     if expected_signals < formula_carbons:
         return (
-            f"C signals expected {expected_signals} after molecular symmetry correction "
+            f"C signals expected {expected_signals} after phenyl-ring symmetry correction "
             f"({formula_carbons} C atoms in formula), found {found_signals}"
         )
     return f"C expected {expected_signals}, found {found_signals}"
