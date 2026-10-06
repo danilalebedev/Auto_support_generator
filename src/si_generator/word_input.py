@@ -393,7 +393,7 @@ def _map_row(headers: list[str], values: list[str]) -> dict[str, str]:
         elif "hrms" in key:
             result["hrms_label"] = _hrms_label_from_header(header)
             result["hrms_found"] = _first_number(value)
-            adduct = re.search(r"\[M[+-][A-Za-z0-9]+\]\+", header)
+            adduct = re.search(r"\[M[+-][A-Za-z0-9]+\]\+", f"{header} {value}")
             if adduct:
                 result.setdefault("hrms_adduct", adduct.group(0))
         elif key in {"mp", "meltingpoint"}:

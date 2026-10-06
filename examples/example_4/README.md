@@ -5,9 +5,9 @@ This example contains 28 compounds: **2g, 2h, 2k, 3a-3w, 5, and 6**. It demonstr
 ## Input files
 
 - `All_in_one_input.docx`: combined Compound table, Reaction schema, Scope, SI template, and Crystallography template.
-- `Compound_table.docx`: author-provided methods and analytical data with ChemDraw structures at their original 100% size.
-- `Reaction_schema.docx` and `Scope.docx`: editable precursor/product structures and measured masses for all compounds.
-- `SI_template.docx`: Times New Roman 14 pt with zero paragraph spacing between the product heading, structure anchor, and method.
+- `Compound_table.docx`: exactly seven fields (`number`, `structure`, `color`, `mp`, `Rf`, `HRMS`, and `Elemental_analysis`) with ChemDraw structures at their original 100% size.
+- `Reaction_schema.docx` and `Scope.docx`: range-selected reaction schemes plus editable precursor/product structures and measured masses for all compounds.
+- `SI_template.docx`: all range-selected general methods in one place, followed by the shared compound template in Times New Roman 14 pt with zero paragraph spacing.
 - `Spectra_source.zip`: one primary raw 1H and 13C experiment for every compound.
 - `Additional_spectra.zip`: optional 19F, coupled 13C, and minor-diastereomer experiments retained separately.
 - `CIF_source`: CIF, ORTEP, metadata, and available checkCIF files for the compounds with X-ray data.

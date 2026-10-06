@@ -14,10 +14,13 @@ import time
 import zipfile
 
 from docx import Document
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.section import WD_ORIENT, WD_SECTION
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
+from lxml import etree
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -84,6 +87,176 @@ PRECURSOR_SMILES = {
     "3v": "CCOC(=O)C1[C@H](c2ccc(C)cc2)[C@@H](C(=O)OCC)C12C(=O)c1ccccc1C2=O",
 }
 
+YLIDE_SMILES = {
+    "4a": "C[S+](C)[C-]C(=O)c1ccccc1",
+    "4b": "C[S+](C)[C-]C(=O)c1ccccc1OC",
+    "4c": "C[S+](C)[C-]C(=O)c1ccc(OC)cc1",
+    "4d": "C[S+](C)[C-]C(=O)c1ccc(Cl)cc1",
+    "4e": "C[S+](C)[C-]C(=O)c1cccs1",
+    "4g": "CCOC(=O)[C-][S+](C)C",
+}
+
+METHOD_TEMPLATES = (
+    (
+        "2g, 2h, 2k",
+        "Cyclopropane {Product.number} was obtained from {Reagent_1.name} "
+        "({Reagent_1.mg} mg, {Reagent_1.mmol} mmol), trimethylsulfoxonium iodide "
+        "({Sulfoxonium.mg} mg, {Sulfoxonium.mmol} mmol) and NaH (60% dispersion in mineral oil; "
+        "{NaH.mg} mg, {NaH.mmol} mmol) in DMF ({Solvent_DMF.ml} mL) according to the general "
+        "procedure. Yield {Product.mg} mg ({Product.yield.percent}); {Product.appearance}; "
+        "mp {Product.mp} °C. Rf = {Product.rf.value} ({Product.rf.system}).",
+    ),
+    (
+        "3a-3i, 3k-3o",
+        "Cyclobutane {Product.number} was obtained from {Reagent_1.name} "
+        "({Reagent_1.mg} mg, {Reagent_1.mmol} mmol) and {Reagent_2.name} "
+        "({Reagent_2.mg} mg, {Reagent_2.mmol} mmol) in DCE ({Solvent_DCE.ml} mL) according to "
+        "General procedure A. Yield {Product.mg} mg ({Product.yield.percent}); "
+        "{Product.appearance}; mp {Product.mp} °C. Rf = {Product.rf.value} ({Product.rf.system}).",
+    ),
+    (
+        "3j",
+        "Cyclobutane {Product.number} was obtained from {Reagent_1.name} "
+        "({Reagent_1.mg} mg, {Reagent_1.mmol} mmol) and {Reagent_2.name} "
+        "({Reagent_2.mg} mg, {Reagent_2.mmol} mmol) in DMF ({Solvent_DMF.ml} mL) according to "
+        "modified General procedure A. Yield {Product.mg} mg ({Product.yield.percent}); "
+        "{Product.appearance}; mp {Product.mp} °C. Rf = {Product.rf.value} ({Product.rf.system}).",
+    ),
+    (
+        "3p, 3r-3u",
+        "Cyclobutane {Product.number} was obtained from {Reagent_1.name} "
+        "({Reagent_1.mg} mg, {Reagent_1.mmol} mmol) and {Reagent_2.name} "
+        "({Reagent_2.mg} mg, {Reagent_2.mmol} mmol) in DCM ({Solvent_DCM.ml} mL) according to "
+        "General procedure B. Yield {Product.mg} mg "
+        "({Product.yield.percent}); {Product.appearance}; mp {Product.mp} °C. "
+        "Rf = {Product.rf.value} ({Product.rf.system}).",
+    ),
+    (
+        "3q",
+        "Cyclobutane {Product.number} was obtained from {Reagent_1.name} "
+        "({Reagent_1.mg} mg, {Reagent_1.mmol} mmol) and {Reagent_2.name} "
+        "({Reagent_2.mg} mg, {Reagent_2.mmol} mmol) in DCE ({Solvent_DCE.ml} mL) according to "
+        "General procedure B. Yield {Product.mg} mg "
+        "({Product.yield.percent}); {Product.appearance}; mp {Product.mp} °C. "
+        "Rf = {Product.rf.value} ({Product.rf.system}).",
+    ),
+    (
+        "3v",
+        "Cyclobutane {Product.number} was obtained from {Reagent_1.name} "
+        "({Reagent_1.mg} mg, {Reagent_1.mmol} mmol) and {Reagent_2.name} "
+        "({Reagent_2.mg} mg, {Reagent_2.mmol} mmol) in DCM ({Solvent_DCM.ml} mL) according to "
+        "General procedure D. Yield {Product.mg} mg ({Product.yield.percent}); "
+        "{Product.appearance}; mp {Product.mp} °C. Rf = {Product.rf.value} ({Product.rf.system}).",
+    ),
+    (
+        "3w",
+        "Cyclobutane {Product.number} was obtained from {Reagent_1.name} "
+        "({Reagent_1.mg} mg, {Reagent_1.mmol} mmol) and {Reagent_2.name} "
+        "({Reagent_2.mg} mg, {Reagent_2.mmol} mmol) in DCE ({Solvent_DCE.ml} mL) according to "
+        "General procedure D. Yield {Product.mg} mg ({Product.yield.percent}); "
+        "{Product.appearance}; mp {Product.mp} °C. Rf = {Product.rf.value} ({Product.rf.system}).",
+    ),
+    (
+        "5",
+        "Compound {Product.number} was obtained from {Reagent_1.name} "
+        "({Reagent_1.mg} mg, {Reagent_1.mmol} mmol), (4-chlorophenyl)boronic acid "
+        "({Boronic_acid.mg} mg, {Boronic_acid.mmol} mmol), Na2CO3 ({Na2CO3.mg} mg, "
+        "{Na2CO3.mmol} mmol) and Pd(dppf)Cl2 ({Pd_dppf_Cl2.mg} mg, {Pd_dppf_Cl2.mmol} mmol) "
+        "in dioxane ({Solvent_dioxane.ml} mL) and water ({Solvent_water.ml} mL). "
+        "Yield {Product.mg} mg ({Product.yield.percent}); {Product.appearance}; "
+        "mp {Product.mp} °C. Rf = {Product.rf.value} ({Product.rf.system}).",
+    ),
+    (
+        "6",
+        "Compound {Product.number} was obtained from {Reagent_1.name} "
+        "({Reagent_1.mg} mg, {Reagent_1.mmol} mmol), phenylhydrazine "
+        "({Phenylhydrazine.mg} mg, {Phenylhydrazine.mmol} mmol) and acetic acid "
+        "({AcOH.mg} mg, {AcOH.mmol} mmol) in ethanol ({Solvent_EtOH.ml} mL). "
+        "Yield {Product.mg} mg ({Product.yield.percent}); {Product.appearance}; "
+        "mp {Product.mp} °C. Rf = {Product.rf.value} ({Product.rf.system}).",
+    ),
+)
+
+REACTION_SCHEMAS = (
+    (
+        "2g, 2h, 2k",
+        (
+            ("Reagent_1", "1", "", "", ""),
+            ("Sulfoxonium", "1.3", "220.07", "", ""),
+            ("NaH", "1.1", "40.00", "", ""),
+            ("Solvent_DMF", "", "", "", "0.2"),
+        ),
+    ),
+    (
+        "3a-3i, 3k-3o",
+        (
+            ("Reagent_1", "1", "", "", ""),
+            ("Reagent_2", "1.5", "", "", ""),
+            ("Solvent_DCE", "", "", "", "0.5"),
+        ),
+    ),
+    (
+        "3j",
+        (
+            ("Reagent_1", "1", "", "", ""),
+            ("Reagent_2", "2.4", "", "", ""),
+            ("Solvent_DMF", "", "", "", "0.2"),
+        ),
+    ),
+    (
+        "3p, 3r-3u",
+        (
+            ("Reagent_1", "1", "", "", ""),
+            ("Reagent_2", "1.5", "", "", ""),
+            ("Solvent_DCM", "", "", "", "0.5"),
+        ),
+    ),
+    (
+        "3q",
+        (
+            ("Reagent_1", "1", "", "", ""),
+            ("Reagent_2", "1.5", "", "", ""),
+            ("Solvent_DCE", "", "", "", "0.5"),
+        ),
+    ),
+    (
+        "3v",
+        (
+            ("Reagent_1", "1", "", "", ""),
+            ("Reagent_2", "2.5", "", "", ""),
+            ("Solvent_DCM", "", "", "", "0.5"),
+        ),
+    ),
+    (
+        "3w",
+        (
+            ("Reagent_1", "1", "", "", ""),
+            ("Reagent_2", "2.5", "", "", ""),
+            ("Solvent_DCE", "", "", "", "0.5"),
+        ),
+    ),
+    (
+        "5",
+        (
+            ("Reagent_1", "1", "", "", ""),
+            ("Boronic_acid", "1.2", "156.38", "", ""),
+            ("Na2CO3", "3", "105.99", "", ""),
+            ("Pd_dppf_Cl2", "0.02", "731.70", "", ""),
+            ("Solvent_dioxane", "", "", "", "1"),
+            ("Solvent_water", "", "", "", "1"),
+        ),
+    ),
+    (
+        "6",
+        (
+            ("Reagent_1", "1", "", "", ""),
+            ("Phenylhydrazine", "1.1", "108.14", "", ""),
+            ("AcOH", "0.33", "60.05", "", ""),
+            ("Solvent_EtOH", "", "", "", "0.3"),
+        ),
+    ),
+)
+
 
 def clean(text: str) -> str:
     return " ".join(text.split())
@@ -104,11 +277,48 @@ def set_normal(document: Document) -> None:
         border.getparent().remove(border)
 
 
+def _set_cell_margins(cell, *, top: int, start: int, bottom: int, end: int) -> None:
+    properties = cell._tc.get_or_add_tcPr()
+    margins = properties.first_child_found_in("w:tcMar")
+    if margins is None:
+        margins = OxmlElement("w:tcMar")
+        properties.append(margins)
+    for edge, value in (("top", top), ("start", start), ("bottom", bottom), ("end", end)):
+        node = margins.find(qn(f"w:{edge}"))
+        if node is None:
+            node = OxmlElement(f"w:{edge}")
+            margins.append(node)
+        node.set(qn("w:w"), str(value))
+        node.set(qn("w:type"), "dxa")
+
+
+def _normalize_table_ole_styles(document: Document) -> None:
+    for shape in document._element.xpath(
+        './/*[local-name()="tbl"]//*[local-name()="object"]//*[local-name()="shape"]'
+    ):
+        style = str(shape.get("style") or "")
+        width = re.search(r"(?:^|;)width:([^;]+)", style)
+        height = re.search(r"(?:^|;)height:([^;]+)", style)
+        if width and height:
+            shape.set("style", f"width:{width.group(1)};height:{height.group(1)}")
+
+
 def make_si_template(path: Path) -> None:
     document = Document(REPO / "src/si_generator/templates/SI_template.docx")
     for paragraph in list(document.paragraphs):
         if "{Reagent_" in paragraph.text or paragraph.text == "{reaction.loadings}":
             paragraph._p.getparent().remove(paragraph._p)
+    first_paragraph = document.paragraphs[0]._p
+    definitions: list[tuple[str, bool]] = []
+    for selector, template in METHOD_TEMPLATES:
+        definitions.append((f"[AUTO SI: METHOD {selector}]", True))
+        definitions.append((template, False))
+    definitions.append(("[AUTO SI: COMPOUND TEMPLATE]", True))
+    for text, bold in definitions:
+        paragraph = document.add_paragraph(text)
+        if paragraph.runs:
+            paragraph.runs[0].bold = bold
+        first_paragraph.addprevious(paragraph._p)
     set_normal(document)
     for paragraph in document.paragraphs:
         paragraph.paragraph_format.space_before = Pt(0)
@@ -222,11 +432,32 @@ def _compound_block(paragraphs, number: str, start: int, end: int) -> dict[str, 
     if not yield_match:
         raise ValueError(f"Could not determine product mass and yield for {number}")
 
+    appearance_match = re.search(
+        r"\b((?:(?:light|pale|dark)[- ]?)?(?:white|yellow|orange|brown|green|colorless|cream|yellowish)"
+        r"(?:[- ][a-z]+)?\s+(?:solid|oil|powder|foam))\b",
+        preparation,
+        flags=re.IGNORECASE,
+    )
+    melting_point_match = re.search(
+        r"\b(?:m\.?p\.?|mp)\s*=?\s*([\d]+(?:\s*[\u2013-]\s*[\d]+)?)\s*°?\s*C",
+        preparation,
+        flags=re.IGNORECASE,
+    )
+    rf_match = re.search(
+        r"\bRf\s*=\s*([\d.]+(?:\s+and\s+[\d.]+)?)\.?\s*\(([^)]+)\)",
+        preparation,
+        flags=re.IGNORECASE,
+    )
+    reagent_2_match = re.search(r"\b(4[a-g])\b", preparation, flags=re.IGNORECASE)
+
     return {
         "number": number,
         "name": name,
         "structure_index": structure_index,
         "preparation": preparation,
+        "appearance": appearance_match.group(1) if appearance_match else "",
+        "melting_point": melting_point_match.group(1).replace(" ", "") if melting_point_match else "",
+        "rf": f"{rf_match.group(1).rstrip('.')} ({rf_match.group(2)})" if rf_match else "",
         "hrms_found": found_match.group(1) if found_match else "",
         "hrms_adduct": adduct_match.group(0) if adduct_match else "[M+H]+",
         "ir": ir,
@@ -234,6 +465,7 @@ def _compound_block(paragraphs, number: str, start: int, end: int) -> dict[str, 
         "extra_nmr": "\n".join(extras),
         "precursor": precursor,
         "precursor_smiles": PRECURSOR_SMILES[precursor],
+        "reagent_2": reagent_2_match.group(1).lower() if reagent_2_match else "",
         "precursor_mass_mg": precursor_mass_mg,
         "product_mass_mg": float(yield_match.group(1)),
         "reported_yield_percent": float(yield_match.group(2)),
@@ -255,31 +487,22 @@ def make_compound_table(source_path: Path, output: Path) -> list[dict[str, objec
     set_normal(document)
     section = document.sections[-1]
     section.orientation = WD_ORIENT.LANDSCAPE
-    section.page_width, section.page_height = Inches(16.54), Inches(11.69)
-    section.left_margin = section.right_margin = Inches(0.6)
-    section.top_margin = section.bottom_margin = Inches(0.6)
+    section.page_width, section.page_height = Inches(11.69), Inches(8.27)
+    section.left_margin = section.right_margin = Inches(0.5)
+    section.top_margin = section.bottom_margin = Inches(0.5)
     for paragraph in section.header.paragraphs + section.footer.paragraphs:
         paragraph.clear()
 
-    document.add_heading("Complete NMR and crystallography example", 0)
-    document.add_paragraph(
-        "All available preparation and analytical data are retained from the supplied Supporting Information. "
-        "The primary 1H and 13C NMR reports and appendix images are generated from Spectra_source.zip. "
-        "CIF data are attached only to compounds for which an author-provided structure is available."
-    )
     headers = (
-        "Number",
-        "Structure",
-        "Name",
-        "Formula",
-        "Preparation",
-        "HRMS (ESI-TOF) m/z",
-        "HRMS adduct",
-        "IR",
-        "Anal",
-        "Extra NMR",
+        "number",
+        "structure",
+        "color",
+        "mp",
+        "Rf",
+        "HRMS",
+        "Elemental_analysis",
     )
-    widths = [Inches(value) for value in (0.5, 2.0, 1.8, 0.8, 3.85, 0.7, 0.7, 1.8, 0.8, 2.1)]
+    widths = [Inches(value) for value in (0.55, 2.2, 1.1, 0.8, 2.5, 1.25, 2.2)]
     table = document.add_table(rows=1, cols=len(headers))
     table.style = "Table Grid"
     table.autofit = False
@@ -294,14 +517,11 @@ def make_compound_table(source_path: Path, output: Path) -> list[dict[str, objec
         values = (
             block["number"],
             "",
-            block["name"],
-            "",
-            block["preparation"],
-            block["hrms_found"],
-            block["hrms_adduct"],
-            block["ir"],
+            block["appearance"],
+            block["melting_point"],
+            block["rf"],
+            f"{block['hrms_adduct']} {block['hrms_found']}".strip(),
             block["analysis"],
-            block["extra_nmr"],
         )
         for cell, value in zip(row.cells, values):
             cell.text = str(value)
@@ -309,15 +529,20 @@ def make_compound_table(source_path: Path, output: Path) -> list[dict[str, objec
         row.cells[1].paragraphs[0].add_run()._r.append(structure)
 
     for row_index, row in enumerate(table.rows):
-        for cell, width in zip(row.cells, widths):
+        row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        for column_index, (cell, width) in enumerate(zip(row.cells, widths)):
             cell.width = width
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            _set_cell_margins(cell, top=45, start=55, bottom=45, end=55)
             for paragraph in cell.paragraphs:
-                paragraph.paragraph_format.space_after = Pt(3)
+                paragraph.paragraph_format.space_after = Pt(0)
                 paragraph.paragraph_format.line_spacing = 1.0
                 paragraph.paragraph_format.keep_with_next = False
+                if row_index == 0 or column_index in {0, 2, 3, 5}:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 for run in paragraph.runs:
                     run.font.name = "Times New Roman"
-                    run.font.size = Pt(9)
+                    run.font.size = Pt(10)
                     run.font.hidden = False
                     run.font.color.rgb = RGBColor(0, 0, 0)
                     run.bold = row_index == 0
@@ -325,33 +550,49 @@ def make_compound_table(source_path: Path, output: Path) -> list[dict[str, objec
     final = document.add_section(WD_SECTION.NEW_PAGE)
     final.orientation = WD_ORIENT.PORTRAIT
     final.page_width, final.page_height = Inches(8.27), Inches(11.69)
+    final.left_margin = final.right_margin = Inches(0.7)
+    final.top_margin = final.bottom_margin = Inches(0.7)
+    _normalize_table_ole_styles(document)
     document.save(output)
 
     metadata = extract_structure_metadata_by_row(output)
-    reopened = Document(output)
-    formula_column = headers.index("Formula")
     for row_index, block in enumerate(blocks, start=2):
         formula = metadata.get(row_index)
         if formula is None or not formula.formula:
             raise ValueError(f"Could not extract formula from structure for {block['number']}")
-        reopened.tables[0].cell(row_index - 1, formula_column).text = formula.formula
         block["formula"] = formula.formula
         block["smiles"] = formula.smiles
-    reopened.save(output)
     return blocks
 
 
 def make_reaction_schema(path: Path) -> None:
     document = Document()
     set_normal(document)
-    document.add_heading("Reaction schema", level=1)
-    table = document.add_table(rows=2, cols=5)
-    table.style = "Table Grid"
     headers = ("Reagents", "equiv.", "MW, g/mol", "Density, g/ml", "Concentration, M")
-    for cell, text in zip(table.rows[0].cells, headers):
-        cell.text = text
-    for cell, text in zip(table.rows[1].cells, ("Reagent_1", "1", "", "", "")):
-        cell.text = text
+    for block_index, (selector, rows) in enumerate(REACTION_SCHEMAS):
+        marker = document.add_paragraph(f"[AUTO SI: REACTION {selector}]")
+        marker.runs[0].bold = True
+        table = document.add_table(rows=1, cols=5)
+        table.style = "Table Grid"
+        for cell, text in zip(table.rows[0].cells, headers):
+            cell.text = text
+        for values in rows:
+            row = table.add_row()
+            for cell, text in zip(row.cells, values):
+                cell.text = text
+        if block_index + 1 < len(REACTION_SCHEMAS):
+            document.add_paragraph()
+    for table in document.tables:
+        for row_index, row in enumerate(table.rows):
+            row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+            for cell in row.cells:
+                _set_cell_margins(cell, top=40, start=55, bottom=40, end=55)
+                for paragraph in cell.paragraphs:
+                    paragraph.paragraph_format.space_after = Pt(0)
+                    for run in paragraph.runs:
+                        run.font.name = "Times New Roman"
+                        run.font.size = Pt(10)
+                        run.bold = row_index == 0
     document.save(path)
 
 
@@ -360,6 +601,17 @@ def _insert_reagent_oles(scope_path: Path, blocks: list[dict[str, object]]) -> N
     import win32com.client as win32
     from rdkit import Chem
     from rdkit.Chem import AllChem
+
+    def paste_chemdraw_object(chemical_document, cell_range) -> None:
+        for attempt in range(5):
+            chemical_document.Objects.Copy()
+            time.sleep(0.15 + attempt * 0.15)
+            try:
+                cell_range.PasteSpecial(DataType=0)
+                return
+            except Exception:
+                if attempt == 4:
+                    raise
 
     with TemporaryDirectory(prefix="asg_scope_reagents_") as temporary:
         molecule_paths: dict[str, Path] = {}
@@ -374,6 +626,17 @@ def _insert_reagent_oles(scope_path: Path, blocks: list[dict[str, object]]) -> N
             molecule_path = Path(temporary) / f"{precursor}.mol"
             Chem.MolToMolFile(molecule, str(molecule_path))
             molecule_paths[precursor] = molecule_path
+        for block in blocks:
+            reagent_2 = str(block["reagent_2"])
+            if not reagent_2 or reagent_2 in molecule_paths:
+                continue
+            molecule = Chem.MolFromSmiles(YLIDE_SMILES[reagent_2])
+            if molecule is None:
+                raise ValueError(f"Could not parse second-reagent structure {reagent_2}")
+            AllChem.Compute2DCoords(molecule)
+            molecule_path = Path(temporary) / f"{reagent_2}.mol"
+            Chem.MolToMolFile(molecule, str(molecule_path))
+            molecule_paths[reagent_2] = molecule_path
         for block in blocks:
             if str(block["number"]) != "3v":
                 continue
@@ -406,22 +669,22 @@ def _insert_reagent_oles(scope_path: Path, blocks: list[dict[str, object]]) -> N
             for row_index, block in enumerate(blocks, start=2):
                 chem_document = chem_draw.Documents.Open(str(molecule_paths[str(block["precursor"])]))
                 try:
-                    chem_document.Objects.Copy()
-                    time.sleep(0.05)
                     cell_range = table.Cell(row_index, 1).Range
                     cell_range.End -= 1
                     cell_range.Text = ""
-                    for attempt in range(3):
-                        try:
-                            cell_range.PasteSpecial(DataType=0)
-                            break
-                        except Exception:
-                            if attempt == 2:
-                                raise
-                            chem_document.Objects.Copy()
-                            time.sleep(0.3)
+                    paste_chemdraw_object(chem_document, cell_range)
                 finally:
                     chem_document.Close(False)
+                reagent_2 = str(block["reagent_2"])
+                if reagent_2:
+                    chem_document = chem_draw.Documents.Open(str(molecule_paths[reagent_2]))
+                    try:
+                        cell_range = table.Cell(row_index, 3).Range
+                        cell_range.End -= 1
+                        cell_range.Text = ""
+                        paste_chemdraw_object(chem_document, cell_range)
+                    finally:
+                        chem_document.Close(False)
                 if row_index % 6 == 0:
                     word_document.Save()
             for row_index, block in enumerate(blocks, start=2):
@@ -429,12 +692,10 @@ def _insert_reagent_oles(scope_path: Path, blocks: list[dict[str, object]]) -> N
                     continue
                 chem_document = chem_draw.Documents.Open(str(molecule_paths["product_3v"]))
                 try:
-                    chem_document.Objects.Copy()
-                    time.sleep(0.1)
-                    cell_range = table.Cell(row_index, 3).Range
+                    cell_range = table.Cell(row_index, 5).Range
                     cell_range.End -= 1
                     cell_range.Text = ""
-                    cell_range.PasteSpecial(DataType=0)
+                    paste_chemdraw_object(chem_document, cell_range)
                 finally:
                     chem_document.Close(False)
             word_document.Save()
@@ -457,15 +718,21 @@ def make_scope(source_path: Path, blocks: list[dict[str, object]], output: Path)
     source_paragraphs = list(document.paragraphs)
     document._body.clear_content()
     set_normal(document)
-    document.add_heading("Compound scope", level=1)
+    section = document.sections[-1]
+    section.orientation = WD_ORIENT.LANDSCAPE
+    section.page_width, section.page_height = Inches(11.69), Inches(8.27)
+    section.left_margin = section.right_margin = Inches(0.5)
+    section.top_margin = section.bottom_margin = Inches(0.5)
     headers = (
         "Reagent_1",
         "Mass of Reagent_1, mg",
+        "Reagent_2",
+        "Mass of Reagent_2, mg",
         "Product",
         "Product_number",
         "Mass of product, mg",
     )
-    widths = [Inches(value) for value in (1.55, 1.25, 1.85, 0.9, 1.25)]
+    widths = [Inches(value) for value in (1.65, 1.15, 1.65, 1.15, 1.9, 0.9, 1.2)]
     table = document.add_table(rows=1, cols=len(headers))
     table.style = "Table Grid"
     table.autofit = False
@@ -477,6 +744,8 @@ def make_scope(source_path: Path, blocks: list[dict[str, object]], output: Path)
             "",
             f"{float(block['precursor_mass_mg']):g}",
             "",
+            "",
+            "",
             str(block["number"]),
             f"{float(block['product_mass_mg']):g}",
         )
@@ -484,7 +753,7 @@ def make_scope(source_path: Path, blocks: list[dict[str, object]], output: Path)
             cell.text = value
         if str(block["number"]) != "3v":
             product = deepcopy(source_paragraphs[int(block["structure_index"])]._p.xpath(".//w:object")[0])
-            row.cells[2].paragraphs[0].add_run()._r.append(product)
+            row.cells[4].paragraphs[0].add_run()._r.append(product)
 
     for row_index, row in enumerate(table.rows):
         for cell, width in zip(row.cells, widths):
@@ -498,13 +767,19 @@ def make_scope(source_path: Path, blocks: list[dict[str, object]], output: Path)
                     run.bold = row_index == 0
     document.save(output)
     _insert_reagent_oles(output, blocks)
+    normalized = Document(output)
+    _normalize_table_ole_styles(normalized)
+    normalized.save(output)
 
     metadata = extract_structure_metadata_by_cell(output)
     for row_index, block in enumerate(blocks, start=2):
         reagent = metadata.get((1, row_index, 1))
-        product = metadata.get((1, row_index, 3))
+        reagent_2 = metadata.get((1, row_index, 3))
+        product = metadata.get((1, row_index, 5))
         if reagent is None or not reagent.formula:
             raise ValueError(f"Scope is missing the precursor structure for {block['number']}")
+        if block["reagent_2"] and (reagent_2 is None or not reagent_2.formula):
+            raise ValueError(f"Scope is missing Reagent_2 for {block['number']}")
         if product is None or product.formula != block.get("formula"):
             raise ValueError(f"Scope product structure differs from the compound table for {block['number']}")
 
@@ -583,6 +858,41 @@ def _write_crystallography(source: Document, cif_root: Path, root: Path) -> dict
     return result
 
 
+def _strip_word_comments(path: Path) -> None:
+    with zipfile.ZipFile(path, "r") as source:
+        entries = {item.filename: source.read(item.filename) for item in source.infolist()}
+    for name in list(entries):
+        if name.startswith("word/comments"):
+            entries.pop(name)
+            continue
+        if not name.endswith((".xml", ".rels")):
+            continue
+        try:
+            root = etree.fromstring(entries[name])
+        except etree.XMLSyntaxError:
+            continue
+        changed = False
+        for element in list(root.iter()):
+            local_name = etree.QName(element).localname
+            should_remove = local_name in {"commentRangeStart", "commentRangeEnd", "commentReference"}
+            if local_name == "Relationship" and "comments" in str(element.get("Target") or ""):
+                should_remove = True
+            if local_name == "Override" and "comments" in str(element.get("PartName") or ""):
+                should_remove = True
+            if should_remove and element.getparent() is not None:
+                element.getparent().remove(element)
+                changed = True
+        if changed:
+            entries[name] = etree.tostring(
+                root, xml_declaration=True, encoding="UTF-8", standalone=True
+            )
+    temporary = path.with_suffix(".comments-cleaned.docx")
+    with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as output:
+        for name, payload in entries.items():
+            output.writestr(name, payload)
+    temporary.replace(path)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-docx", required=True, type=Path)
@@ -608,6 +918,15 @@ def main() -> None:
         si_template=root / "SI_template.docx",
         crystallography_template=root / "Crystallography_template.docx",
     )
+    for filename in (
+        "Compound_table.docx",
+        "Reaction_schema.docx",
+        "Scope.docx",
+        "SI_template.docx",
+        "Crystallography_template.docx",
+        "All_in_one_input.docx",
+    ):
+        _strip_word_comments(root / filename)
 
     coverage = _write_spectra_archives(
         args.fid_zip,

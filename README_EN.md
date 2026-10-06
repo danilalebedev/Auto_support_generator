@@ -6,7 +6,7 @@ Generate accepts an optional **CIF source** folder/ZIP with compound-number subf
 
 An optional sidecar JSON supplies crystal-growth/refinement text, CCDC, an external ORTEP image/caption and geometry-table selection. Without an external image, the program makes a labelled coordinate preview, not a thermal-ellipsoid plot. A custom crystallography template may be selected separately or embedded in all-in-one DOCX. Local checks do not replace official checkCIF or CCDC deposition. The default ACS-oriented DOCX is a house template, not an official publisher form.
 
-Raw Bruker HSQC, HMBC, COSY, NOESY, TOCSY and ROESY experiments are detected from acquisition metadata. Version A uses separately processed 1H/13C external projections, independent 8% trace sizes, contour scaling 4.0 and `ppm` labels on both axes; the 13C projection uses Bernstein baseline correction of order 3.
+Raw Bruker HSQC, HMBC, COSY, NOESY, TOCSY and ROESY experiments are detected from acquisition metadata. Version A uses separately processed 1H/13C external projections, independent 8% trace sizes, contour scaling 4.0 and isotope-labelled `1H / ppm` and `13C / ppm` axes; the 13C projection uses Bernstein baseline correction of order 3.
 
 **Multiple series** assembles a folder of series, each with its own Compound_table, optional SI_template and Reaction_schema/Scope. Processing settings are shared; compound numbers must be unique. See the [field reference and requirements](docs/crystallography.md) and [complete runnable example](examples/example_4). Existing installer binaries have not been rebuilt for these source changes.
 
@@ -211,7 +211,7 @@ The first product row supplies the reaction at the top, with named reagents abov
 
 The `scope` folder contains editable CDXML, native ChemDraw PNG previews and saved layout data. The PNG overview appears before characterization in Word. Patch updates the overview without NMR processing; Add extends the same series or keeps new methods separate. Installed ChemDraw is required. Turning the option off skips scope generation entirely.
 
-Each numbered example contains the editable input files and a `Reference_output.docx` generated with **Show scope** enabled. Start with [example_1](examples/example_1), or use [example_4](examples/example_4) for the complete NMR/X-ray workflow.
+Each numbered example contains the editable input files and a `Reference_output.docx` generated with **Show scope** enabled. Start with [example_1](examples/example_1), use [example_4](examples/example_4) for the complete NMR/X-ray workflow, or [example_5](examples/example_5) for real HSQC/HMBC processing.
 
 ## Processing
 
@@ -253,7 +253,7 @@ Spectra_source/
 
 Inner experiment names may vary; acquisition metadata identifies 1H and 13C. Top-level compound numbers must match Compound table.
 
-Raw 2D experiment folders contain `ser`. Acquisition metadata identifies HSQC, HMBC, COSY, NOESY, TOCSY and ROESY. Version A uses external 1H/13C projections (8% each), contour scaling 4.0 and `ppm` on both axes; HSQC/HMBC use 13C vertically, while homonuclear experiments use 1H on both axes.
+Raw 2D experiment folders contain `ser`. Acquisition metadata identifies HSQC, HMBC, COSY, NOESY, TOCSY and ROESY. Version A uses external 1H/13C projections (8% each), contour scaling 4.0 and isotope-labelled axes; HSQC/HMBC use 13C vertically, while homonuclear experiments use 1H on both axes.
 
 ## Check
 
@@ -324,6 +324,7 @@ The repository and **Instructions → Example files** include base and extended 
 | [`examples/example_2`](examples/example_2) | Series continuation, compounds 2e–2f. |
 | [`examples/example_3`](examples/example_3) | New method, compounds 3a, 3b, 3c, 3d, 3i; Spectra source folder and zip. |
 | [`examples/example_4`](examples/example_4) | Complete all-in-one example with 28 compounds, editable scope, raw 1H/13C for every compound and X-ray data for the available subset. |
+| [`examples/example_5`](examples/example_5) | Five benzodiazepinones with raw 1H/13C for every compound and real HSQC/HMBC experiments for 4a and 4b. |
 
 Every set uses GUI-matching names and includes a `Reference_output.docx` generated with **Show scope**.
 

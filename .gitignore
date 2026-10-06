@@ -16,6 +16,7 @@ processed_spectra/
 processed_mnova/
 mnova_reports/
 .local_examples/
+.qa/
 examples/example_*/_build/
 
 *.tmp

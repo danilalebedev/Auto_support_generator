@@ -145,7 +145,7 @@ Spectra_source/
       2a.cif
 ```
 
-Acquisition metadata определяет HSQC, HMBC, COSY, NOESY, TOCSY и ROESY. В режиме Version A верхняя проекция берётся из отдельно обработанного 1H, вертикальная проекция HSQC/HMBC — из 13C, а для гомоядерных 2D обе проекции — из 1H. Размеры проекций независимы и занимают по 8% поля, contour scaling равен 4.0; 13C-проекция получает Bernstein baseline correction порядка 3. Обе оси подписываются `ppm`. Результаты сохраняются в приложении спектров вместе с редактируемыми Mnova-файлами.
+Acquisition metadata определяет HSQC, HMBC, COSY, NOESY, TOCSY и ROESY. В режиме Version A верхняя проекция берётся из отдельно обработанного 1H, вертикальная проекция HSQC/HMBC — из 13C, а для гомоядерных 2D обе проекции — из 1H. Размеры проекций независимы и занимают по 8% поля, contour scaling равен 4.0; 13C-проекция получает Bernstein baseline correction порядка 3. Оси подписываются `1H / ppm` и `13C / ppm`. Результаты сохраняются в приложении спектров вместе с редактируемыми Mnova-файлами.
 
 CIF можно подавать отдельным необязательным полем **CIF source** в Generate; старое размещение `Spectra_source/<номер>/cif` также поддерживается. Обработка встроена в программу и не требует отдельного `run.ps1`.
 
@@ -272,7 +272,7 @@ si-procedure-import method.docx -o procedure_inputs --variable "bromide 2a" --pr
 
 В `scope` сохраняются редактируемые `.cdxml`, PNG и данные для дальнейших изменений. Word содержит нативную PNG-визуализацию ChemDraw перед описаниями соединений. Patch обновляет состав и номера scope без обработки спектров, Add расширяет его или создаёт отдельную схему для новой методики. Требуется установленный ChemDraw; при выключенной галочке блок не создаётся.
 
-Каждый нумерованный пример содержит редактируемые входные файлы и `Reference_output.docx`, сгенерированный с включённой опцией **Show scope**. Начните с [example_1](examples/example_1), а полный NMR/РСА workflow показан в [example_4](examples/example_4).
+Каждый нумерованный пример содержит редактируемые входные файлы и `Reference_output.docx`, сгенерированный с включённой опцией **Show scope**. Начните с [example_1](examples/example_1), полный NMR/РСА workflow показан в [example_4](examples/example_4), а обработка реальных HSQC/HMBC показана в [example_5](examples/example_5).
 
 ## Processing
 
@@ -390,6 +390,7 @@ Patch использует уже обработанные PNG и Mnova OLE и �
 | [`examples/example_2`](examples/example_2) | Продолжение серии, соединения 2e–2f. |
 | [`examples/example_3`](examples/example_3) | Новая методика, соединения 3a, 3b, 3c, 3d, 3i; Spectra source как папка и zip. |
 | [`examples/example_4`](examples/example_4) | Полный all-in-one пример: 28 соединений, редактируемый scope, raw 1H/13C для каждого и РСА для доступного поднабора. |
+| [`examples/example_5`](examples/example_5) | Пять бензодиазепинонов: raw 1H/13C для всех соединений и реальные HSQC/HMBC для 4a и 4b. |
 
 Во всех папках используются имена, совпадающие с полями GUI, и есть `Reference_output.docx`, сгенерированный с **Show scope**.
 

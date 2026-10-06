@@ -63,12 +63,15 @@ INSTRUCTION_TEMPLATE_FILES = (
     ("Example 4 - Compound table", Path("example_4") / "Compound_table.docx", "Author methods, 100% ChemDraw structures and analytical data for 28 compounds."),
     ("Example 4 - Scope", Path("example_4") / "Scope.docx", "Editable precursor/product structures and measured masses for all 28 compounds."),
     ("Example 4 - Crystallography template", Path("example_4") / "Crystallography_template.docx", "Editable crystallography section headings, description, table and optional geometry."),
+    ("Example 5 - All-in-one input", Path("example_5") / "All_in_one_input.docx", "Five benzodiazepinones with a shared GP3 method and real HSQC/HMBC data for 4a and 4b."),
+    ("Example 5 - Complete folder", Path("example_5"), "Raw 1H/13C spectra for 4a-4e, optional real 2D spectra, editable scope and a generated reference output."),
 )
 STARTER_EXAMPLE_DIRS = (
     Path("example_1"),
     Path("example_2"),
     Path("example_3"),
     Path("example_4"),
+    Path("example_5"),
 )
 
 
@@ -973,6 +976,7 @@ class SIGeneratorApp:
                 "- example_2/All_in_one_input.docx: compact two-product example.\n"
                 "- example_3/All_in_one_input.docx: a different method with two variable reagents.\n"
                 "- example_4/All_in_one_input.docx: 28 compounds with raw NMR, editable scope and optional crystallography data.\n"
+                "- example_5/All_in_one_input.docx: five benzodiazepinones with real HSQC/HMBC processing.\n"
                 "- Open or copy them from Example files below. Replace values and structures, but preserve section labels and table headers."
             ),
             wraplength=760,
@@ -1055,7 +1059,7 @@ class SIGeneratorApp:
                 "- Inside each compound folder: raw Bruker 1D experiment folders containing fid and optional 2D experiment folders containing ser.\n"
                 "- Folder names inside each compound can be arbitrary.\n\n"
                 "Detection\n"
-                "- Acquisition metadata identifies 1H, 13C, HSQC, HMBC, COSY, NOESY, TOCSY and ROESY; 2D axes are labelled ppm.\n"
+                "- Acquisition metadata identifies 1H, 13C, HSQC, HMBC, COSY, NOESY, TOCSY and ROESY; 2D axes are labelled 1H / ppm and 13C / ppm where applicable.\n"
                 "- Version A uses separately processed 1H/13C external projections, independent 8% trace sizes and contour scaling 4.0. HSQC/HMBC use 13C vertically; homonuclear spectra use 1H on both axes.\n"
                 "- The 13C projection is prepared with Bernstein baseline correction, polynomial order 3.\n"
                 "- Compound numbers in spectra source and compound table must be identical."
@@ -1222,7 +1226,7 @@ class SIGeneratorApp:
             "7. Tables use centered columns, top/bottom rules and automatic Table S1, S2, etc. captions. Add and Patch update the sequence.\n"
             "8. Output reports/crystallography stores original CIFs, figures, extracted JSON and individual DOCX reports. Add and Patch preserve these bundles.\n"
             "9. Local checks do not replace checkCIF. Optional sample.checkcif.pdf imports official alerts; CCDC deposition and responses remain the author's responsibility.\n"
-            "10. Ready example: example_4 contains 28 compounds, raw NMR, CIF/ORTEP files, embedded templates and a generated reference DOCX."
+            "10. Ready examples: example_4 covers complete NMR/X-ray processing; example_5 demonstrates real HSQC/HMBC output."
         ), wraplength=760, justify="left").grid(row=0, column=0, sticky="ew")
         series = self._instruction_block(content, 15, "Multiple series", "Generate one SI from several methods in one run.")
         ttk.Label(series, text=(

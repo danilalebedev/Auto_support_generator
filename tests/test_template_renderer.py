@@ -15,6 +15,37 @@ from si_generator.render.document_model import build_si_document_model
 
 
 class TemplateRendererTests(unittest.TestCase):
+    def test_method_definition_blocks_are_not_rendered_as_compound_content(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            template = root / "template.docx"
+            output = root / "support.docx"
+            document = Document()
+            document.add_paragraph("[AUTO SI: METHOD 2a-2c]")
+            document.add_paragraph("Definition uses {Reagent_1.mg} mg.")
+            document.add_paragraph("[AUTO SI: COMPOUND TEMPLATE]")
+            document.add_paragraph("{Product.name} ({Product.number})")
+            document.add_paragraph("{Product.preparation}")
+            document.save(template)
+
+            compound = Compound(
+                id="cmp_001",
+                number="2b",
+                name="Example compound",
+                preparation="Selected preparation.",
+            )
+            build_document_from_model(
+                build_si_document_model([compound], spectra_embed_mode="none"),
+                output,
+                template_path=template,
+            )
+            text = "\n".join(paragraph.text for paragraph in Document(output).paragraphs)
+
+        self.assertIn("Example compound (2b)", text)
+        self.assertIn("Selected preparation.", text)
+        self.assertNotIn("AUTO SI", text)
+        self.assertNotIn("Definition uses", text)
+
     def test_journal_template_renders_prepared_method_without_hardcoded_reagents(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "support.docx"

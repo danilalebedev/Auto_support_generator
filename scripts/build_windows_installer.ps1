@@ -114,6 +114,7 @@ Copy-Item -LiteralPath (Join-Path $root "examples\example_1") -Destination (Join
 Copy-Item -LiteralPath (Join-Path $root "examples\example_2") -Destination (Join-Path $payloadExamplesDir "example_2") -Recurse
 Copy-Item -LiteralPath (Join-Path $root "examples\example_3") -Destination (Join-Path $payloadExamplesDir "example_3") -Recurse
 Copy-Item -LiteralPath (Join-Path $root "examples\example_4") -Destination (Join-Path $payloadExamplesDir "example_4") -Recurse
+Copy-Item -LiteralPath (Join-Path $root "examples\example_5") -Destination (Join-Path $payloadExamplesDir "example_5") -Recurse
 $payloadDocsAssets = Join-Path $payloadDir "docs\assets"
 New-Item -ItemType Directory -Force -Path $payloadDocsAssets | Out-Null
 Copy-Item -LiteralPath (Join-Path $root "docs\assets\gui_overview.png") -Destination (Join-Path $payloadDocsAssets "gui_overview.png")

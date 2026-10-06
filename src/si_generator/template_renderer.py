@@ -21,6 +21,12 @@ from .domain.ir import parse_ir_block
 from .domain.massspec import build_hrms_block, hrms_adduct_text, hrms_found_text, hrms_label_text
 from .domain.references import format_reference
 from .domain.reactions import calculate_reaction_loadings
+from .method_selectors import (
+    COMPOUND_TEMPLATE_MARKER,
+    MethodSelectorError,
+    is_compound_template_marker,
+    method_selector,
+)
 from .mnova_ole import MnovaOleTarget, embed_mnova_ole_objects, preview_size_pt
 from .render.si_document import DocumentBlock, SIDocument
 from .runtime_paths import bundled_resource_path
@@ -93,11 +99,23 @@ def _split_template_segments(document: DocumentObject) -> dict[str, list[Paragra
             continue
         pages[-1].append(paragraph)
 
+    compound_paragraphs = _compound_template_paragraphs(pages[0] if pages else [])
     return {
-        "compound": pages[0] if pages else [],
+        "compound": compound_paragraphs,
         "appendix_1h": pages[1] if len(pages) > 1 else [],
         "appendix_13c": pages[2] if len(pages) > 2 else (pages[1] if len(pages) > 1 else []),
     }
+
+
+def _compound_template_paragraphs(paragraphs: list[Paragraph]) -> list[Paragraph]:
+    if not any(method_selector(paragraph.text) is not None for paragraph in paragraphs):
+        return paragraphs
+    for index, paragraph in enumerate(paragraphs):
+        if is_compound_template_marker(paragraph.text):
+            return paragraphs[index + 1 :]
+    raise MethodSelectorError(
+        f"Method-aware SI template must contain {COMPOUND_TEMPLATE_MARKER}."
+    )
 
 
 def _paragraph_has_page_break(paragraph: Paragraph) -> bool:

@@ -1,4 +1,5 @@
 import copy
+from contextlib import nullcontext
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -13,12 +14,15 @@ from rdkit import Chem
 from rdkit.Chem import rdDepictor
 
 from si_generator.domain.compound import Compound
+from si_generator.domain.loadings_workflow import SchemaEntry, ScopeRow
 from si_generator.domain.requests import GenerateSIRequest
 from si_generator.graph.nodes.scope_graphic import generate_scope_graphic_node
 from si_generator.scope_graphic.document import insert_overview
 from si_generator.scope_graphic.layout import Canvas, align, copy_ring_fills, make_page, parse, transform
 from si_generator.scope_graphic.lifecycle import update_model, refresh_patch
-from si_generator.scope_graphic.generator import write_model
+from si_generator.method_selectors import parse_selector
+from si_generator.scope_graphic.generator import generate, write_model
+from si_generator.structure_metadata import StructureMetadata
 from si_generator.gui import _build_generate_request
 
 
@@ -88,6 +92,82 @@ def test_long_scope_is_split_without_losing_products(tmp_path):
         root = parse((tmp_path / page["cdxml"]).read_text())
         labels += [e.text for e in root.findall("page/t/s") if e.text.isdigit()]
     assert labels == [str(i) for i in range(25)]
+
+
+def test_multiple_reaction_schemas_use_only_their_reagent_columns(tmp_path):
+    compounds = [
+        Compound(number="4a", name="First", id="first", yield_text="70%"),
+        Compound(number="5", name="Second", id="second", yield_text="80%"),
+        Compound(number="4b", name="Third", id="third", yield_text="75%"),
+    ]
+    rows = [
+        ScopeRow(
+            product_number="4a",
+            product_mass_mg=10,
+            product=StructureMetadata(),
+            reagent_cells={"Reagent_1": (1, 2, 1), "Reagent_2": (1, 2, 3)},
+            product_cell=(1, 2, 5),
+        ),
+        ScopeRow(
+            product_number="5",
+            product_mass_mg=10,
+            product=StructureMetadata(),
+            reagent_cells={"Reagent_1": (1, 3, 1), "Reagent_2": (1, 3, 3)},
+            product_cell=(1, 3, 5),
+        ),
+        ScopeRow(
+            product_number="4b",
+            product_mass_mg=10,
+            product=StructureMetadata(),
+            reagent_cells={"Reagent_1": (1, 4, 1), "Reagent_2": (1, 4, 3)},
+            product_cell=(1, 4, 5),
+        ),
+    ]
+    schemas = [
+        (
+            parse_selector("4a-4b"),
+            {
+                "Reagent_1": SchemaEntry("Reagent_1", "Reagent_1", 1),
+                "Reagent_2": SchemaEntry("Reagent_2", "Reagent_2", 1),
+            },
+        ),
+        (
+            parse_selector("5"),
+            {"Reagent_1": SchemaEntry("Reagent_1", "Reagent_1", 1)},
+        ),
+    ]
+    cdx = {
+        (1, 2, 1): "r1a",
+        (1, 2, 3): "r2a",
+        (1, 2, 5): "p1",
+        (1, 3, 1): "r1b",
+        (1, 3, 5): "p2",
+        (1, 4, 1): "r1c",
+        (1, 4, 3): "r2c",
+        (1, 4, 5): "p3",
+    }
+    captured = {}
+
+    def save_model(data, output, app):
+        captured.update(data)
+        return Path(output) / "scope_graphic.json"
+
+    with (
+        patch("si_generator.scope_graphic.generator.read_scope", return_value=rows),
+        patch("si_generator.scope_graphic.generator.read_reaction_schemas", return_value=schemas),
+        patch("si_generator.scope_graphic.generator._extract_cdx_by_cell", return_value=cdx),
+        patch("si_generator.scope_graphic.generator.chemdraw", return_value=nullcontext(object())),
+        patch("si_generator.scope_graphic.generator.cdx_to_xml", side_effect=lambda _app, value: value),
+        patch("si_generator.scope_graphic.generator.write_model", side_effect=save_model),
+    ):
+        generate(compounds, tmp_path / "Scope.docx", tmp_path / "Reaction_schema.docx", tmp_path)
+
+    assert [len(series["reaction"]["reactants"]) for series in captured["series"]] == [2, 1]
+    assert [len(series["products"][0]["reactants"]) for series in captured["series"]] == [2, 1]
+    assert [[product["number"] for product in series["products"]] for series in captured["series"]] == [
+        ["4a", "4b"],
+        ["5"],
+    ]
 
 
 def test_cdxml_contains_unique_ids_labels_yields_and_unchanged_chemistry():

@@ -8,6 +8,7 @@ from si_generator.domain.spectra_config import build_spectra_config, build_spect
 from si_generator.graph.compound_store import make_compound_store
 from si_generator.graph.nodes.spectra import plan_nmr_processing_node
 from si_generator.mnova import _format_task_line, _render_spec_arg
+from si_generator.nmr_fill import _formula_hydrogen_count
 from si_generator.domain.compound import Compound
 
 
@@ -67,6 +68,11 @@ class MnovaRenderSpecTests(unittest.TestCase):
     def test_empty_render_spec_is_empty_json_object(self) -> None:
         self.assertEqual(_render_spec_arg(None), "{}")
         self.assertEqual(_render_spec_arg({}), "{}")
+
+    def test_formula_hydrogen_count_supplies_mnova_normalization_target(self) -> None:
+        self.assertEqual(_formula_hydrogen_count("C17H18N2O2"), 18)
+        self.assertEqual(_formula_hydrogen_count("C6D6"), 0)
+        self.assertEqual(_formula_hydrogen_count("invalid"), 0)
 
     def test_example_mngp_profiles_are_available_per_nucleus(self) -> None:
         expected = [MNGP_STYLES / "classic_1H.mngp", MNGP_STYLES / "classic_13C.mngp"]
@@ -177,6 +183,11 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertIn("_targetSignalHeightFraction(renderSpec", script)
         self.assertIn("_peakThresholdFraction(nucleus, renderSpec", script)
         self.assertIn("_filterMultipletReportByPeakThreshold", script)
+        self.assertIn("function _normalizeProtonIntegrals(spectrum, renderSpec, statusPath)", script)
+        self.assertIn("list.normValue = total / expectedHydrogens", script)
+        self.assertIn("spectrum.setMultiplets(multiplets)", script)
+        self.assertIn("spectrum.setIntegrals(integrals)", script)
+        self.assertIn("expected_hydrogen_count", script)
         self.assertIn("_isIgnoredByRenderSpec(delta, renderSpec", script)
         self.assertIn("_applyGraphicsProfileDefault(graphicsProfilePath, statusPath);", script)
         self.assertIn("_prepareSpectrumForExport(spectrum, nucleus, tasks[i].renderSpec || {}, tasks[i].graphicsProfilePath || \"\", statusPath)", script)
@@ -195,8 +206,8 @@ class MnovaRenderSpecTests(unittest.TestCase):
         self.assertIn("function _twoDimensionalContourScaling(renderSpec)", script)
         self.assertIn("function _twoDimensionalTraceSize(renderSpec, orientation)", script)
         self.assertIn("spectrum.updateTraces();", script)
-        self.assertIn('"axes.horizontal.label", "ppm"', script)
-        self.assertIn('"axes.vertical.label", "ppm"', script)
+        self.assertIn('"axes.horizontal.label", "1H / ppm"', script)
+        self.assertIn('"axes.vertical.label", _twoDimensionalVerticalNucleus(nucleus) + " / ppm"', script)
         self.assertLess(
             script.index("_fitVerticalScaleForImage(spectrum, nucleus, renderSpec || {});"),
             script.index("_filterPeaksForImage(spectrum, nucleus, renderSpec || {});", script.index("function _prepareSpectrumForExport")),

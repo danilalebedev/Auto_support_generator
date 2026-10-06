@@ -432,6 +432,199 @@ function _configureBaselineProcessing(processing, nucleus, renderSpec, statusPat
     return true;
 }
 
+function _annotationRange(annotation, isIntegral)
+{
+    var left, right;
+    try {
+        if (isIntegral) {
+            left = Number(annotation.rangeMin(1));
+            right = Number(annotation.rangeMax(1));
+        } else {
+            left = Number(annotation.rangeMin);
+            right = Number(annotation.rangeMax);
+        }
+    } catch (e) {
+        return null;
+    }
+    if (isNaN(left) || isNaN(right)) {
+        return null;
+    }
+    return [Math.min(left, right), Math.max(left, right)];
+}
+
+function _excludedProtonAnnotation(spectrum, annotation, isIntegral, renderSpec)
+{
+    var range = _annotationRange(annotation, isIntegral);
+    var center, solvent, reference, excluded, i;
+    if (!range) {
+        return false;
+    }
+    center = (range[0] + range[1]) / 2;
+    if (_isIgnoredByRenderSpec(center, renderSpec || {})) {
+        return true;
+    }
+    solvent = String(spectrum.solvent || "").toLowerCase();
+    reference = solvent.indexOf("dmso") >= 0 ? 2.50 : 7.26;
+    excluded = [reference];
+    if (solvent.indexOf("dmso") >= 0) {
+        excluded.push(3.33);
+    } else {
+        excluded.push(1.56);
+        excluded.push(1.77);
+    }
+    for (i = 0; i < excluded.length; i++) {
+        if (excluded[i] >= range[0] - 0.02 && excluded[i] <= range[1] + 0.02) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function _normalizeAnnotationListToHydrogenCount(spectrum, list, expectedHydrogens, isIntegral, renderSpec, forceNormalization)
+{
+    var total = 0;
+    var currentTotal = 0;
+    var deviation, annotation, value, i;
+    var entries = [];
+    if (!list || !list.count || expectedHydrogens <= 0) {
+        return false;
+    }
+    for (i = 0; i < list.count; i++) {
+        annotation = list.at(i);
+        if (_excludedProtonAnnotation(spectrum, annotation, isIntegral, renderSpec || {})) {
+            continue;
+        }
+        try {
+            value = Number(annotation.integralValue(1.0));
+        } catch (e) {
+            value = 0;
+        }
+        if (!isNaN(value) && value > 0) {
+            total += value;
+            entries.push({annotation: annotation, value: value, assigned: 0, scaled: 0});
+            if (!isIntegral && Number(annotation.nH) > 0) {
+                currentTotal += Number(annotation.nH);
+            }
+        }
+    }
+    if (total <= 0) {
+        return false;
+    }
+    if (isIntegral || currentTotal <= 0) {
+        currentTotal = Number(list.normValue) > 0 ? total / Number(list.normValue) : 0;
+    }
+    deviation = currentTotal > 0 ? Math.abs(currentTotal - expectedHydrogens) / expectedHydrogens : 1;
+    if (!forceNormalization && deviation < 0.15) {
+        return false;
+    }
+    list.normValue = total / expectedHydrogens;
+    if (!isIntegral && expectedHydrogens >= entries.length) {
+        _assignMultipletHydrogens(entries, expectedHydrogens, total);
+    }
+    return true;
+}
+
+function _assignMultipletHydrogens(entries, expectedHydrogens, total)
+{
+    var assignedTotal = 0;
+    var i, bestIndex, bestScore;
+    for (i = 0; i < entries.length; i++) {
+        entries[i].scaled = entries[i].value * expectedHydrogens / total;
+        entries[i].assigned = Math.max(1, Math.floor(entries[i].scaled));
+        assignedTotal += entries[i].assigned;
+    }
+    while (assignedTotal < expectedHydrogens) {
+        bestIndex = -1;
+        bestScore = -Infinity;
+        for (i = 0; i < entries.length; i++) {
+            if (entries[i].scaled - entries[i].assigned > bestScore) {
+                bestScore = entries[i].scaled - entries[i].assigned;
+                bestIndex = i;
+            }
+        }
+        if (bestIndex < 0) {
+            break;
+        }
+        entries[bestIndex].assigned++;
+        assignedTotal++;
+    }
+    while (assignedTotal > expectedHydrogens) {
+        bestIndex = -1;
+        bestScore = -Infinity;
+        for (i = 0; i < entries.length; i++) {
+            if (entries[i].assigned > 1 && entries[i].assigned - entries[i].scaled > bestScore) {
+                bestScore = entries[i].assigned - entries[i].scaled;
+                bestIndex = i;
+            }
+        }
+        if (bestIndex < 0) {
+            break;
+        }
+        entries[bestIndex].assigned--;
+        assignedTotal--;
+    }
+    for (i = 0; i < entries.length; i++) {
+        entries[i].annotation.nH = entries[i].assigned;
+    }
+}
+
+function _normalizeProtonIntegrals(spectrum, renderSpec, statusPath)
+{
+    var expectedHydrogens = Number(renderSpec ? renderSpec.expected_hydrogen_count : 0);
+    var multiplets, integrals, multipletsChanged, integralsChanged;
+    if (!expectedHydrogens || expectedHydrogens <= 0) {
+        return;
+    }
+    try {
+        multiplets = new Multiplets(spectrum.multiplets());
+        multipletsChanged = _normalizeAnnotationListToHydrogenCount(
+            spectrum, multiplets, expectedHydrogens, false, renderSpec || {}, false
+        );
+        if (multipletsChanged) {
+            spectrum.setMultiplets(multiplets);
+        }
+    } catch (multipletError) {
+        if (statusPath) {
+            _appendText(statusPath, "WARNING proton multiplet normalization failed: " + multipletError + "\n");
+        }
+    }
+    try {
+        integrals = new Integrals(spectrum.integrals());
+        integralsChanged = _normalizeAnnotationListToHydrogenCount(
+            spectrum, integrals, expectedHydrogens, true, renderSpec || {}, false
+        );
+        if (integralsChanged) {
+            spectrum.setIntegrals(integrals);
+        }
+    } catch (integralError) {
+        if (statusPath) {
+            _appendText(statusPath, "WARNING proton integral normalization failed: " + integralError + "\n");
+        }
+    }
+    if (multipletsChanged && !integralsChanged && integrals) {
+        integralsChanged = _normalizeAnnotationListToHydrogenCount(
+            spectrum, integrals, expectedHydrogens, true, renderSpec || {}, true
+        );
+        if (integralsChanged) {
+            spectrum.setIntegrals(integrals);
+        }
+    } else if (integralsChanged && !multipletsChanged && multiplets) {
+        multipletsChanged = _normalizeAnnotationListToHydrogenCount(
+            spectrum, multiplets, expectedHydrogens, false, renderSpec || {}, true
+        );
+        if (multipletsChanged) {
+            spectrum.setMultiplets(multiplets);
+        }
+    }
+    if (multipletsChanged || integralsChanged) {
+        spectrum.process();
+        spectrum.update();
+        if (statusPath) {
+            _appendText(statusPath, "INTEGRAL_NORMALIZATION 1H target=" + expectedHydrogens + " multiplets=" + Boolean(multipletsChanged) + " integrals=" + Boolean(integralsChanged) + "\n");
+        }
+    }
+}
+
 function _processForReport(spectrum, nucleus, sensitivity, doReference, peakOnlyPass, renderSpec, statusPath)
 {
     var p = new NMRProcessing(spectrum.proc);
@@ -462,6 +655,9 @@ function _processForReport(spectrum, nucleus, sensitivity, doReference, peakOnly
     p.setParameter("integration.apply", true);
     p.setParameter("Mult.Apply", true);
     spectrum.process(p);
+    if (nucleus === "1H") {
+        _normalizeProtonIntegrals(spectrum, renderSpec || {}, statusPath);
+    }
     spectrum.update();
 }
 
@@ -929,8 +1125,8 @@ function _prepareTwoDimensionalSpectrumForExport(spectrum, nucleus, renderSpec, 
     _setSpectrumProperty(spectrum, "axes.vertical.units", "ppm", statusPath);
     _setSpectrumProperty(spectrum, "axes.horizontal.showlabel", true, statusPath);
     _setSpectrumProperty(spectrum, "axes.vertical.showlabel", true, statusPath);
-    _setSpectrumProperty(spectrum, "axes.horizontal.label", "ppm", statusPath);
-    _setSpectrumProperty(spectrum, "axes.vertical.label", "ppm", statusPath);
+    _setSpectrumProperty(spectrum, "axes.horizontal.label", "1H / ppm", statusPath);
+    _setSpectrumProperty(spectrum, "axes.vertical.label", _twoDimensionalVerticalNucleus(nucleus) + " / ppm", statusPath);
     try {
         spectrum.updateTraces();
     } catch (e) {

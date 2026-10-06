@@ -14,7 +14,9 @@ from si_generator.domain.loadings_workflow import (
     _amount_from_equivalents,
     apply_loadings_workflow,
     read_characterization_template,
+    read_characterization_templates,
     read_reaction_schema,
+    read_reaction_schemas,
     read_scope,
 )
 from si_generator.domain.requests import GenerateSIRequest
@@ -652,6 +654,73 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertEqual(compound.reaction["source"], "loadings_workflow")
         self.assertEqual(compound.reaction["template_values"]["product.name"], "Example")
         self.assertTrue(compound.yield_text)
+
+    def test_multiple_method_selectors_choose_schema_and_template_by_compound_number(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            schema_path = root / "Reaction_schema.docx"
+            schema_doc = Document()
+            for selector, catalyst, reagent_mw, catalyst_equiv, catalyst_mw in (
+                ("1a", "Catalyst_A", "100", "0.1", "50"),
+                ("2a-2c", "Catalyst_B", "200", "0.2", "75"),
+            ):
+                schema_doc.add_paragraph(f"[AUTO SI: REACTION {selector}]")
+                table = schema_doc.add_table(rows=1, cols=5)
+                for index, header in enumerate(
+                    ["Reagents", "equiv.", "MW, g/mol", "Density, g/ml", "Concentration, M"]
+                ):
+                    table.rows[0].cells[index].text = header
+                for values in (
+                    ("Reagent_1", "1", reagent_mw, "", ""),
+                    (catalyst, catalyst_equiv, catalyst_mw, "", ""),
+                ):
+                    cells = table.add_row().cells
+                    for index, value in enumerate(values):
+                        cells[index].text = value
+            schema_doc.save(schema_path)
+
+            scope_path = root / "Scope.docx"
+            scope_doc = Document()
+            scope_table = scope_doc.add_table(rows=1, cols=5)
+            for index, header in enumerate(
+                ["Reagent_1", "Mass of Reagent_1, mg", "Product", "Product_number", "Mass of product, mg"]
+            ):
+                scope_table.rows[0].cells[index].text = header
+            for number, mass in (("1a", "100"), ("2b", "200")):
+                cells = scope_table.add_row().cells
+                for index, value in enumerate(("", mass, "", number, "")):
+                    cells[index].text = value
+            scope_doc.save(scope_path)
+
+            template_path = root / "SI_template.docx"
+            template_doc = Document()
+            template_doc.add_paragraph("[AUTO SI: METHOD 1a]")
+            template_doc.add_paragraph("Method A used {Catalyst_A.mg} mg of Catalyst_A.")
+            template_doc.add_paragraph("[AUTO SI: METHOD 2a-2c]")
+            template_doc.add_paragraph("Method B used {Catalyst_B.mg} mg of Catalyst_B.")
+            template_doc.add_paragraph("[AUTO SI: COMPOUND TEMPLATE]")
+            template_doc.add_paragraph("{Product.name} ({Product.number})")
+            template_doc.add_paragraph("{Product.preparation}")
+            template_doc.save(template_path)
+
+            compounds = [Compound(number="1a", name="First"), Compound(number="2b", name="Second")]
+            issues = apply_loadings_workflow(
+                compounds,
+                root,
+                paths=LoadingsWorkflowPaths(schema_path, scope_path, template_path),
+                structure_names_by_cell={},
+            )
+
+            schemas = read_reaction_schemas(schema_path)
+            templates = read_characterization_templates(template_path)
+
+        self.assertEqual(issues, [])
+        self.assertEqual(len(schemas), 2)
+        self.assertEqual(len(templates), 2)
+        self.assertIn("Method A used 5 mg", compounds[0].preparation)
+        self.assertIn("Method B used 15 mg", compounds[1].preparation)
+        self.assertAlmostEqual(compounds[0].reaction["target_mmol"], 1.0)
+        self.assertAlmostEqual(compounds[1].reaction["target_mmol"], 1.0)
 
     def test_loadings_workflow_does_not_depend_on_render_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

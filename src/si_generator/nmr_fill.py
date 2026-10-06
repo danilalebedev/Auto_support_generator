@@ -52,6 +52,10 @@ def fill_nmr_from_mnova(
             single_mnova_path = processed_root / compound.number / f"{compound.number}_1H.mnova"
             compound.h1_image_path = str(image_path)
             compound.h1_mnova_path = str(single_mnova_path)
+            h1_render_spec = dict(compound_specs.get("1H", {}))
+            expected_hydrogens = _formula_hydrogen_count(compound.formula)
+            if expected_hydrogens:
+                h1_render_spec["expected_hydrogen_count"] = expected_hydrogens
             tasks.append(
                 MnovaTask(
                     compound.number,
@@ -59,7 +63,7 @@ def fill_nmr_from_mnova(
                     h1_source,
                     image_path,
                     mnova_path,
-                    dict(compound_specs.get("1H", {})),
+                    h1_render_spec,
                     single_mnova_path,
                     mnova_graphics_profile_1h,
                 )
@@ -272,6 +276,15 @@ def _resolve_path(value: str, base_dir: Path) -> Path:
     if path.is_absolute():
         return path
     return (base_dir / path).resolve()
+
+
+def _formula_hydrogen_count(formula: str) -> int:
+    if not formula:
+        return 0
+    try:
+        return int(parse_formula(formula).get("H", 0))
+    except ValueError:
+        return 0
 
 
 def _parse_mnova_report(report: str, nucleus: str) -> tuple[str, str]:

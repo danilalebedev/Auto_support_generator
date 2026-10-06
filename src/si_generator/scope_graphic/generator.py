@@ -4,7 +4,8 @@ import json
 import re
 from pathlib import Path
 
-from ..domain.loadings_workflow import read_scope, read_reaction_schema, _limiting_mmol
+from ..domain.loadings_workflow import read_scope, read_reaction_schemas, _limiting_mmol
+from ..method_selectors import select_for_compound
 from ..chemdraw_names import _extract_cdx_by_cell
 from .layout import make_page
 from .native import chemdraw, cdx_to_xml, render_png
@@ -28,7 +29,7 @@ def yield_label(compound, row, schema):
 
 def generate(compounds, scope_path, schema_path, output_dir, conditions="", title="Reaction and compound scope"):
     rows = read_scope(scope_path, structure_names_by_cell={})
-    schema = read_reaction_schema(schema_path)
+    schemas = read_reaction_schemas(schema_path)
     row_map = {r.product_number: r for r in rows}
     numbers = [c.number for c in compounds]
     if len(row_map) != len(rows) or set(row_map) != set(numbers):
@@ -37,41 +38,91 @@ def generate(compounds, scope_path, schema_path, output_dir, conditions="", titl
     if not compounds:
         raise ValueError("Scope graphic requires at least one compound.")
     cdx = _extract_cdx_by_cell(Path(scope_path), set())
-    first = row_map[numbers[0]]
-    keys = sorted(first.reagent_cells, key=lambda k: int(k.split("_")[-1]))
-    if not keys:
-        raise ValueError("Scope.docx must contain at least one Reagent_i structure for the reaction.")
-    missing = [k for k in keys if first.reagent_cells[k] not in cdx]
-    if missing:
-        raise ValueError("Scope reaction: missing ChemDraw OLE structure for " + ", ".join(missing))
-    named = [entry.label for key, entry in schema.items()
-             if not re.fullmatch(r"Reagent_\d+", key) and not key.startswith("Solvent_")]
-    solvents = [entry.label.removeprefix("Solvent_") for key, entry in schema.items() if key.startswith("Solvent_")]
-    missing_solvents = [s for s in solvents if s.lower() not in conditions.lower()]
-    conditions = ", ".join([*missing_solvents, conditions.strip()]).strip(", ")
-    reagents = [", ".join(named)] if named else []
-    if len(reagents[0] if reagents else "") > 55:
-        reagents = named
-    model = {"version": 1, "title": title, "conditions": conditions, "products": [], "reaction": {}}
+    schema_indexes = [(selector, index) for index, (selector, _schema) in enumerate(schemas)]
+    grouped: list[tuple[int, list]] = []
+    group_by_schema: dict[int, list] = {}
+    for compound in compounds:
+        schema_index = select_for_compound(schema_indexes, compound.number)
+        if schema_index is None:
+            raise ValueError(f"Scope reaction: no reaction schema includes compound {compound.number}.")
+        group = group_by_schema.get(schema_index)
+        if group is None:
+            group = []
+            group_by_schema[schema_index] = group
+            grouped.append((schema_index, group))
+        group.append(compound)
+
+    series_models = []
     with chemdraw() as app:
-        for compound in compounds:
-            row = row_map[compound.number]
-            if row.product_cell not in cdx:
-                raise ValueError(f"Scope: compound {compound.number} has no editable product structure.")
-            # A scope with the same numbers but different products must not silently
-            # introduce an inconsistent chemistry overview.
-            if compound.formula and row.product.formula and compound.formula != row.product.formula:
-                raise ValueError(f"Scope: formula for {compound.number} differs from Compound table "
-                                 f"({row.product.formula} versus {compound.formula}).")
-            model["products"].append({"id": compound.id, "number": compound.number,
-                                      "yield": yield_label(compound, row, schema),
-                                      "reactants": [cdx_to_xml(app, cdx[row.reagent_cells[k]]) for k in keys
-                                                    if row.reagent_cells.get(k) in cdx],
-                                      "cdxml": cdx_to_xml(app, cdx[row.product_cell])})
-            if len(model["products"][-1]["reactants"]) != len(keys):
-                raise ValueError(f"Scope reaction: missing Reagent_i structure for {compound.number}.")
-        model["reaction"] = {"reactants": [cdx_to_xml(app, cdx[first.reagent_cells[k]]) for k in keys],
-                             "product": model["products"][0]["cdxml"], "number": numbers[0], "reagents": reagents}
+        for schema_index, series_compounds in grouped:
+            schema = schemas[schema_index][1]
+            keys = sorted(
+                (key for key in schema if re.fullmatch(r"Reagent_\d+", key)),
+                key=lambda key: int(key.split("_")[-1]),
+            )
+            if not keys:
+                raise ValueError("Reaction schema must contain at least one Reagent_i entry for the scope.")
+            first = row_map[series_compounds[0].number]
+            missing = [key for key in keys if first.reagent_cells.get(key) not in cdx]
+            if missing:
+                raise ValueError("Scope reaction: missing ChemDraw OLE structure for " + ", ".join(missing))
+
+            named = [
+                entry.label for key, entry in schema.items()
+                if not re.fullmatch(r"Reagent_\d+", key) and not key.startswith("Solvent_")
+            ]
+            solvents = [
+                entry.label.removeprefix("Solvent_")
+                for key, entry in schema.items() if key.startswith("Solvent_")
+            ]
+            missing_solvents = [value for value in solvents if value.lower() not in conditions.lower()]
+            series_conditions = ", ".join([*missing_solvents, conditions.strip()]).strip(", ")
+            reagents = [", ".join(named)] if named else []
+            if len(reagents[0] if reagents else "") > 55:
+                reagents = named
+            series = {
+                "version": 1,
+                "title": title,
+                "conditions": series_conditions,
+                "products": [],
+                "reaction": {},
+            }
+            for compound in series_compounds:
+                row = row_map[compound.number]
+                if row.product_cell not in cdx:
+                    raise ValueError(f"Scope: compound {compound.number} has no editable product structure.")
+                if compound.formula and row.product.formula and compound.formula != row.product.formula:
+                    raise ValueError(f"Scope: formula for {compound.number} differs from Compound table "
+                                     f"({row.product.formula} versus {compound.formula}).")
+                reactants = [
+                    cdx_to_xml(app, cdx[row.reagent_cells[key]])
+                    for key in keys if row.reagent_cells.get(key) in cdx
+                ]
+                if len(reactants) != len(keys):
+                    raise ValueError(f"Scope reaction: missing Reagent_i structure for {compound.number}.")
+                series["products"].append({
+                    "id": compound.id,
+                    "number": compound.number,
+                    "yield": yield_label(compound, row, schema),
+                    "reactants": reactants,
+                    "cdxml": cdx_to_xml(app, cdx[row.product_cell]),
+                })
+            series["reaction"] = {
+                "reactants": [cdx_to_xml(app, cdx[first.reagent_cells[key]]) for key in keys],
+                "product": series["products"][0]["cdxml"],
+                "number": series_compounds[0].number,
+                "reagents": reagents,
+            }
+            series_models.append(series)
+
+        model = series_models[0] if len(series_models) == 1 else {
+            "version": 1,
+            "title": title,
+            "conditions": conditions,
+            "products": [product for series in series_models for product in series["products"]],
+            "reaction": series_models[0]["reaction"],
+            "series": series_models,
+        }
         return write_model(model, Path(output_dir), app)
 
 

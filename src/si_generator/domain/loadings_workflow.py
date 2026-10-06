@@ -9,7 +9,18 @@ from pathlib import Path
 from typing import Any
 
 from docx import Document
+from docx.table import Table
+from docx.text.paragraph import Paragraph
 
+from ..method_selectors import (
+    COMPOUND_TEMPLATE_MARKER,
+    MethodSelectorError,
+    Selector,
+    is_compound_template_marker,
+    method_selector,
+    reaction_selector,
+    select_for_compound,
+)
 from ..structure_metadata import StructureMetadata, extract_structure_metadata_by_cell
 from .compound import Compound, capitalize_compound_name
 from .types import Issue, ReagentAmount
@@ -88,11 +99,12 @@ def apply_loadings_workflow(
         return []
 
     issues: list[Issue] = []
-    schema = read_reaction_schema(paths.schema_docx)
+    schemas = read_reaction_schemas(paths.schema_docx)
     template_path = Path(template_docx) if template_docx else paths.template_docx or _default_si_template_path()
-    template = read_characterization_template(template_path)
+    templates = read_characterization_templates(template_path)
     if structure_names_by_cell is None:
-        structure_names_by_cell, name_issues = _structure_names_for_template(paths.scope_docx, template)
+        template_text = "\n".join(template for _, template in templates)
+        structure_names_by_cell, name_issues = _structure_names_for_template(paths.scope_docx, template_text)
         issues.extend(name_issues)
     scope_rows = read_scope(paths.scope_docx, structure_names_by_cell=structure_names_by_cell)
     compounds_by_number = {compound.number.strip(): compound for compound in compounds if compound.number.strip()}
@@ -102,6 +114,18 @@ def apply_loadings_workflow(
 
     for row in scope_rows:
         compound = compounds_by_number.get(row.product_number)
+        schema = select_for_compound(schemas, row.product_number)
+        template = select_for_compound(templates, row.product_number)
+        if schema is None or template is None:
+            missing = "reaction schema" if schema is None else "method template"
+            issues.append(
+                _compound_issue(
+                    compound,
+                    "LOADINGS_METHOD_SELECTOR_MISSING",
+                    f"No {missing} selector includes compound {row.product_number}.",
+                )
+            )
+            continue
         row_issues = _apply_scope_row(compound, row, schema, template)
         issues.extend(row_issues)
 
@@ -137,11 +161,47 @@ def _scope_input_number_mismatch(
 
 
 def read_reaction_schema(path: str | Path) -> dict[str, SchemaEntry]:
+    schemas = read_reaction_schemas(path)
+    return schemas[0][1] if schemas else {}
+
+
+def read_reaction_schemas(path: str | Path) -> list[tuple[Selector | None, dict[str, SchemaEntry]]]:
     document = Document(str(path))
     if not document.tables:
+        return []
+
+    paragraph_by_element = {paragraph._p: paragraph for paragraph in document.paragraphs}
+    table_by_element = {table._tbl: table for table in document.tables}
+    blocks: list[tuple[Selector | None, dict[str, SchemaEntry]]] = []
+    active_selector: Selector | None = None
+    has_selectors = False
+    for element in document._element.body:
+        paragraph = paragraph_by_element.get(element)
+        if paragraph is not None:
+            selector = reaction_selector(paragraph.text)
+            if selector is not None:
+                active_selector = selector
+                has_selectors = True
+            continue
+        table = table_by_element.get(element)
+        if table is None:
+            continue
+        schema = _read_reaction_schema_table(table)
+        if schema:
+            blocks.append((active_selector, schema))
+        active_selector = None
+
+    if has_selectors and any(selector is None for selector, _ in blocks):
+        raise MethodSelectorError(
+            "Every reaction table must follow an [AUTO SI: REACTION <numbers>] marker when selectors are used."
+        )
+    return blocks
+
+
+def _read_reaction_schema_table(table: Table) -> dict[str, SchemaEntry]:
+    if not table.rows:
         return {}
 
-    table = document.tables[0]
     headers = [_normalize_header(cell.text) for cell in table.rows[0].cells]
     name_col = _header_index(headers, "reagents", "reagent")
     equiv_col = _header_index(headers, "equiv", "equivalents")
@@ -222,8 +282,50 @@ def read_scope(
 
 
 def read_characterization_template(path: str | Path) -> str:
+    templates = read_characterization_templates(path)
+    return templates[0][1] if templates else ""
+
+
+def read_characterization_templates(path: str | Path) -> list[tuple[Selector | None, str]]:
     document = Document(str(path))
-    paragraphs = [paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip()]
+    paragraphs = document.paragraphs
+    selectors_present = any(method_selector(paragraph.text) is not None for paragraph in paragraphs)
+    if not selectors_present:
+        text = _characterization_template_text(paragraph.text for paragraph in paragraphs)
+        return [(None, text)] if text else []
+
+    templates: list[tuple[Selector | None, str]] = []
+    active_selector: Selector | None = None
+    active_paragraphs: list[str] = []
+    found_compound_template = False
+    for paragraph in paragraphs:
+        text = paragraph.text.strip()
+        selector = method_selector(text)
+        if selector is not None:
+            if active_selector is not None:
+                templates.append((active_selector, _characterization_template_text(active_paragraphs)))
+            active_selector = selector
+            active_paragraphs = []
+            continue
+        if is_compound_template_marker(text):
+            if active_selector is not None:
+                templates.append((active_selector, _characterization_template_text(active_paragraphs)))
+            found_compound_template = True
+            break
+        if active_selector is not None and text:
+            active_paragraphs.append(text)
+
+    if not found_compound_template:
+        raise MethodSelectorError(
+            f"Method-aware SI template must contain {COMPOUND_TEMPLATE_MARKER}."
+        )
+    if any(not template for _, template in templates):
+        raise MethodSelectorError("Every [AUTO SI: METHOD <numbers>] block must contain a method template.")
+    return templates
+
+
+def _characterization_template_text(paragraphs) -> str:
+    paragraphs = [str(text).strip() for text in paragraphs if str(text).strip()]
     loadings_paragraph = next((text for text in paragraphs if _paragraph_has_loadings_placeholders(text)), "")
     preparation_paragraph = next(
         (
