@@ -4,12 +4,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from .procedure_import import generate_procedure_inputs, read_procedure_text
+from .procedure_import import generate_procedure_inputs, generate_procedure_inputs_from_docx, read_procedure_text
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Create Reaction_schema.docx, Scope_draft.docx, and SI_template.docx from an ordinary method."
+        description="Create a loadings table and Auto Support Generator input drafts from an ordinary method."
     )
     parser.add_argument("procedure", help="UTF-8 .txt/.md or .docx file containing the procedure.")
     parser.add_argument("--output-folder", "-o", required=True, help="Folder for generated input drafts.")
@@ -28,23 +28,34 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        text = read_procedure_text(args.procedure)
-        generated = generate_procedure_inputs(
-            text,
-            args.output_folder,
-            variable_names=args.variable,
-            inventory_path=args.inventory,
-            product_numbers=args.product_number,
-        )
+        if Path(args.procedure).suffix.casefold() == ".docx":
+            generated = generate_procedure_inputs_from_docx(
+                args.procedure,
+                args.output_folder,
+                variable_names=args.variable,
+                inventory_path=args.inventory,
+                product_numbers=args.product_number,
+            )
+        else:
+            generated = generate_procedure_inputs(
+                read_procedure_text(args.procedure),
+                args.output_folder,
+                variable_names=args.variable,
+                inventory_path=args.inventory,
+                product_numbers=args.product_number,
+            )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
+    print(f"All-in-one input: {generated.all_in_one}")
+    print(f"Compound table: {generated.compound_table}")
     print(f"Reaction schema: {generated.reaction_schema}")
-    print(f"Scope draft: {generated.scope_draft}")
+    print(f"Scope: {generated.scope}")
     print(f"SI template: {generated.si_template}")
+    print(f"Loadings table: {generated.loadings_table}")
     print(f"Review report: {generated.report}")
-    print("Next: add ChemDraw OLE structures and measured masses to Scope_draft.docx, then rename it to Scope.docx.")
+    print("Next: review highlighted cells, then add ChemDraw OLE structures and measured values to Compound_table.docx and Scope.docx.")
     return 0
 
 

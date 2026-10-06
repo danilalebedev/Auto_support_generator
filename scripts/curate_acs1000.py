@@ -37,6 +37,42 @@ def independent_exclusion(label, *, has_source_correction=False):
     return None
 
 
+def load_lineage_rejections(start):
+    """Collect independently rejected source texts from every corpus ancestor.
+
+    Replacement selection must remember more than the immediate parent;
+    otherwise version N can re-select a passage rejected in version N-2 and
+    oscillate between two corpus hashes.
+    """
+    rejected=set()
+    visited=set()
+    folder=Path(start).resolve()
+    while folder not in visited:
+        visited.add(folder)
+        frozen_path=folder / "frozen_inputs.json"
+        if not frozen_path.exists(): break
+        corpus=json.loads(frozen_path.read_text(encoding="utf-8"))
+        cases={c["id"]:c for c in corpus["cases"]}
+        labels={}
+        for path in sorted((folder / "annotations").glob("*.json")):
+            raw=json.loads(path.read_text(encoding="utf-8"))
+            if raw.get("dataset_sha256")!=corpus["dataset_sha256"]:
+                raise ValueError(f"Annotation corpus hash mismatch in lineage: {path}")
+            for label in raw["cases"]:
+                if label["id"] in labels:
+                    raise ValueError(f"Duplicate lineage annotation: {label['id']}")
+                labels[label["id"]]=label
+        for case_id,label in labels.items():
+            case=cases.get(case_id)
+            if case and independent_exclusion(label): rejected.add(case["text_sha256"])
+        log_path=folder / "curation_log.json"
+        if not log_path.exists(): break
+        parent_path=json.loads(log_path.read_text(encoding="utf-8")).get("parent_corpus")
+        if not parent_path: break
+        folder=Path(parent_path).resolve()
+    return rejected
+
+
 def select_replacement(pool, previous, counts, used, rejected):
     eligible=[c for c in pool if counts[c["parent_doi"]]<5
               and not c["extraction_flags"]
@@ -104,7 +140,9 @@ def main():
     boundary_labels=load_boundary_labels(parent["dataset_sha256"])
     sources,pool=load_pool(cache)
     updated=[]
-    rejected={sha for (_,sha),label in boundary_labels.items() if independent_exclusion(label)}
+    lineage_rejected=load_lineage_rejections(FOLDER)
+    rejected=set(lineage_rejected)
+    rejected.update(sha for (_,sha),label in boundary_labels.items() if independent_exclusion(label))
     changes=[]
     replacement_reasons={}
     restored_fingerprints=set()
@@ -215,7 +253,7 @@ def main():
     snapshot=output / "snapshots"
     snapshot.mkdir(exist_ok=True)
     shutil.copy2(FOLDER / "snapshots/parser_before_1000.py",snapshot / "parser_before_1000.py")
-    save(output / "curation_log.json",{"parent_corpus":str(FOLDER),"changes":changes,"transferred_labels":len(transferred),"boundary_pool_label_transfers":correction_transfers,"fresh_annotations_required":len(cases)-len(transferred),"additional_pdfs_attempted":downloaded})
+    save(output / "curation_log.json",{"parent_corpus":str(FOLDER),"changes":changes,"transferred_labels":len(transferred),"boundary_pool_label_transfers":correction_transfers,"fresh_annotations_required":len(cases)-len(transferred),"additional_pdfs_attempted":downloaded,"lineage_rejected_texts":len(lineage_rejected)})
     print(json.dumps({"output":str(output),**stats,"split_counts":frozen["split_counts"],"transferred_labels":len(transferred),"fresh_annotations_required":len(cases)-len(transferred)},indent=2))
 
 

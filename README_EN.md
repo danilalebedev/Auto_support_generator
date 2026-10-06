@@ -56,6 +56,7 @@ Auto Support Generator builds organic-chemistry Supporting Information (SI). It 
 | Page | What it does |
 |---|---|
 | **Generate** | Creates a new SI from a compound table and raw spectra and applies a publication preset. |
+| **Generate templates** | Parses a method `.docx` into a ready all-in-one input, classic Word inputs, a loadings review table and an audit report. |
 | **Processing** | Controls NMR processing, appendix type and analytical validation. |
 | **Check** | Checks a previous output: manifest/DOCX/artifact integrity, 1H and 13C counts against the molecular formula, HRMS and elemental analysis; writes a mismatch report. |
 | **Patch** | Creates a modified SI copy without reprocessing spectra: renumber, remove, reorder, swap or journal reformatting. |
@@ -121,6 +122,17 @@ This section is for developers. Install Python 3.12, run `Setup Auto SI Generato
 | **Scope .docx** | `Scope.docx`: per-product reaction data and structures for variable reagents. |
 
 Enable loadings only when both files are supplied. Product numbers in Compound table and Scope must match.
+
+### Generate templates from a written method
+
+Open **Generate templates** and select the experimental method as a `.docx` file. Explicit masses, amounts, volumes, equivalents, `mol%` and concentrations are parsed locally. The page creates one folder containing:
+
+- `All_in_one_input.docx` with Compound table, Reaction schema, Scope and a complete SI template;
+- the same classic inputs as separate `Compound_table.docx`, `Reaction_schema.docx`, `Scope.docx` and `SI_template.docx` files;
+- `Loadings_table.docx`, an auditable source-to-mg/mmol/mL/eq/M review table;
+- `Method.docx`, a copy of the source method, and `procedure_import_report.json` with unresolved fields and value provenance.
+
+Enter variable compound names exactly as written in the method and in `Reagent_1`, `Reagent_2`, ... order. Optional product numbers prefill both product tables. The importer never invents structures: review every yellow cell, add editable ChemDraw OLE structures and measured masses, then use either the generated all-in-one input or the separate files on **Generate**.
 
 ### Preparing the Word inputs
 

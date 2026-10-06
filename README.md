@@ -32,6 +32,8 @@ To uninstall, open **Windows Settings → Apps → Installed apps → Auto Suppo
 
 **Generate → Show scope** optionally inserts a reaction and an aligned compound overview before characterization. Each structure is labelled on one line as **compound number**, yield (for example **2a**, 80%); reagent equivalents are omitted, and editable CDXML files are saved alongside the Word output. See the [scope example and instructions](examples/reaction_scope).
 
+**Generate templates** converts an experimental method `.docx` into both a ready `All_in_one_input.docx` and the matching classic `Compound_table.docx`, `Reaction_schema.docx`, `Scope.docx` and `SI_template.docx` files. It also writes an auditable loadings table and highlights chemistry that still requires user input.
+
 Optional **CIF source** adds X-ray structure figures, experimental descriptions and numbered crystal/refinement tables to SI. A custom crystallography template can be supplied separately or embedded in all-in-one DOCX. Raw 2D Bruker experiments (HSQC, HMBC, COSY, NOESY, TOCSY and ROESY) are processed with external 1H/13C projections and `ppm` axis labels. **Multiple series** combines several methods with separate inputs and templates in one run. See the [crystallography guide](docs/crystallography.md), [compact example](examples/crystallography) and [eight-compound all-in-one example](examples/crystallography_all_in_one). Source changes require a new build; existing installer binaries are not automatically updated.
 
 - [Русская версия](README_RU.md)

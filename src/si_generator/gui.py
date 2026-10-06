@@ -39,7 +39,7 @@ from .journal_profiles import (
     journal_profile_labels,
     resolve_journal_profile_id,
 )
-from .procedure_import import generate_procedure_inputs, read_procedure_text
+from .procedure_import import generate_procedure_inputs_from_docx
 from .runtime_diagnostics import format_preflight_issues, issue_has_errors, preflight_generate_request
 from .runtime_paths import bundled_resource_path, default_output_path, examples_dir
 from .workflows.check_si import run_check_si
@@ -174,6 +174,15 @@ class SIGeneratorApp:
         self.result_report = StringVar(value="")
         self.result_logs = StringVar(value="")
         self.result_overview = StringVar(value="")
+        self.procedure_method_docx = StringVar(value="")
+        self.procedure_variable_names = StringVar(value="")
+        self.procedure_product_numbers = StringVar(value="")
+        self.procedure_inventory_csv = StringVar(value="")
+        self.procedure_output_folder = StringVar(value=str(default_output_path().parent))
+        self.procedure_result_all_in_one = StringVar(value="")
+        self.procedure_result_classic_folder = StringVar(value="")
+        self.procedure_result_loadings = StringVar(value="")
+        self.procedure_result_report = StringVar(value="")
         self.existing_manifest = StringVar(value="")
         self.check_support_docx = StringVar(value="")
         self.patch_source_output_dir = StringVar(value="")
@@ -311,7 +320,7 @@ class SIGeneratorApp:
         sidebar = ttk.Frame(parent, style="Sidebar.TFrame", padding=(18, 16, 16, 18))
         sidebar.grid(row=0, column=0, sticky="nsew")
         sidebar.columnconfigure(0, weight=1)
-        sidebar.rowconfigure(8, weight=1)
+        sidebar.rowconfigure(9, weight=1)
 
         brand = ttk.Frame(sidebar, style="Sidebar.TFrame")
         brand.grid(row=0, column=0, sticky="ew", pady=(0, 14))
@@ -331,6 +340,7 @@ class SIGeneratorApp:
 
         nav_items = (
             ("generate", "Generate"),
+            ("templates", "Generate templates"),
             ("advanced", "Processing"),
             ("check", "Check"),
             ("patch", "Patch"),
@@ -360,6 +370,7 @@ class SIGeneratorApp:
         page_host.columnconfigure(0, weight=1)
         page_host.rowconfigure(0, weight=1)
         self._build_generate_page(page_host)
+        self._build_templates_page(page_host)
         self._build_advanced_page(page_host)
         self._build_check_page(page_host)
         self._build_patch_page(page_host)
@@ -525,128 +536,111 @@ class SIGeneratorApp:
         )
         ttk.Label(
             loadings,
-            text="Have an ordinary written procedure? Create a reaction schema, SI template, and editable Scope draft.",
+            text="To create these files from a written method, open Generate templates in the sidebar.",
             style="Muted.TLabel",
             wraplength=700,
-        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=(0, 8), pady=(10, 4))
-        ttk.Button(
-            loadings,
-            text="Create from procedure...",
-            command=self._open_procedure_import_dialog,
-        ).grid(row=3, column=2, sticky="e", pady=(10, 4))
+        ).grid(row=3, column=0, columnspan=3, sticky="w", padx=(0, 8), pady=(10, 4))
         return loadings
 
-    def _open_procedure_import_dialog(self) -> None:
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Create input files from procedure")
-        dialog.geometry("820x620")
-        dialog.minsize(680, 520)
-        dialog.transient(self.root)
-        dialog.grab_set()
-        dialog.columnconfigure(0, weight=1)
-        dialog.rowconfigure(2, weight=1)
+    def _build_templates_page(self, parent: ttk.Frame) -> None:
+        page = self._make_page(parent, "templates")
+        page.rowconfigure(0, weight=1)
+        scroll = _ScrollableFrame(page, padding=2)
+        self._scrollable_frames.append(scroll)
+        scroll.grid(row=0, column=0, sticky="nsew")
+        content = scroll.content
+        content.columnconfigure(0, weight=1)
 
+        source = ttk.LabelFrame(content, text="Method", padding=12, style="Card.TLabelframe")
+        source.grid(row=0, column=0, sticky="ew")
+        source.columnconfigure(1, weight=1)
+        self._file_row(
+            source,
+            0,
+            "Method .docx",
+            self.procedure_method_docx,
+            lambda: self._browse_file(self.procedure_method_docx, [("Word documents", "*.docx")]),
+        )
+        ttk.Label(source, text="Variable compounds").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(source, textvariable=self.procedure_variable_names).grid(row=1, column=1, columnspan=2, sticky="ew", pady=4)
         ttk.Label(
-            dialog,
-            text="Paste a general procedure or load it from TXT, Markdown, or DOCX. Explicit masses, amounts, "
-            "volumes, equivalents, and concentrations are converted to Auto Support Generator aliases.",
-            wraplength=760,
-            justify="left",
-        ).grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 8))
-
-        toolbar = ttk.Frame(dialog)
-        toolbar.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
-        procedure = tk.Text(dialog, wrap="word", undo=True, height=18)
-        procedure.grid(row=2, column=0, sticky="nsew", padx=16)
-
-        def load_method() -> None:
-            path = filedialog.askopenfilename(
-                parent=dialog,
-                title="Choose procedure",
-                filetypes=[
-                    ("Supported procedures", "*.docx *.txt *.md"),
-                    ("Word documents", "*.docx"),
-                    ("Text files", "*.txt *.md"),
-                    ("All files", "*.*"),
-                ],
-            )
-            if not path:
-                return
-            try:
-                loaded = read_procedure_text(path)
-            except Exception as exc:
-                messagebox.showerror("Auto Support Generator", f"Could not read the procedure:\n{exc}", parent=dialog)
-                return
-            procedure.delete("1.0", "end")
-            procedure.insert("1.0", loaded)
-
-        ttk.Button(toolbar, text="Load TXT or DOCX...", command=load_method).pack(side="left")
-
-        options = ttk.Frame(dialog)
-        options.grid(row=3, column=0, sticky="ew", padx=16, pady=12)
-        options.columnconfigure(1, weight=1)
-        variable_names = StringVar()
-        product_numbers = StringVar()
-        default_parent = Path(self.output_folder.get().strip() or default_output_path().parent)
-        generated_folder = StringVar(value=str(default_parent / "procedure_inputs"))
-        ttk.Label(options, text="Compounds varied in Scope (recommended)").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(options, textvariable=variable_names).grid(row=0, column=1, columnspan=2, sticky="ew", pady=4)
-        ttk.Label(
-            options,
-            text="Copy their names exactly from the procedure, comma-separated in Reagent_1, Reagent_2 order. "
-            "Leaving this empty creates an inferred draft that requires extra review.",
+            source,
+            text="Names exactly as written in the method, comma-separated in Reagent_1, Reagent_2 order. "
+            "Leave empty only when you want the program to infer a review draft.",
             style="Muted.TLabel",
-        ).grid(row=1, column=1, columnspan=2, sticky="w")
-        ttk.Label(options, text="Product numbers").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(options, textvariable=product_numbers).grid(row=2, column=1, columnspan=2, sticky="ew", pady=4)
-        ttk.Label(options, text="Output folder").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
-        ttk.Entry(options, textvariable=generated_folder).grid(row=3, column=1, sticky="ew", pady=4)
+            wraplength=760,
+        ).grid(row=2, column=1, columnspan=2, sticky="w", pady=(0, 4))
+        ttk.Label(source, text="Product numbers").grid(row=3, column=0, sticky="w", padx=(0, 8), pady=4)
+        ttk.Entry(source, textvariable=self.procedure_product_numbers).grid(row=3, column=1, columnspan=2, sticky="ew", pady=4)
+        ttk.Label(
+            source,
+            text="Optional comma-separated numbers, for example 2a, 2b, 2c. They prefill Compound_table.docx and Scope.docx.",
+            style="Muted.TLabel",
+            wraplength=760,
+        ).grid(row=4, column=1, columnspan=2, sticky="w", pady=(0, 4))
+        self._file_row(
+            source,
+            5,
+            "Reagent inventory .csv",
+            self.procedure_inventory_csv,
+            lambda: self._browse_file(self.procedure_inventory_csv, [("CSV files", "*.csv")]),
+            optional=True,
+        )
+        self._folder_row(
+            source,
+            6,
+            "Output folder",
+            self.procedure_output_folder,
+            lambda: self._browse_folder(self.procedure_output_folder),
+        )
 
-        def choose_output_folder() -> None:
-            selected = filedialog.askdirectory(parent=dialog, title="Choose output folder")
-            if selected:
-                generated_folder.set(selected)
+        ttk.Label(
+            content,
+            text=(
+                "The method is parsed locally. Explicit masses, mmol, volumes, equivalents, mol%, and "
+                "concentrations become calculation aliases. Values that cannot be inferred safely stay "
+                "yellow and are listed in the review report. No chemical structure is invented."
+            ),
+            style="Muted.TLabel",
+            wraplength=820,
+            justify="left",
+        ).grid(row=1, column=0, sticky="ew", pady=(10, 0))
 
-        ttk.Button(options, text="Browse...", command=choose_output_folder).grid(row=3, column=2, padx=(8, 0), pady=4)
-
-        buttons = ttk.Frame(dialog)
-        buttons.grid(row=4, column=0, sticky="e", padx=16, pady=(0, 16))
-
-        def create_inputs() -> None:
-            source_text = procedure.get("1.0", "end").strip()
-            if not source_text:
-                messagebox.showerror("Auto Support Generator", "Paste or load a procedure first.", parent=dialog)
-                return
-            variables = [item.strip() for item in re.split(r"[,;\n]", variable_names.get()) if item.strip()]
-            products = [item.strip() for item in re.split(r"[,;\n]", product_numbers.get()) if item.strip()]
-            try:
-                generated = generate_procedure_inputs(
-                    source_text,
-                    generated_folder.get().strip(),
-                    variable_names=variables,
-                    product_numbers=products,
-                )
-            except Exception as exc:
-                messagebox.showerror("Auto Support Generator", f"Could not create input files:\n{exc}", parent=dialog)
-                return
-            self.loadings_schema_docx.set(str(generated.reaction_schema))
-            self.loadings_scope_docx.set(str(generated.scope_draft))
-            self.template_docx.set(str(generated.si_template))
-            self.generate_loadings.set(False)
-            messagebox.showinfo(
-                "Auto Support Generator",
-                "Drafts created and selected. "
-                + ("" if variables else "Variable compounds were inferred; confirm Reagent_1/Reagent_2 before use. ")
-                + "Review Reaction_schema.docx and SI_template.docx, then fill "
-                "ChemDraw structures and measured masses in Scope_draft.docx. Rename it to Scope.docx or "
-                "keep the selected path, and enable Calculate reagent loadings when it is complete.",
-                parent=dialog,
-            )
-            dialog.destroy()
-
-        ttk.Button(buttons, text="Cancel", command=dialog.destroy).pack(side="left", padx=(0, 8))
-        ttk.Button(buttons, text="Create files", command=create_inputs, style="Accent.TButton").pack(side="left")
-        procedure.focus_set()
+        results = ttk.LabelFrame(content, text="Generated package", padding=12, style="Card.TLabelframe")
+        results.grid(row=2, column=0, sticky="ew", pady=(10, 0))
+        results.columnconfigure(1, weight=1)
+        self._result_row(
+            results,
+            0,
+            "All-in-one input",
+            self.procedure_result_all_in_one,
+            lambda: self._open_result_path(self.procedure_result_all_in_one, "All-in-one input"),
+            "Open",
+        )
+        self._result_row(
+            results,
+            1,
+            "Classic files folder",
+            self.procedure_result_classic_folder,
+            lambda: self._open_result_path(self.procedure_result_classic_folder, "Classic files folder"),
+            "Open folder",
+        )
+        self._result_row(
+            results,
+            2,
+            "Loadings review",
+            self.procedure_result_loadings,
+            lambda: self._open_result_path(self.procedure_result_loadings, "Loadings review"),
+            "Open",
+        )
+        self._result_row(
+            results,
+            3,
+            "Import report",
+            self.procedure_result_report,
+            lambda: self._open_result_path(self.procedure_result_report, "Import report"),
+            "Open",
+        )
 
     def _build_advanced_page(self, parent: ttk.Frame) -> None:
         page = self._make_page(parent, "advanced")
@@ -1241,6 +1235,26 @@ class SIGeneratorApp:
             "5. Compound numbers must be unique across all series. Processing settings stay shared.\n"
             "6. The final output contains the combined SI and the individual series runs. The crystallography example includes a ready Multiple_series folder."
         ), wraplength=760, justify="left").grid(row=0, column=0, sticky="ew")
+        generated_templates = self._instruction_block(
+            content,
+            17,
+            "Generate templates",
+            "Create all-in-one and classic inputs from a written method.",
+        )
+        ttk.Label(
+            generated_templates,
+            text=(
+                "1. Upload the general experimental method as Method .docx.\n"
+                "2. List compounds that vary across the series exactly as written, in Reagent_1, Reagent_2 order.\n"
+                "3. Optionally list product numbers to prefill both Compound_table.docx and Scope.docx.\n"
+                "4. Click Generate templates. The app creates All_in_one_input.docx plus separate Compound_table, Reaction_schema, Scope and SI_template files.\n"
+                "5. Loadings_table.docx shows the source text, normalized mg/mmol/mL/eq/M values, calculation provenance and every field requiring review.\n"
+                "6. Review all yellow cells. Add editable ChemDraw structures and measured masses; the importer never invents structures or silently fills ambiguous chemistry.\n"
+                "7. Use the generated all-in-one file directly on Generate, or use the separate files in classic mode. Method.docx and the JSON report keep the conversion reproducible."
+            ),
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="ew")
         ttk.Label(
             contact,
             text=(
@@ -1389,6 +1403,7 @@ class SIGeneratorApp:
     def _show_page(self, page: str) -> None:
         page_text = {
             "generate": ("Generate SI", "Create formatted Supporting Information from a compound table and spectra."),
+            "templates": ("Generate templates", "Create calculation-ready Word inputs from an experimental method."),
             "advanced": ("Processing", "Spectra rendering, peak picking, baseline correction, and validation."),
             "check": ("Check support", "Run validation from an existing manifest and optional support document."),
             "patch": ("Patch SI", "Modify an existing generated output without reprocessing spectra."),
@@ -1408,6 +1423,7 @@ class SIGeneratorApp:
         self._current_page = page
         actions = {
             "generate": ("Generate SI", self._start_generation),
+            "templates": ("Generate templates", self._start_generate_templates),
             "advanced": ("Generate SI", self._start_generation),
             "check": ("Check support", self._start_manifest_check),
             "patch": ("Apply patch", self._start_patch),
@@ -1739,6 +1755,73 @@ class SIGeneratorApp:
         self.status_text.set("MestReNova detected")
         self._save_settings()
 
+    def _start_generate_templates(self) -> None:
+        if self._is_running:
+            messagebox.showinfo("SI Generator", "Another operation is already running.")
+            return
+        try:
+            method = _required_existing_file(
+                self.procedure_method_docx.get(),
+                "Choose a Method .docx first.",
+                suffixes=(".docx",),
+            )
+            inventory = _optional_existing_file(
+                self.procedure_inventory_csv.get(),
+                "Reagent inventory",
+                suffixes=(".csv",),
+            )
+            output_parent_text = self.procedure_output_folder.get().strip().strip('"')
+            if not output_parent_text:
+                raise ValueError("Choose an output folder for the generated templates.")
+            output_parent = Path(output_parent_text).expanduser().resolve()
+            output_parent.mkdir(parents=True, exist_ok=True)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("SI Generator", str(exc))
+            return
+
+        variables = [item.strip() for item in re.split(r"[,;\n]", self.procedure_variable_names.get()) if item.strip()]
+        products = [item.strip() for item in re.split(r"[,;\n]", self.procedure_product_numbers.get()) if item.strip()]
+        safe_stem = re.sub(r"[^A-Za-z0-9._-]+", "_", method.stem).strip("._") or "method"
+        output_folder = _next_available_folder(output_parent / f"{safe_stem}_templates")
+        self._save_settings()
+        self._start_background_operation(
+            "Generate templates",
+            f"Method: {method}\nOutput: {output_folder}\n",
+            self._run_generate_templates_workflow,
+            (method, output_folder, variables, products, inventory),
+        )
+
+    def _run_generate_templates_workflow(self, payload) -> None:
+        method, output_folder, variables, products, inventory = payload
+        try:
+            generated = generate_procedure_inputs_from_docx(
+                method,
+                output_folder,
+                variable_names=variables,
+                product_numbers=products,
+                inventory_path=inventory,
+            )
+            summary = {
+                "all_in_one": str(generated.all_in_one),
+                "compound_table": str(generated.compound_table),
+                "reaction_schema": str(generated.reaction_schema),
+                "scope": str(generated.scope),
+                "si_template": str(generated.si_template),
+                "loadings_table": str(generated.loadings_table),
+                "report": str(generated.report),
+                "output_folder": str(output_folder),
+            }
+            self._log_queue.put(
+                "Created All_in_one_input.docx and the matching classic-input files.\n"
+                "Review yellow cells in Loadings_table.docx, Reaction_schema.docx, Scope.docx, and Compound_table.docx.\n"
+            )
+            self._log_queue.put({"type": "templates_succeeded", "summary": summary})
+        except Exception as exc:
+            self._log_queue.put(f"\nERROR: {exc}\n")
+            self._log_queue.put({"type": "run_failed", "error": str(exc)})
+        finally:
+            self._log_queue.put("__RUN_FINISHED__")
+
     def _start_generation(self) -> None:
         if self._is_running:
             messagebox.showinfo("SI Generator", "Generation is already running.")
@@ -2050,6 +2133,27 @@ class SIGeneratorApp:
                 elif isinstance(item, dict) and item.get("type") == "run_succeeded":
                     self.status_text.set("Done")
                     self._apply_result_summary(item.get("summary", {}))
+                elif isinstance(item, dict) and item.get("type") == "templates_succeeded":
+                    summary = item.get("summary", {})
+                    self.status_text.set("Templates generated")
+                    self.procedure_result_all_in_one.set(summary.get("all_in_one", ""))
+                    self.procedure_result_classic_folder.set(summary.get("output_folder", ""))
+                    self.procedure_result_loadings.set(summary.get("loadings_table", ""))
+                    self.procedure_result_report.set(summary.get("report", ""))
+                    if summary.get("output_folder"):
+                        self._last_output_folder = Path(summary["output_folder"])
+                    self.input_mode.set("all_in_one")
+                    self.unified_input_docx.set(summary.get("all_in_one", ""))
+                    self.input_path.set(summary.get("compound_table", ""))
+                    self.template_docx.set(summary.get("si_template", ""))
+                    self.loadings_schema_docx.set(summary.get("reaction_schema", ""))
+                    self.loadings_scope_docx.set(summary.get("scope", ""))
+                    self._save_settings()
+                    messagebox.showinfo(
+                        "Auto Support Generator",
+                        "Templates are ready and the all-in-one file is selected on the Generate page. "
+                        "Review every yellow cell and add ChemDraw structures before generating SI.",
+                    )
                 elif isinstance(item, dict) and item.get("type") == "run_failed":
                     self.status_text.set("Failed")
                     if isinstance(item.get("summary"), dict):
@@ -2167,6 +2271,11 @@ class SIGeneratorApp:
             "mnova_graphics_profile_13c": self.mnova_graphics_profile_13c,
             "output_docx": self.output_docx,
             "output_folder": self.output_folder,
+            "procedure_method_docx": self.procedure_method_docx,
+            "procedure_variable_names": self.procedure_variable_names,
+            "procedure_product_numbers": self.procedure_product_numbers,
+            "procedure_inventory_csv": self.procedure_inventory_csv,
+            "procedure_output_folder": self.procedure_output_folder,
             "journal_profile_label": self.journal_profile_label,
             "theme_mode": self.theme_mode,
             "peak_threshold_1h_percent": self.peak_threshold_1h_percent,

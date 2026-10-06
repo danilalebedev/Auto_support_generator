@@ -3,18 +3,22 @@ from __future__ import annotations
 import csv
 import json
 import re
+import shutil
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
 from docx import Document
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+from docx.enum.section import WD_ORIENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from docx.enum.text import WD_COLOR_INDEX
-from docx.shared import RGBColor
-from docx.shared import Pt
+from docx.shared import Inches, Pt, RGBColor
 
 from .reagent_catalog import lookup_reagent, normalize_reagent_name, catalog_summary
+from .unified_word_input import build_unified_input_docx
 
 
 NUMBER = r"(?:\d+\s*/\s*[1-9]\d*|\d+(?:[.,]\d+)?)"
@@ -28,6 +32,21 @@ QUANTITY_RE = re.compile(rf"(?<![\d.])(?<!\d/)(?P<value>{NUMBER})\s*(?P<unit>{UN
 PAREN_RE = re.compile(r"\((?P<body>[^()]{1,200})\)")
 
 SCHEMA_HEADERS = ("Reagents", "equiv.", "MW, g/mol", "Density, g/ml", "Concentration, M")
+LOADINGS_HEADERS = (
+    "Alias",
+    "Compound",
+    "Role / scope",
+    "Source loading",
+    "Mass, mg",
+    "Amount, mmol",
+    "Volume, mL",
+    "equiv.",
+    "Concentration, M",
+    "MW, g/mol",
+    "Density, g/mL",
+    "Source / review",
+)
+LOADINGS_COLUMN_WIDTHS_INCHES = (0.68, 1.32, 0.78, 1.12, 0.54, 0.58, 0.58, 0.46, 0.67, 0.63, 0.68, 1.72)
 
 SOLVENT_NAMES = {
     "acetonitrile",
@@ -119,10 +138,19 @@ class ParsedChemical:
 
 @dataclass(frozen=True)
 class GeneratedProcedureInputs:
+    compound_table: Path
     reaction_schema: Path
-    scope_draft: Path
+    scope: Path
     si_template: Path
+    all_in_one: Path
     report: Path
+    loadings_table: Path
+    source_method: Path | None = None
+
+    @property
+    def scope_draft(self) -> Path:
+        """Compatibility alias for callers created before Scope.docx became final output."""
+        return self.scope
 
 
 def read_procedure_text(path: str | Path) -> str:
@@ -130,7 +158,22 @@ def read_procedure_text(path: str | Path) -> str:
     source = Path(path)
     if source.suffix.casefold() == ".docx":
         document = Document(str(source))
-        blocks = [paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip()]
+        blocks: list[str] = []
+        for paragraph in document.paragraphs:
+            text = paragraph.text.strip()
+            if not text:
+                continue
+            style_name = str(getattr(paragraph.style, "name", "") or "").casefold()
+            common_heading = bool(
+                re.fullmatch(
+                    r"(?:general|typical|representative)(?:\s+experimental)?\s+procedure(?:\s+[A-Za-z0-9.-]+)?",
+                    text,
+                    re.IGNORECASE,
+                )
+            )
+            if style_name.startswith(("title", "heading")) or common_heading:
+                continue
+            blocks.append(text)
         for table in document.tables:
             for row in table.rows:
                 line = " | ".join(cell.text.strip() for cell in row.cells if cell.text.strip())
@@ -447,7 +490,7 @@ def parse_procedure(
         "catalog": catalog_summary(),
         "scope_requirement": (
             "Insert editable ChemDraw OLE structures, product numbers, limiting-reagent masses, "
-            "and isolated product masses into Scope_draft.docx."
+            "and isolated product masses into Scope.docx."
         ),
     }
     return result
@@ -460,22 +503,98 @@ def generate_procedure_inputs(
     variable_names: Iterable[str] = (),
     inventory_path: str | Path | None = None,
     product_numbers: Iterable[str] = (),
+    source_method: str | Path | None = None,
 ) -> GeneratedProcedureInputs:
-    """Generate Auto Support Generator input drafts from one ordinary procedure."""
+    """Generate a complete editable input package from one ordinary procedure."""
     folder = Path(output_folder)
     folder.mkdir(parents=True, exist_ok=True)
     parsed = parse_procedure(text, variable_names=variable_names, inventory_path=inventory_path)
 
+    compound_table_path = folder / "Compound_table.docx"
     schema_path = folder / "Reaction_schema.docx"
-    scope_path = folder / "Scope_draft.docx"
+    scope_path = folder / "Scope.docx"
     template_path = folder / "SI_template.docx"
+    all_in_one_path = folder / "All_in_one_input.docx"
     report_path = folder / "procedure_import_report.json"
+    loadings_table_path = folder / "Loadings_table.docx"
+    source_method_path: Path | None = None
 
+    _write_compound_table(compound_table_path, product_numbers)
     _write_reaction_schema(parsed, schema_path)
     _write_scope_draft(parsed, scope_path, product_numbers)
     _write_si_template(parsed, template_path)
+    _write_loadings_table(parsed, loadings_table_path)
+    build_unified_input_docx(
+        compound_table_path,
+        all_in_one_path,
+        reaction_schema=schema_path,
+        scope=scope_path,
+        si_template=template_path,
+    )
+    if source_method:
+        source = Path(source_method).expanduser().resolve()
+        if not source.exists() or not source.is_file():
+            raise FileNotFoundError(f"Procedure document does not exist: {source}")
+        source_method_path = folder / "Method.docx"
+        shutil.copy2(source, source_method_path)
     report_path.write_text(json.dumps(parsed, ensure_ascii=False, indent=2), encoding="utf-8")
-    return GeneratedProcedureInputs(schema_path, scope_path, template_path, report_path)
+    return GeneratedProcedureInputs(
+        compound_table=compound_table_path,
+        reaction_schema=schema_path,
+        scope=scope_path,
+        si_template=template_path,
+        all_in_one=all_in_one_path,
+        report=report_path,
+        loadings_table=loadings_table_path,
+        source_method=source_method_path,
+    )
+
+
+def generate_procedure_inputs_from_docx(
+    procedure_docx: str | Path,
+    output_folder: str | Path,
+    *,
+    variable_names: Iterable[str] = (),
+    inventory_path: str | Path | None = None,
+    product_numbers: Iterable[str] = (),
+) -> GeneratedProcedureInputs:
+    """Read a Word method and generate both classic and all-in-one inputs."""
+    source = Path(procedure_docx).expanduser().resolve()
+    if source.suffix.casefold() != ".docx":
+        raise ValueError("Method must be a .docx document.")
+    return generate_procedure_inputs(
+        read_procedure_text(source),
+        output_folder,
+        variable_names=variable_names,
+        inventory_path=inventory_path,
+        product_numbers=product_numbers,
+        source_method=source,
+    )
+
+
+def _write_compound_table(path: Path, product_numbers: Iterable[str]) -> None:
+    document = Document()
+    _set_default_font(document)
+    _add_document_title(document, "Compound table")
+    document.add_paragraph(
+        "One row is one product. Insert an editable ChemDraw OLE structure, fill measured values, "
+        "and enter - for an optional block that must be omitted from the final SI. Product numbers "
+        "must match Scope.docx and spectra folder names."
+    )
+    headers = ("number", "structure", "color", "mp", "Rf", "HRMS", "Elemental_analysis", "IR")
+    numbers = [number.strip() for number in product_numbers if number.strip()] or [""]
+    table = document.add_table(rows=1 + len(numbers), cols=len(headers))
+    table.style = "Table Grid"
+    for column, heading in enumerate(headers):
+        table.cell(0, column).text = heading
+        for run in table.cell(0, column).paragraphs[0].runs:
+            run.bold = True
+    for row_index, number in enumerate(numbers, start=1):
+        table.cell(row_index, 0).text = number
+        for cell in table.rows[row_index].cells:
+            if not cell.text.strip():
+                _shade_cell(cell)
+    document.save(path)
 
 
 def _write_reaction_schema(parsed: dict[str, Any], path: Path) -> None:
@@ -515,7 +634,7 @@ def _write_scope_draft(parsed: dict[str, Any], path: Path, product_numbers: Iter
     variables = [chemical for chemical in parsed["chemicals"] if chemical["variable"]]
     document = Document()
     _set_default_font(document)
-    _add_document_title(document, "Scope draft from procedure")
+    _add_document_title(document, "Scope from procedure")
     document.add_paragraph(
         "Replace the blank structure cells with editable ChemDraw OLE objects. Fill the actual mass of "
         "Reagent_1 and the isolated product mass for every product. Product_number must match Compound_table.docx."
@@ -544,14 +663,15 @@ def _write_scope_draft(parsed: dict[str, Any], path: Path, product_numbers: Iter
 
 
 def _write_si_template(parsed: dict[str, Any], path: Path) -> None:
-    document = Document()
-    _set_default_font(document)
-    _add_document_title(document, "Generated SI method template")
-    document.add_paragraph(
-        "Review the aliases before use. Constant conditions remain literal; reagent amounts and variable "
-        "compound names are calculated for each Scope row."
-    )
-    paragraph = document.add_paragraph()
+    base_template = Path(__file__).resolve().parent / "templates" / "SI_template.docx"
+    document = Document(base_template)
+    paragraphs = document.paragraphs
+    if len(paragraphs) < 5:
+        raise ValueError(f"Bundled SI template is incomplete: {base_template}")
+    paragraph = paragraphs[2]
+    paragraph.clear()
+    for obsolete in paragraphs[3:5]:
+        obsolete._element.getparent().remove(obsolete._element)
     issues_by_alias: dict[str, set[str]] = {}
     for issue in parsed["unresolved"]:
         issues_by_alias.setdefault(issue.get("alias",""),set()).add(issue.get("field","review"))
@@ -566,24 +686,167 @@ def _write_si_template(parsed: dict[str, Any], path: Path) -> None:
             position = name.end()
         paragraph.add_run(text[position:])
 
+    template_text = parsed["template_text"].strip()
+    if template_text and template_text[-1] not in ".!?":
+        template_text += "."
+    template_text += (
+        " Yield {Product.mg} mg ({Product.yield.percent}); {Product.appearance}; "
+        "mp {Product.mp} °C. Rf = {Product.rf.value} ({Product.rf.system})."
+    )
     offset = 0
-    for match in re.finditer(r"\{(?P<alias>[^{}.]+)\.(?P<attr>[^{}]+)\}",parsed["template_text"]):
-        add_literal(parsed["template_text"][offset:match.start()])
+    for match in re.finditer(r"\{(?P<alias>[^{}.]+)\.(?P<attr>[^{}]+)\}", template_text):
+        add_literal(template_text[offset:match.start()])
         run = paragraph.add_run(match[0])
         if issues_by_alias.get(match["alias"]):
             run.font.highlight_color = WD_COLOR_INDEX.YELLOW
         offset = match.end()
-    add_literal(parsed["template_text"][offset:])
-    document.add_paragraph("Yellow names and placeholders depend on a Scope structure, missing property, or a loading that needs review. Fill the yellow cells in Reaction_schema and Scope before generating the final SI.")
-    for issue in parsed["unresolved"]:
-        document.add_paragraph(f"{issue['chemical'] or 'Method'}: {issue['issue']}")
+    add_literal(template_text[offset:])
     document.save(path)
 
 
-def _shade_cell(cell) -> None:
+def _write_loadings_table(parsed: dict[str, Any], path: Path) -> None:
+    """Write a human-review table of source and normalized reaction loadings."""
+    document = Document()
+    section = document.sections[0]
+    section.orientation = WD_ORIENT.LANDSCAPE
+    section.page_width, section.page_height = section.page_height, section.page_width
+    section.left_margin = section.right_margin = Inches(0.35)
+    section.top_margin = section.bottom_margin = Inches(0.45)
+    _set_default_font(document)
+    _add_document_title(document, "Compound loadings extracted from procedure")
+    document.add_paragraph(
+        "Values are normalized to mg, mmol, mL, equivalents and mol/L. Yellow cells require manual input "
+        "or review. N/A means the property is not normally required for that material. Calculated "
+        "values are explicitly identified in the last column."
+    )
+    table = document.add_table(rows=1, cols=len(LOADINGS_HEADERS))
+    table.style = "Table Grid"
+    table.autofit = False
+    header_properties = table.rows[0]._tr.get_or_add_trPr()
+    repeat_header = OxmlElement("w:tblHeader")
+    repeat_header.set(qn("w:val"), "true")
+    header_properties.append(repeat_header)
+    for index, heading in enumerate(LOADINGS_HEADERS):
+        cell = table.cell(0, index)
+        cell.text = heading
+        cell.width = Inches(LOADINGS_COLUMN_WIDTHS_INCHES[index])
+        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        _shade_cell(cell, "1F4E78")
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        for run in cell.paragraphs[0].runs:
+            run.bold = True
+            run.font.color.rgb = RGBColor(255, 255, 255)
+
+    issues_by_alias: dict[str, list[dict[str, str]]] = {}
+    for issue in parsed["unresolved"]:
+        if issue.get("alias"):
+            issues_by_alias.setdefault(issue["alias"], []).append(issue)
+    field_columns = {
+        "mass_mg": 4,
+        "amount_mmol": 5,
+        "volume_ml": 6,
+        "equivalents": 7,
+        "concentration_m": 8,
+        "molecular_weight_g_mol": 9,
+        "density_g_ml": 10,
+    }
+    quantity_names = {
+        "mass_mg": "mass",
+        "amount_mmol": "amount",
+        "volume_ml": "volume",
+        "equivalents": "equivalents",
+        "concentration_m": "concentration",
+        "percentage": "percentage",
+    }
+
+    for chemical in parsed["chemicals"]:
+        if chemical["role"] == "workup":
+            continue
+        row = table.add_row().cells
+        for index, cell in enumerate(row):
+            cell.width = Inches(LOADINGS_COLUMN_WIDTHS_INCHES[index])
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+        row[0].text = chemical["alias"]
+        row[1].text = chemical["name"]
+        row[2].text = chemical["role"] + ("; variable" if chemical["variable"] else "; constant")
+        explicit = [q for q in chemical["quantities"] if not q["derived"] and q.get("raw")]
+        row[3].text = "; ".join(dict.fromkeys(q["raw"] for q in explicit)) or "not stated"
+        for key,column in field_columns.items():
+            row[column].text = _format_number(chemical.get(key)) or ""
+
+        derived = [q for q in chemical["quantities"] if q["derived"]]
+        review = [issue["issue"] for issue in issues_by_alias.get(chemical["alias"], [])]
+        provenance: list[str] = []
+        explicit_kinds = list(dict.fromkeys(quantity_names.get(q["kind"],q["kind"]) for q in explicit))
+        if explicit_kinds:
+            provenance.append("text: " + ", ".join(explicit_kinds))
+        for quantity in derived:
+            provenance.append(
+                "calculated " + quantity_names.get(quantity["kind"],quantity["kind"])
+                + (f" ({quantity['formula']})" if quantity.get("formula") else "")
+            )
+        for prop,label in (("molecular_weight_g_mol","MW"),("density_g_ml","density")):
+            source = chemical.get("property_sources",{}).get(prop)
+            if source:
+                provenance.append(f"{label}: {source.get('source','reference')}")
+        if review:
+            provenance.append("REVIEW: " + " | ".join(dict.fromkeys(review)))
+        row[11].text = "; ".join(provenance) or "No loading source found"
+
+        applicable = {
+            "mass_mg": chemical["role"] != "solvent",
+            "amount_mmol": chemical["role"] != "solvent",
+            "volume_ml": chemical["role"] == "solvent" or chemical.get("volume_ml") is not None,
+            "equivalents": chemical["role"] != "solvent",
+            "concentration_m": chemical["role"] == "solvent" or chemical.get("concentration_m") is not None,
+            "molecular_weight_g_mol": chemical["role"] != "solvent",
+            "density_g_ml": (
+                chemical.get("density_g_ml") is not None
+                or chemical["role"] != "solvent" and chemical.get("volume_ml") is not None
+                and chemical.get("concentration_m") is None
+            ),
+        }
+        unresolved_fields = {issue.get("field") for issue in issues_by_alias.get(chemical["alias"], [])}
+        for key,column in field_columns.items():
+            if not applicable[key]:
+                row[column].text = "N/A"
+            elif chemical.get(key) is None or key in unresolved_fields:
+                _shade_cell(row[column])
+        if review or chemical.get("warnings") or chemical.get("formulation"):
+            _shade_cell(row[11])
+        if chemical["variable"]:
+            _shade_cell(row[1])
+
+    for row_index, row in enumerate(table.rows):
+        for column_index, cell in enumerate(row.cells):
+            for paragraph in cell.paragraphs:
+                if column_index in field_columns.values():
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                for run in paragraph.runs:
+                    run.font.size = Pt(7.25)
+                    if row_index == 0:
+                        run.bold = True
+                        run.font.color.rgb = RGBColor(255, 255, 255)
+    if parsed.get("ignored_workup_entities"):
+        document.add_paragraph(
+            "Work-up materials excluded from the reaction-loading table: "
+            + ", ".join(parsed["ignored_workup_entities"])
+            + ". Their quantities remain literal in SI_template.docx."
+        )
+    document.add_paragraph(
+        "Reaction_schema.docx remains the machine-readable calculation schema. This table is an auditable "
+        "summary of the example procedure and must be reviewed before scaling."
+    )
+    document.save(path)
+
+
+def _shade_cell(cell, fill: str = "FFF2CC") -> None:
+    properties = cell._tc.get_or_add_tcPr()
+    for existing in properties.findall(qn("w:shd")):
+        properties.remove(existing)
     shading = OxmlElement("w:shd")
-    shading.set(qn("w:fill"),"FFF2CC")
-    cell._tc.get_or_add_tcPr().append(shading)
+    shading.set(qn("w:fill"), fill)
+    properties.append(shading)
 
 
 def _set_default_font(document: Document) -> None:
@@ -771,7 +1034,7 @@ def _normalize_text(text: str) -> str:
         .translate(str.maketrans("₀₁₂₃₄₅₆₇₈₉", "0123456789"))
         .strip()
     )
-    return value
+    return re.sub(r"\s+", " ", value)
 
 
 def _normalize_name(name: str) -> str:

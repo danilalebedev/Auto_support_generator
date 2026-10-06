@@ -170,6 +170,31 @@ def test_curation_replacement_respects_paper_cap_and_rejected_text():
     assert select_replacement([one,two],previous,Counter({"a":5}),set(),{two["text_sha256"]}) is None
 
 
+def test_curation_remembers_rejections_across_version_lineage(tmp_path):
+    import curate_acs1000 as curator
+
+    grandparent=tmp_path / "grandparent"
+    parent=tmp_path / "parent"
+    for folder,digest,case_id,text_sha,eligibility in (
+        (grandparent,"sha-grand","OLD-1","rejected-old","not_synthesis"),
+        (parent,"sha-parent","NEW-1","accepted-parent","clear"),
+    ):
+        (folder / "annotations").mkdir(parents=True)
+        curator.save(folder / "frozen_inputs.json",{
+            "dataset_sha256":digest,
+            "cases":[{"id":case_id,"text_sha256":text_sha}],
+        })
+        curator.save(folder / "annotations" / "labels.json",{
+            "dataset_sha256":digest,
+            "cases":[{"id":case_id,"eligibility":eligibility,"notes":""}],
+        })
+    curator.save(parent / "curation_log.json",{"parent_corpus":str(grandparent)})
+
+    rejected=curator.load_lineage_rejections(parent)
+
+    assert rejected == {"rejected-old"}
+
+
 def test_held_out_evaluation_requires_immutable_lock(tmp_path, monkeypatch):
     import benchmark_acs1000 as benchmark
     monkeypatch.setattr(benchmark,"FOLDER",tmp_path)

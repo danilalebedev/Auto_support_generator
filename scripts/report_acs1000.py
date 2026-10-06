@@ -42,19 +42,21 @@ def load_current_evaluations(corpus, labels):
         "annotation_compiler_sha256":"scripts/acs1000_annotations.py"}.items()}
     rows={}
     sections=[]
-    for split,title in [("holdout","Отложенные статьи"),("all","Весь набор, включая использованную для разработки часть"),("development_partial","Промежуточная диагностика development — не тест обобщения")]:
+    summaries={}
+    for split,title in [("holdout","Отложенные статьи"),("validation","Промежуточная проверка"),("all","Весь набор, включая использованную для разработки часть"),("development","Разработка — не тест обобщения"),("development_partial","Промежуточная диагностика development — не тест обобщения")]:
         path=FOLDER / f"results_{split}.json"
         if not path.exists(): continue
         report=json.loads(path.read_text(encoding="utf-8"))
         if report.get("dataset_sha256")!=corpus["dataset_sha256"] or any(report.get(k)!=v for k,v in hashes.items()): continue
         if any(c["id"] not in labels or c.get("annotation_sha256")!=hashlib.sha256(json.dumps(labels[c["id"]],sort_keys=True,ensure_ascii=False).encode()).hexdigest() for c in report["cases"]): continue
         rows.update({c["id"]:c["metrics"] for c in report["cases"]})
+        summaries[split]={"summary":report["summary"],"by_eligibility":report.get("by_eligibility",{})}
         table=[]
         for mode,label in [("baseline","До доработок + переменные"),("current","После доработок + переменные"),("unassisted","После доработок, только текст")]:
             m=report["summary"][mode]
             table.append(f"<tr><td>{label}</td><td>{m['exact_templates']}/{m['cases']}</td><td>{m['complete_passes']}/{m['cases']}</td><td>{m['entity_precision']:.1%} / {m['entity_recall']:.1%}</td><td>{m['quantity_precision']:.1%} / {m['quantity_accuracy']:.1%}</td></tr>")
         sections.append(f"<h2>{html.escape(title)}</h2><p>Совпадение с независимой LLM-разметкой, не экспертная химическая верификация. «Все поля» не означает готовность методики к применению или проверку реального расчёта загрузок.</p><table><thead><tr><th>Режим</th><th>Точный шаблон</th><th>Все сравниваемые поля</th><th>Объекты: precision / recall</th><th>Числа: precision / recall</th></tr></thead><tbody>{''.join(table)}</tbody></table>")
-    return rows,"".join(sections)
+    return rows,"".join(sections),summaries
 
 
 def main():
@@ -62,7 +64,7 @@ def main():
     stats=validate_corpus(corpus["cases"])
     sources={str(s["figshare_id"]):s for s in json.loads((FOLDER / "sources.json").read_text(encoding="utf-8"))}
     labels=load_labels(corpus["cases"])
-    evaluated,metrics_html=load_current_evaluations(corpus,labels)
+    evaluated,metrics_html,summaries=load_current_evaluations(corpus,labels)
     before=baseline_parser()
     results=[]
     for c in corpus["cases"]:
@@ -77,7 +79,7 @@ def main():
         results.append(row)
     hashes={p:hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in ["src/si_generator/procedure_import.py","scripts/acs_corpus_v2.py","scripts/benchmark_acs1000.py","scripts/acs1000_annotations.py"]}
     result={"dataset_sha256":corpus["dataset_sha256"],"generated_utc":datetime.now(timezone.utc).isoformat(),
-            "stats":stats,"annotation_count":len(labels),"accuracy":None,"file_hashes":hashes,
+            "stats":stats,"annotation_count":len(labels),"accuracy":summaries or None,"file_hashes":hashes,
             "extraction_flag_counts":dict(Counter(f for c in corpus["cases"] for f in c["extraction_flags"])),"cases":results}
     save(FOLDER / "predictions_review.json",result)
     # Compact view keeps large source-property evidence in JSON, not every DOM card.
