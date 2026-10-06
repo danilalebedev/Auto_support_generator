@@ -78,6 +78,32 @@ def test_user_reference_overrides_automatic_substrate_cue():
     assert result["reference_amount_mmol"] == 1
 
 
+def test_obtained_from_uses_first_reagent_for_concentration_and_ignores_tlc_solvents():
+    procedure = (
+        "Cyclobutane 3d was obtained from cyclopropane 2d (200 mg, 0.8 mmol), "
+        "4a (203 mg, 1.1 mmol) in DCE (1.5 mL) according to General procedure A, 6.5 h. "
+        "Yield 231 mg (80%); white solid; mp 147-148 °C; "
+        "Rf=0.36 (petroleum ether - ethyl acetate, 4:1)."
+    )
+    result = parse_procedure(procedure)
+    by_name = {chemical["name"]: chemical for chemical in active(result)}
+
+    assert result["reference_chemical"] == "cyclopropane 2d"
+    assert result["reference_amount_mmol"] == 0.8
+    assert by_name["cyclopropane 2d"]["alias"] == "Reagent_1"
+    assert by_name["cyclopropane 2d"]["mass_mg"] == 200
+    assert by_name["4a"]["amount_mmol"] == 1.1
+    assert abs(by_name["DCE"]["concentration_m"] - (0.8 / 1.5)) < 1e-9
+    assert "petroleum ether" not in by_name
+    assert "ethyl acetate" not in by_name
+
+    explicitly_marked = parse_procedure(procedure, variable_names=["2d"])
+    active_names = [chemical["name"] for chemical in active(explicitly_marked)]
+    assert explicitly_marked["reference_chemical"] == "cyclopropane 2d"
+    assert active_names.count("cyclopropane 2d") == 1
+    assert "2d" not in active_names
+
+
 def test_mass_after_chemical_before_loading_parentheses():
     result = parse_procedure("Substrate A 120 mg (0.5 mmol, 1 equiv.) followed by NBS (1 mmol) were stirred in THF (5 mL).", variable_names=["Substrate A"])
     substrate = next(c for c in active(result) if c["name"] == "Substrate A")

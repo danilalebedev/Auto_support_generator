@@ -203,10 +203,19 @@ def parse_procedure(
         # A user-supplied exact name disambiguates generic prose prefixes while
         # retaining those prefixes outside the substituted name span.
         for requested in variable_names:
+            short_label_match = bool(
+                re.fullmatch(r"\d+[a-z]?", requested.strip(), re.I)
+                and _same_chemical_name(cleaned, requested)
+            )
             marked_suffix = (not re.fullmatch(r"\d+[a-z]?",requested,re.I)
                              and _plausible_chemical_name(cleaned) and not QUANTITY_RE.search(cleaned)
                              and re.search(r"(?<![A-Za-z0-9])"+re.escape(_normalize_text(requested))+r"$", cleaned, re.I))
             if _same_chemical_name(cleaned, requested) or marked_suffix:
+                # A short compound number such as `2d` identifies the complete
+                # parsed name `cyclopropane 2d`; replacing only the suffix would
+                # leave a misleading literal prefix in the generated template.
+                if short_label_match:
+                    break
                 mention = re.search(re.escape(_normalize_text(requested)), normalized_text[span[0]:span[1]], re.I)
                 if mention:
                     span = (span[0]+mention.start(), span[0]+mention.end())
@@ -390,7 +399,12 @@ def parse_procedure(
     # and mark their concentration missing instead of silently dropping them.
     workup_start = WORKUP_CONTEXT_RE.search(normalized_text)
     reaction_prefix = normalized_text[:workup_start.start()] if workup_start else normalized_text
-    reaction_prefix = re.split(r"\b(?:TLC|concentrated|evaporation|removed|poured)\b",reaction_prefix,flags=re.I)[0]
+    reaction_prefix = re.split(
+        r"\b(?:TLC|concentrated|evaporation|removed|poured|yield|HRMS|NMR|IR|anal)\b|"
+        r"(?<!\w)(?:m\.?p\.?|Rf)\s*[=:]",
+        reaction_prefix,
+        flags=re.I,
+    )[0]
     for solvent in sorted(SOLVENT_NAMES, key=len, reverse=True):
         if solvent in {"solvent","ether","hexane","n-hexane"}: continue
         for mention in re.finditer(r"(?<![A-Za-z0-9])"+re.escape(solvent)+r"(?![A-Za-z0-9])",reaction_prefix,re.I):
@@ -951,7 +965,7 @@ def _name_left_of(text: str, position: int) -> tuple[str, tuple[int, int], str]:
     segment = text[start:position]
     visible_segment = "".join(visible[start:position])
     connectors = list(re.finditer(
-        r"\b(?:solution|suspension|mixture)\s+of\b|\bin(?=\d+(?:,\d+)+-)|\b(?:containing|added|add|loaded|charged|with|and|or|either|in|of|by|then|thereafter|after which|after that|before)\b|(?<=with)(?=[A-Za-z])",
+        r"\b(?:solution|suspension|mixture)\s+of\b|\bin(?=\d+(?:,\d+)+-)|\b(?:containing|added|add|loaded|charged|with|and|or|either|in|of|from|by|then|thereafter|after which|after that|before)\b|(?<=with)(?=[A-Za-z])",
         visible_segment,re.I))
     relative_start = connectors[-1].end() if connectors else 0
     raw = segment[relative_start:]
@@ -1152,8 +1166,20 @@ def _same_chemical_name(left: str, right: str) -> bool:
             if normalize_reagent_name(carrier) in {normalize_reagent_name(n) for n in SOLVENT_NAMES}:
                 value = active
         value = re.sub(r"^(?:(?:the|corresponding|appropriate|compounds?|substrates?|intermediates?|base|ligand|dry|anhydrous|anhyd\.?)\s+)+", "", value)
-        return re.sub(r"\s+", "", value).strip(".,")
-    return stripped(left) == stripped(right)
+        return value.strip(" .,")
+
+    left_name = stripped(left)
+    right_name = stripped(right)
+    if re.sub(r"\s+", "", left_name) == re.sub(r"\s+", "", right_name):
+        return True
+    for short_name, full_name in ((left_name, right_name), (right_name, left_name)):
+        if re.fullmatch(r"\d+[a-z]?", short_name, re.I) and re.search(
+            r"(?<![A-Za-z0-9])" + re.escape(short_name) + r"$",
+            full_name,
+            re.I,
+        ):
+            return True
+    return False
 
 
 def _apply_builtin_catalog(chemicals: list[ParsedChemical]) -> None:
