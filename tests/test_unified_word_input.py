@@ -149,7 +149,7 @@ class UnifiedWordInputTests(unittest.TestCase):
                 self.assertIsNotNone(bundle.si_template, example_name)
 
     def test_crystallography_example_embeds_both_templates(self) -> None:
-        source = REPO_ROOT / "examples" / "crystallography_all_in_one" / "All_in_one_input.docx"
+        source = REPO_ROOT / "examples" / "example_4" / "All_in_one_input.docx"
         with tempfile.TemporaryDirectory() as tmp:
             bundle = materialize_unified_input(source, Path(tmp) / "parts")
             self.assertIsNotNone(bundle.si_template)

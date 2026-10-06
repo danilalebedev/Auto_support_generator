@@ -113,9 +113,7 @@ Copy-Item -LiteralPath (Join-Path $root "RELEASE_BETA_1_2.md") -Destination (Joi
 Copy-Item -LiteralPath (Join-Path $root "examples\example_1") -Destination (Join-Path $payloadExamplesDir "example_1") -Recurse
 Copy-Item -LiteralPath (Join-Path $root "examples\example_2") -Destination (Join-Path $payloadExamplesDir "example_2") -Recurse
 Copy-Item -LiteralPath (Join-Path $root "examples\example_3") -Destination (Join-Path $payloadExamplesDir "example_3") -Recurse
-Copy-Item -LiteralPath (Join-Path $root "examples\crystallography") -Destination (Join-Path $payloadExamplesDir "crystallography") -Recurse
-Copy-Item -LiteralPath (Join-Path $root "examples\crystallography_all_in_one") -Destination (Join-Path $payloadExamplesDir "crystallography_all_in_one") -Recurse
-Copy-Item -LiteralPath (Join-Path $root "examples\reaction_scope") -Destination (Join-Path $payloadExamplesDir "reaction_scope") -Recurse
+Copy-Item -LiteralPath (Join-Path $root "examples\example_4") -Destination (Join-Path $payloadExamplesDir "example_4") -Recurse
 $payloadDocsAssets = Join-Path $payloadDir "docs\assets"
 New-Item -ItemType Directory -Force -Path $payloadDocsAssets | Out-Null
 Copy-Item -LiteralPath (Join-Path $root "docs\assets\gui_overview.png") -Destination (Join-Path $payloadDocsAssets "gui_overview.png")

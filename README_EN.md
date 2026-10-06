@@ -8,7 +8,7 @@ An optional sidecar JSON supplies crystal-growth/refinement text, CCDC, an exter
 
 Raw Bruker HSQC, HMBC, COSY, NOESY, TOCSY and ROESY experiments are detected from acquisition metadata. Version A uses separately processed 1H/13C external projections, independent 8% trace sizes, contour scaling 4.0 and `ppm` labels on both axes; the 13C projection uses Bernstein baseline correction of order 3.
 
-**Multiple series** assembles a folder of series, each with its own Compound_table, optional SI_template and Reaction_schema/Scope. Processing settings are shared; compound numbers must be unique. See the [field reference and requirements](docs/crystallography.md) and [runnable example](examples/crystallography). Existing installer binaries have not been rebuilt for these source changes.
+**Multiple series** assembles a folder of series, each with its own Compound_table, optional SI_template and Reaction_schema/Scope. Processing settings are shared; compound numbers must be unique. See the [field reference and requirements](docs/crystallography.md) and [complete runnable example](examples/example_4). Existing installer binaries have not been rebuilt for these source changes.
 
 **English** | [Русский](README_RU.md)
 
@@ -211,7 +211,7 @@ The first product row supplies the reaction at the top, with named reagents abov
 
 The `scope` folder contains editable CDXML, native ChemDraw PNG previews and saved layout data. The PNG overview appears before characterization in Word. Patch updates the overview without NMR processing; Add extends the same series or keeps new methods separate. Installed ChemDraw is required. Turning the option off skips scope generation entirely.
 
-See the [input files and demonstration output](examples/reaction_scope). The demonstration intentionally omits NMR processing; attach the example_1 spectra for a full SI run.
+Each numbered example contains the editable input files and a `Reference_output.docx` generated with **Show scope** enabled. Start with [example_1](examples/example_1), or use [example_4](examples/example_4) for the complete NMR/X-ray workflow.
 
 ## Processing
 
@@ -228,12 +228,12 @@ See the [input files and demonstration output](examples/reaction_scope). The dem
 | **Apply to 1H/13C** | Select nuclei receiving baseline correction. |
 | **Whittaker / polynomial parameters** | Expert parameters for the selected baseline algorithm. |
 
-During `13C NMR` validation, the program estimates symmetry classes of all carbon atoms from the molecular graph, including specified stereochemistry and isotopes. This is not a complete NMR prediction: mixtures, diastereotopic environments and dynamic exchange require review. If the structure or SMILES is unavailable or inconsistent with the formula, validation uses the full carbon count.
+During `13C NMR` validation, the program applies graph-symmetry correction only to isolated phenyl rings. Other carbon atoms are counted individually because local stereochemistry and conformation can remove apparent graph equivalence. If the structure or SMILES is unavailable or inconsistent with the formula, validation uses the full carbon count.
 
 ### Chemical validation logic
 
 - **1H NMR:** integral labels such as `1H`, `2H` and `3H` are summed and compared with the number of H atoms in the molecular formula.
-- **13C NMR:** signals are compared with the graph-equivalence classes of all carbon atoms. With symmetry correction enabled, a single peak annotated `(2C)` counts as one signal, not two. Without structure data, the full formula carbon count is used.
+- **13C NMR:** symmetry correction is limited to isolated phenyl rings; all other carbons use the full formula count. A single phenyl peak annotated `(2C)` counts as one signal, not two.
 - **HRMS:** found `m/z` is compared with the calculated value for the formula and adduct. The base tolerance is 5 ppm, while a publication profile may add journal-specific requirements.
 - **Elemental analysis:** experimental element percentages are compared with values calculated from the formula.
 
@@ -323,10 +323,9 @@ The repository and **Instructions → Example files** include base and extended 
 | [`examples/example_1`](examples/example_1) | First series, compounds 2a–2d; Spectra source folder. |
 | [`examples/example_2`](examples/example_2) | Series continuation, compounds 2e–2f. |
 | [`examples/example_3`](examples/example_3) | New method, compounds 3a, 3b, 3c, 3d, 3i; Spectra source folder and zip. |
-| [`examples/reaction_scope`](examples/reaction_scope) | Reaction and aligned compound scope with editable CDXML. |
-| [`examples/crystallography_all_in_one`](examples/crystallography_all_in_one) | Eight X-ray compounds with raw NMR, CIF/ORTEP files, embedded SI/X-ray templates and a generated reference output. |
+| [`examples/example_4`](examples/example_4) | Complete all-in-one example with 28 compounds, editable scope, raw 1H/13C for every compound and X-ray data for the available subset. |
 
-Every set uses GUI-matching names: `Compound_table.docx`, `Spectra_source`, `SI_template.docx`, `Reaction_schema.docx`, `Scope.docx`.
+Every set uses GUI-matching names and includes a `Reference_output.docx` generated with **Show scope**.
 
 ## Output
 

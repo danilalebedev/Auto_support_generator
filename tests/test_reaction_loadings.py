@@ -624,6 +624,35 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertIn("{NBS.mass.mg}", template)
         self.assertNotIn("{compound.name}", template)
 
+    def test_preparation_placeholder_preserves_authored_method_while_calculating_loadings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scope_path = _filtered_example_scope(root, "3a")
+            template_path = root / "SI_template.docx"
+            document = Document()
+            document.add_paragraph("{Product.name} ({Product.number})")
+            document.add_paragraph("{Product.structure}")
+            document.add_paragraph("{Product.preparation}")
+            document.save(template_path)
+            compound = Compound(
+                number="3a",
+                name="Example",
+                preparation="Author-provided experimental method.",
+            )
+
+            issues = apply_loadings_workflow(
+                [compound],
+                EXAMPLES_DIR,
+                paths=LoadingsWorkflowPaths(LOADINGS_DIR / "Reaction_schema.docx", scope_path),
+                template_docx=template_path,
+            )
+
+        self.assertEqual(issues, [])
+        self.assertEqual(compound.preparation, "Author-provided experimental method")
+        self.assertEqual(compound.reaction["source"], "loadings_workflow")
+        self.assertEqual(compound.reaction["template_values"]["product.name"], "Example")
+        self.assertTrue(compound.yield_text)
+
     def test_loadings_workflow_does_not_depend_on_render_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             scope_path = _filtered_example_scope(Path(tmp), "3a")

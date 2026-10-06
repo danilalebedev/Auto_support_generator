@@ -225,7 +225,15 @@ def read_characterization_template(path: str | Path) -> str:
     document = Document(str(path))
     paragraphs = [paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip()]
     loadings_paragraph = next((text for text in paragraphs if _paragraph_has_loadings_placeholders(text)), "")
-    text = loadings_paragraph or "\n".join(paragraphs)
+    preparation_paragraph = next(
+        (
+            text
+            for text in paragraphs
+            if text in {"{Product.preparation}", "{Compound.preparation}"}
+        ),
+        "",
+    )
+    text = loadings_paragraph or preparation_paragraph or "\n".join(paragraphs)
     return _repair_known_template_placeholders(text)
 
 
@@ -322,6 +330,8 @@ def _base_template_values(
     return {
         _token_key("Product.name"): capitalize_compound_name(_metadata_display(row.product, compound.name)),
         _token_key("Product.number"): row.product_number,
+        _token_key("Product.preparation"): compound.preparation,
+        _token_key("Compound.preparation"): compound.preparation,
         _token_key("Product.mg"): _format_mass(row.product_mass_mg),
         _token_key("Product.g"): _format_scaled_amount(_scale_value(row.product_mass_mg, 1 / 1000)),
         _token_key("Product.kg"): _format_scaled_amount(_scale_value(row.product_mass_mg, 1 / 1_000_000)),
@@ -765,7 +775,7 @@ def _display_schema_name(label: str) -> str:
 
 
 def _metadata_display(metadata: StructureMetadata, fallback: str) -> str:
-    return metadata.name or metadata.formula or _display_schema_name(fallback)
+    return metadata.name or _display_schema_name(fallback) or metadata.formula
 
 
 def _metadata_mw(metadata: StructureMetadata) -> float | None:

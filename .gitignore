@@ -16,9 +16,7 @@ processed_spectra/
 processed_mnova/
 mnova_reports/
 .local_examples/
-examples/reaction_scope/Reference_output/
-examples/crystallography_all_in_one/_build/
-examples/crystallography_all_in_one/Reference_output/
+examples/example_*/_build/
 
 *.tmp
 *.log

@@ -48,11 +48,6 @@ from .workflows.patch_si import run_patch_si
 
 
 INSTRUCTION_TEMPLATE_FILES = (
-    ("Crystallography - All-in-one input", Path("crystallography_all_in_one") / "All_in_one_input.docx", "Eight X-ray compounds with original experimental data plus embedded SI and crystallography templates."),
-    ("Crystallography - Eight-compound example", Path("crystallography_all_in_one"), "All-in-one DOCX, raw spectra, eight CIF structures, ORTEP plots and the generated output."),
-    ("Reaction scope - Example", Path("reaction_scope"), "Four compounds, editable reaction/scope CDXML and a generated Word example."),
-    ("Crystallography - Complete folder", Path("crystallography"), "Four compounds, three CIF structures and original ORTEP images; includes a two-method example."),
-    ("Crystallography template", Path("crystallography") / "Crystallography_template.docx", "Editable crystallography section headings, description, table and optional geometry."),
     ("Example 1 - All-in-one input", Path("example_1") / "All_in_one_input.docx", "Four products with a complete reaction schema, scope and SI template in one editable Word file."),
     ("Example 1 - Compound table", Path("example_1") / "Compound_table.docx", "Four compounds for the first synthetic series."),
     ("Example 1 - Spectra source", Path("example_1") / "Spectra_source", "Matching raw 1H and 13C spectra as a folder."),
@@ -63,14 +58,17 @@ INSTRUCTION_TEMPLATE_FILES = (
     ("Example 2 - Complete folder", Path("example_2"), "The same second-series input supplied as separate files."),
     ("Example 3 - All-in-one input", Path("example_3") / "All_in_one_input.docx", "A different reaction method with two variable reagents and five products."),
     ("Example 3 - Complete folder", Path("example_3"), "The same new-method input as separate files, including spectra as a folder and zip."),
+    ("Example 4 - All-in-one input", Path("example_4") / "All_in_one_input.docx", "Twenty-eight compounds with embedded scope, SI and crystallography templates."),
+    ("Example 4 - Complete folder", Path("example_4"), "Raw 1H/13C spectra for every compound, optional CIF/ORTEP data and a generated reference output."),
+    ("Example 4 - Compound table", Path("example_4") / "Compound_table.docx", "Author methods, 100% ChemDraw structures and analytical data for 28 compounds."),
+    ("Example 4 - Scope", Path("example_4") / "Scope.docx", "Editable precursor/product structures and measured masses for all 28 compounds."),
+    ("Example 4 - Crystallography template", Path("example_4") / "Crystallography_template.docx", "Editable crystallography section headings, description, table and optional geometry."),
 )
 STARTER_EXAMPLE_DIRS = (
     Path("example_1"),
     Path("example_2"),
     Path("example_3"),
-    Path("crystallography"),
-    Path("crystallography_all_in_one"),
-    Path("reaction_scope"),
+    Path("example_4"),
 )
 
 
@@ -974,7 +972,7 @@ class SIGeneratorApp:
                 "- example_1/All_in_one_input.docx: complete four-product series and the recommended starting point.\n"
                 "- example_2/All_in_one_input.docx: compact two-product example.\n"
                 "- example_3/All_in_one_input.docx: a different method with two variable reagents.\n"
-                "- crystallography_all_in_one/All_in_one_input.docx: eight compounds with embedded SI and crystallography templates.\n"
+                "- example_4/All_in_one_input.docx: 28 compounds with raw NMR, editable scope and optional crystallography data.\n"
                 "- Open or copy them from Example files below. Replace values and structures, but preserve section labels and table headers."
             ),
             wraplength=760,
@@ -1224,7 +1222,7 @@ class SIGeneratorApp:
             "7. Tables use centered columns, top/bottom rules and automatic Table S1, S2, etc. captions. Add and Patch update the sequence.\n"
             "8. Output reports/crystallography stores original CIFs, figures, extracted JSON and individual DOCX reports. Add and Patch preserve these bundles.\n"
             "9. Local checks do not replace checkCIF. Optional sample.checkcif.pdf imports official alerts; CCDC deposition and responses remain the author's responsibility.\n"
-            "10. Ready example: crystallography_all_in_one contains eight compounds, raw NMR, CIF/ORTEP files, both embedded templates and a generated reference DOCX."
+            "10. Ready example: example_4 contains 28 compounds, raw NMR, CIF/ORTEP files, embedded templates and a generated reference DOCX."
         ), wraplength=760, justify="left").grid(row=0, column=0, sticky="ew")
         series = self._instruction_block(content, 15, "Multiple series", "Generate one SI from several methods in one run.")
         ttk.Label(series, text=(

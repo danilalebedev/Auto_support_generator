@@ -827,9 +827,7 @@ class GuiWorkflowTests(unittest.TestCase):
                 "example_1",
                 "example_2",
                 "example_3",
-                "crystallography",
-                "crystallography_all_in_one",
-                "reaction_scope",
+                "example_4",
             )
             for example_name in example_names:
                 example = examples_root / example_name
