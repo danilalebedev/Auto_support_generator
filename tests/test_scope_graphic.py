@@ -83,10 +83,14 @@ def test_long_scope_is_split_without_losing_products(tmp_path):
                         for i in range(25)]
     def preview(app, cdxml, output):
         Image.new("RGB", (800, 1000), "white").save(output)
-    with patch("si_generator.scope_graphic.generator.render_png", side_effect=preview):
+    with (
+        patch("si_generator.scope_graphic.generator.save_cdx", side_effect=lambda _app, _xml, output: output.touch()),
+        patch("si_generator.scope_graphic.generator.render_png", side_effect=preview),
+    ):
         saved = write_model(data, tmp_path, app=object())
     pages = json.loads(saved.read_text())["pages"]
     assert len(pages) == 3
+    assert all((tmp_path / page["cdx"]).is_file() for page in pages)
     labels = []
     for page in pages:
         root = parse((tmp_path / page["cdxml"]).read_text())
@@ -256,6 +260,31 @@ def test_insertion_is_idempotent_and_precedes_characterization(tmp_path):
     assert result.paragraphs[-1].text == "Compound descriptions"
     markers = [e.get(qn("w:name")) for e in result._element.iter(qn("w:bookmarkStart"))]
     assert markers == ["asg_scope_overview"]
+
+
+def test_insertion_embeds_native_scope_file_as_sized_chemdraw_ole(tmp_path):
+    path = tmp_path / "support.docx"
+    document = Document()
+    document.add_paragraph("Compound descriptions")
+    document.save(path)
+    image = tmp_path / "scope.png"
+    Image.new("RGB", (800, 450), "white").save(image)
+    cdxml = tmp_path / "scope.cdxml"
+    cdxml.write_text("<CDXML/>", encoding="utf-8")
+    cdx = tmp_path / "scope.cdx"
+    cdx.write_bytes(b"CDX")
+    data = tmp_path / "scope_graphic.json"
+    data.write_text(json.dumps({"pages": [{"png": image.name, "cdxml": cdxml.name, "cdx": cdx.name}]}))
+
+    with patch("si_generator.scope_graphic.document.insert_chemdraw_marker_objects") as insert_ole:
+        insert_overview(path, data)
+
+    insert_ole.assert_called_once()
+    args, kwargs = insert_ole.call_args
+    assert args[0] == path
+    assert args[1] == {"[[ASG_SCOPE_OLE:1]]": cdx}
+    width, height = kwargs["size_points"]["[[ASG_SCOPE_OLE:1]]"]
+    assert width > height > 0
 
 
 def test_patch_without_overview_does_not_use_chemdraw(tmp_path):

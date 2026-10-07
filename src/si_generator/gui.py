@@ -1208,7 +1208,7 @@ class SIGeneratorApp:
             "- Reaction conditions: enter temperature, time or other conditions. Unknown conditions are not guessed.\n"
             "- Title: heading above the scheme.\n\n"
             "Output and editing\n"
-            "- scope/reaction_scope_N.cdxml contains editable ChemDraw drawings. Native PNG previews are inserted in Word.\n"
+            "- scope/reaction_scope_N.cdxml and .cdx contain editable ChemDraw drawings. The CDX drawings are embedded in Word as ChemDraw OLE objects.\n"
             "- Structures are aligned by a common molecular core. Each label is one line: bold compound number followed by a normal comma and yield, for example 2a, 80%.\n"
             "- Patch updates numbers, order and removed compounds from saved scope data; NMR processing is not repeated. ChemDraw is needed to redraw previews.\n"
             "- Add To Same Series extends the scope. New Method and Multiple series keep separate reaction overviews.\n"

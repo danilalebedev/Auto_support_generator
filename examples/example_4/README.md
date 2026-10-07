@@ -12,7 +12,7 @@ This example contains 28 compounds: **2g, 2h, 2k, 3a-3w, 5, and 6**. It demonstr
 - `Additional_spectra.zip`: optional 19F, coupled 13C, and minor-diastereomer experiments retained separately.
 - `CIF_source`: CIF, ORTEP, metadata, and available checkCIF files for the compounds with X-ray data.
 - `Source_files/CIF`: the four additional source CIF files supplied without renaming or conversion.
-- `Reference_output.docx`: generated reference support with **Show scope** enabled.
+- `Reference_output.docx`: generated reference support with **Show scope** enabled and each scope page embedded as an editable ChemDraw OLE object.
 - `provenance.json`: source hashes, spectrum coverage, and CIF mapping.
 
 ## Reproduce

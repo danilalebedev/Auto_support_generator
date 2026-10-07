@@ -62,6 +62,33 @@ class UnifiedWordInputTests(unittest.TestCase):
         self.assertEqual(len(source_ole), len(extracted_ole))
         self.assertGreater(len(extracted_ole), 0)
 
+    def test_combined_input_has_unique_ole_shape_ids_and_preserves_scope_layout(self) -> None:
+        example = REPO_ROOT / "examples" / "example_4"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            unified = build_unified_input_docx(
+                example / "Compound_table.docx",
+                root / "All_in_one_input.docx",
+                scope=example / "Scope.docx",
+            )
+            document = Document(unified)
+            shape_ids = [
+                shape.get("id")
+                for shape in document._element.xpath(
+                    './/*[local-name()="object"]//*[local-name()="shape"]'
+                )
+            ]
+            bundle = materialize_unified_input(unified, root / "parts")
+            scope = Document(bundle.scope)
+
+        expected_objects = sum(
+            len(Document(path)._element.xpath('.//*[local-name()="object"]'))
+            for path in (example / "Compound_table.docx", example / "Scope.docx")
+        )
+        self.assertEqual(len(shape_ids), expected_objects)
+        self.assertEqual(len(shape_ids), len(set(shape_ids)))
+        self.assertGreater(scope.sections[0].page_width, scope.sections[0].page_height)
+
     def test_optional_sections_may_be_absent(self) -> None:
         compound_table = REPO_ROOT / "examples" / "example_1" / "Compound_table.docx"
         with tempfile.TemporaryDirectory() as tmp:

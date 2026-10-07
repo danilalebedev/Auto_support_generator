@@ -88,12 +88,12 @@ PRECURSOR_SMILES = {
 }
 
 YLIDE_SMILES = {
-    "4a": "C[S+](C)[C-]C(=O)c1ccccc1",
-    "4b": "C[S+](C)[C-]C(=O)c1ccccc1OC",
-    "4c": "C[S+](C)[C-]C(=O)c1ccc(OC)cc1",
-    "4d": "C[S+](C)[C-]C(=O)c1ccc(Cl)cc1",
-    "4e": "C[S+](C)[C-]C(=O)c1cccs1",
-    "4g": "CCOC(=O)[C-][S+](C)C",
+    "4a": "C[S](C)=CC(=O)c1ccccc1",
+    "4b": "C[S](C)=CC(=O)c1ccccc1OC",
+    "4c": "C[S](C)=CC(=O)c1ccc(OC)cc1",
+    "4d": "C[S](C)=CC(=O)c1ccc(Cl)cc1",
+    "4e": "C[S](C)=CC(=O)c1cccs1",
+    "4g": "CCOC(=O)C=[S](C)C",
 }
 
 METHOD_TEMPLATES = (

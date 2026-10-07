@@ -8,7 +8,7 @@ from ..domain.loadings_workflow import read_scope, read_reaction_schemas, _limit
 from ..method_selectors import select_for_compound
 from ..chemdraw_names import _extract_cdx_by_cell
 from .layout import make_page
-from .native import chemdraw, cdx_to_xml, render_png
+from .native import chemdraw, cdx_to_xml, render_png, save_cdx
 
 
 def yield_label(compound, row, schema):
@@ -138,10 +138,13 @@ def write_model(model, output_dir, app=None):
             products = series["products"][index:index + 12]
             xml, metrics = make_page(products, series["reaction"], series["conditions"], series["title"])
             stem = f"reaction_scope_{len(pages) + 1}"
-            cdxml, png = output_dir / f"{stem}.cdxml", output_dir / f"{stem}.png"
+            cdxml = output_dir / f"{stem}.cdxml"
+            cdx = output_dir / f"{stem}.cdx"
+            png = output_dir / f"{stem}.png"
             cdxml.write_text(xml, encoding="utf-8")
+            save_cdx(app, cdxml, cdx)
             render_png(app, cdxml, png)
-            pages.append({"cdxml": cdxml.name, "png": png.name, **metrics})
+            pages.append({"cdxml": cdxml.name, "cdx": cdx.name, "png": png.name, **metrics})
     model["pages"] = pages
     model_path = output_dir / "scope_graphic.json"
     model_path.write_text(json.dumps(model, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -47,3 +47,11 @@ def render_png(app, cdxml: Path, output: Path) -> None:
         output.write_bytes(data)
     finally:
         doc.Close(False)
+
+
+def save_cdx(app, cdxml: Path, output: Path) -> None:
+    doc = app.Documents.Open(str(cdxml.resolve()))
+    try:
+        doc.SaveAs(str(output.resolve()))
+    finally:
+        doc.Close(False)

@@ -113,6 +113,7 @@ def build_unified_input_docx(
 
     document = Document(output)
     body = document._element.body
+    base_section_properties = deepcopy(body.find(qn("w:sectPr")))
     for element in list(body):
         if element.tag != qn("w:sectPr"):
             body.remove(element)
@@ -133,20 +134,28 @@ def build_unified_input_docx(
         ("si_template", si_template),
         ("crystallography_template", crystallography_template),
     )
+    ole_identity = _OleIdentityAllocator()
+    previous_source_ended_with_section_break = False
     for index, (key, source) in enumerate(section_sources):
         if not source:
             continue
         if index:
             heading = document.add_paragraph(SECTION_MARKERS[key])
             _format_section_marker(heading)
-            heading.paragraph_format.page_break_before = True
+            heading.paragraph_format.page_break_before = not previous_source_ended_with_section_break
         source_document = Document(Path(source).resolve())
+        previous_source_ended_with_section_break = False
         for element in source_document._element.body:
             if element.tag == qn("w:sectPr"):
                 continue
             copied = deepcopy(element)
-            _remap_element_relationships(copied, source_document.part, document.part)
+            _remap_element_relationships(copied, source_document.part, document.part, ole_identity)
             body.insert(len(body) - 1, copied)
+            previous_source_ended_with_section_break = bool(copied.xpath(".//w:sectPr"))
+        source_section_properties = source_document._element.body.find(qn("w:sectPr"))
+        if _section_layout_signature(source_section_properties) != _section_layout_signature(base_section_properties):
+            body.insert(len(body) - 1, _section_boundary(source_section_properties))
+            previous_source_ended_with_section_break = True
 
     end = document.add_paragraph(END_MARKER)
     _format_section_marker(end)
@@ -180,7 +189,7 @@ def _apply_table_borders(table) -> None:
         border.set(qn("w:color"), "000000")
 
 
-def _remap_element_relationships(element, source_part, target_part) -> None:
+def _remap_element_relationships(element, source_part, target_part, ole_identity=None) -> None:
     cloned_parts: dict[str, Part] = {}
     relationship_namespace = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
     for node in element.iter():
@@ -200,6 +209,53 @@ def _remap_element_relationships(element, source_part, target_part) -> None:
                     cloned_parts[source_key] = cloned_part
                 new_id = target_part.relate_to(cloned_part, relationship.reltype)
             node.set(attribute_name, new_id)
+    if ole_identity is not None:
+        ole_identity.remap(element)
+
+
+class _OleIdentityAllocator:
+    def __init__(self) -> None:
+        self._shape_index = 1025
+        self._object_index = 1_000_000_000
+
+    def remap(self, element) -> None:
+        for word_object in element.xpath('.//*[local-name()="object"]'):
+            ole_objects = word_object.xpath('.//*[local-name()="OLEObject"]')
+            for shape in word_object.xpath('.//*[local-name()="shape"]'):
+                old_shape_id = shape.get("id")
+                new_shape_id = f"_x0000_i{self._shape_index}"
+                self._shape_index += 1
+                shape.set("id", new_shape_id)
+                for ole_object in ole_objects:
+                    if ole_object.get("ShapeID") == old_shape_id:
+                        ole_object.set("ShapeID", new_shape_id)
+            for ole_object in ole_objects:
+                ole_object.set("ObjectID", f"_{self._object_index}")
+                self._object_index += 1
+
+
+def _section_layout_signature(section_properties) -> tuple:
+    if section_properties is None:
+        return ()
+    page_size = section_properties.find(qn("w:pgSz"))
+    if page_size is None:
+        return ()
+    width = int(page_size.get(qn("w:w"), "0"))
+    height = int(page_size.get(qn("w:h"), "0"))
+    orientation = page_size.get(qn("w:orient"))
+    return ("landscape" if orientation == "landscape" or width > height else "portrait",)
+
+
+def _section_boundary(section_properties):
+    paragraph = etree.Element(qn("w:p"))
+    properties = etree.SubElement(paragraph, qn("w:pPr"))
+    boundary = etree.SubElement(properties, qn("w:sectPr"))
+    if section_properties is not None:
+        for name in ("type", "pgSz", "pgMar", "cols", "docGrid"):
+            node = section_properties.find(qn(f"w:{name}"))
+            if node is not None:
+                boundary.append(deepcopy(node))
+    return paragraph
 
 
 def _clone_part(source_part, target_package) -> Part:
