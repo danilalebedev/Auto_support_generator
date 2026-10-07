@@ -697,6 +697,9 @@ def _emu_to_pt(value: int) -> float:
 
 def _compound_values(compound: Compound, *, include_preparation: bool = True) -> dict[str, str]:
     loadings_values = {_key(str(key)): str(value) for key, value in compound.reaction.get("template_values", {}).items()}
+    for preparation_key in ("product.preparation", "compound.preparation"):
+        if not loadings_values.get(preparation_key):
+            loadings_values.pop(preparation_key, None)
     if loadings_values.get("product.name"):
         loadings_values["product.name"] = capitalize_compound_name(loadings_values["product.name"])
     product_values = _product_values(compound)

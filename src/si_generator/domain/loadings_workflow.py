@@ -404,6 +404,8 @@ def _apply_scope_row(
 
     preparation = _render_template(template, values)
     compound.preparation = preparation.rstrip(".")
+    values[_token_key("Product.preparation")] = compound.preparation
+    values[_token_key("Compound.preparation")] = compound.preparation
     compound.yield_text = _yield_text(row.product_mass_mg, percent_yield)
     if row.product.formula and not compound.formula:
         compound.formula = row.product.formula

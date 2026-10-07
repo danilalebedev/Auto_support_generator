@@ -79,6 +79,38 @@ class TemplateRendererTests(unittest.TestCase):
         self.assertNotIn("K2CO3 ( mg", text)
         self.assertNotIn("according to GP2", text)
 
+    def test_empty_legacy_template_value_does_not_hide_calculated_preparation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            template = root / "template.docx"
+            output = root / "support.docx"
+            document = Document()
+            document.add_paragraph("{Product.name} ({Product.number})")
+            document.add_paragraph("{Product.preparation}")
+            document.save(template)
+            compound = Compound(
+                id="cmp_001",
+                number="2a",
+                name="Example compound",
+                preparation="Calculated loading: substrate 100 mg (1.0 mmol).",
+                reaction={
+                    "source": "loadings_workflow",
+                    "template_values": {
+                        "product.preparation": "",
+                        "compound.preparation": "",
+                    },
+                },
+            )
+
+            build_document_from_model(
+                build_si_document_model([compound], spectra_embed_mode="none"),
+                output,
+                template_path=template,
+            )
+            text = "\n".join(paragraph.text for paragraph in Document(output).paragraphs)
+
+        self.assertIn("Calculated loading: substrate 100 mg (1.0 mmol).", text)
+
     def test_replaces_split_placeholder_and_preserves_template_run_style(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

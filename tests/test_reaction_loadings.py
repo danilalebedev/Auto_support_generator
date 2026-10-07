@@ -719,6 +719,14 @@ class ReactionLoadingsTests(unittest.TestCase):
         self.assertEqual(len(templates), 2)
         self.assertIn("Method A used 5 mg", compounds[0].preparation)
         self.assertIn("Method B used 15 mg", compounds[1].preparation)
+        self.assertEqual(
+            compounds[0].reaction["template_values"]["product.preparation"],
+            compounds[0].preparation,
+        )
+        self.assertEqual(
+            compounds[1].reaction["template_values"]["compound.preparation"],
+            compounds[1].preparation,
+        )
         self.assertAlmostEqual(compounds[0].reaction["target_mmol"], 1.0)
         self.assertAlmostEqual(compounds[1].reaction["target_mmol"], 1.0)
 
