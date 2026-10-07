@@ -17,7 +17,7 @@ Questions, feedback, or bug reports are welcome. Contact the author:
 
 ## Install without Git or Python
 
-1. Open [`installer/AutoSupportGeneratorSetup.exe`](installer/AutoSupportGeneratorSetup.exe) on GitHub.
+1. Open [`installer/AutoSupportGeneratorSetup.exe`](installer/AutoSupportGeneratorSetup.exe) on GitHub. The adjacent [`AutoSupportGeneratorSetup.exe.sha256`](installer/AutoSupportGeneratorSetup.exe.sha256) records its SHA-256 checksum.
 2. Click **Download raw file** and save the installer.
 3. Run `AutoSupportGeneratorSetup.exe`. If Windows SmartScreen appears, verify that the file came from this repository, then choose **More info → Run anyway**.
 4. Use **Browse...** to choose the installation folder or keep the suggested folder under `%LOCALAPPDATA%`.
@@ -36,7 +36,11 @@ The [complete NMR all-in-one example](examples/example_4) contains 28 compounds 
 
 **Generate templates** converts an experimental method `.docx` into both a ready `All_in_one_input.docx` and the matching classic `Compound_table.docx`, `Reaction_schema.docx`, `Scope.docx` and `SI_template.docx` files. It also writes an auditable loadings table and highlights chemistry that still requires user input.
 
-Optional **CIF source** adds X-ray structure figures, experimental descriptions and numbered crystal/refinement tables to SI. A custom crystallography template can be supplied separately or embedded in all-in-one DOCX. Raw 2D Bruker experiments (HSQC, HMBC, COSY, NOESY, TOCSY and ROESY) are processed with external 1H/13C projections and isotope-labelled `1H / ppm` and `13C / ppm` axes. **Multiple series** combines several methods with separate inputs and templates in one run. See the [crystallography guide](docs/crystallography.md) and the [complete numbered example](examples/example_4). Source changes require a new build; existing installer binaries are not automatically updated.
+Optional **CIF source** adds X-ray structure figures, experimental descriptions and numbered crystal/refinement tables to SI. A custom crystallography template can be supplied separately or embedded in all-in-one DOCX. Raw 2D Bruker experiments (HSQC, HMBC, COSY, NOESY, TOCSY and ROESY) are processed with external 1H/13C projections and isotope-labelled `1H / ppm` and `13C / ppm` axes. **Multiple series** combines several methods with separate inputs and templates in one run. See the [crystallography guide](docs/crystallography.md) and the [complete numbered example](examples/example_4). The current beta 1.3 installer and its SHA-256 checksum are in [`installer`](installer).
+
+Publication presets are reproducible house templates, not official publisher forms. Their implemented checks and remaining manual review are documented in the [journal requirements matrix](docs/journal_si_template_requirements.md) and the [ACS Organic Letters audit](docs/acs_orglett_compliance_audit.md).
+
+For several synthetic series in one all-in-one file, place `[AUTO SI: REACTION <numbers>]` before each reaction table and `[AUTO SI: METHOD <numbers>]` before each shared general procedure. Finish the method blocks with `[AUTO SI: COMPOUND TEMPLATE]`; comma-separated labels and ranges such as `2a-2f` are supported. Full field and section rules are in the [Russian guide](README_RU.md#несколько-методик-и-реакций-в-одном-входе) and [English guide](README_EN.md#several-methods-and-reactions-in-one-input).
 
 - [Русская версия](README_RU.md)
 - [English version](README_EN.md)

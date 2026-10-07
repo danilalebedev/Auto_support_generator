@@ -20,9 +20,12 @@ def make_payload(root: Path, *, app_text: str = "app") -> Path:
     payload.mkdir()
     for filename in installer.PAYLOAD_FILES:
         (payload / filename).write_text(app_text if filename == installer.APP_EXE_NAME else filename, encoding="utf-8")
-    example = payload / "examples" / "example_1"
-    example.mkdir(parents=True)
-    (example / "Compound_table.docx").write_text("example", encoding="utf-8")
+    for example_name in installer.REQUIRED_EXAMPLES:
+        example = payload / "examples" / example_name
+        example.mkdir(parents=True)
+        (example / "Compound_table.docx").write_text("example", encoding="utf-8")
+        (example / "All_in_one_input.docx").write_text("all-in-one", encoding="utf-8")
+        (example / "Reference_output.docx").write_text("reference", encoding="utf-8")
     docs = payload / "docs" / "assets"
     docs.mkdir(parents=True)
     (docs / "gui_overview.png").write_bytes(b"png")
@@ -50,6 +53,7 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual((app_dir / "gui_settings.json").read_text(encoding="utf-8"), "settings")
             self.assertFalse(old_example.exists())
             self.assertTrue((app_dir / "examples" / "example_1" / "Compound_table.docx").is_file())
+            self.assertTrue((app_dir / "examples" / "example_5" / "Reference_output.docx").is_file())
             self.assertTrue((app_dir / "docs" / "assets" / "gui_overview.png").is_file())
             self.assertTrue((app_dir / installer.UNINSTALL_EXE_NAME).is_file())
             manifest = installer._read_install_manifest(app_dir)
@@ -127,6 +131,20 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertTrue((selected_dir / installer.APP_EXE_NAME).is_file())
             self.assertTrue((selected_dir / "examples" / "example_1" / "Compound_table.docx").is_file())
+            self.assertTrue((selected_dir / "examples" / "example_5" / "All_in_one_input.docx").is_file())
+
+    def test_install_payload_requires_all_numbered_examples(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            payload = make_payload(root)
+            missing = payload / "examples" / "example_5"
+            for child in missing.iterdir():
+                child.unlink()
+            missing.rmdir()
+
+            with patch.object(installer, "_payload_root", return_value=payload):
+                with self.assertRaisesRegex(RuntimeError, "example_5"):
+                    installer._install_payload(root / "app")
 
     def test_main_without_quiet_opens_gui_installer_with_selected_defaults(self) -> None:
         selected_dir = Path("C:/Apps/AutoSupportGenerator")

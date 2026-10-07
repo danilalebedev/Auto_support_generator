@@ -35,6 +35,8 @@ NS = {
     "rel": "http://schemas.openxmlformats.org/package/2006/relationships",
 }
 
+_HRMS_ADDUCT_PATTERN = r"\[M(?:[+-]\d*[A-Z][A-Za-z0-9]*)?\]\d*[+-]"
+
 ET.register_namespace("w", NS["w"])
 ET.register_namespace("r", NS["r"])
 ET.register_namespace("v", NS["v"])
@@ -393,7 +395,7 @@ def _map_row(headers: list[str], values: list[str]) -> dict[str, str]:
         elif "hrms" in key:
             result["hrms_label"] = _hrms_label_from_header(header)
             result["hrms_found"] = _first_number(value)
-            adduct = re.search(r"\[M[+-][A-Za-z0-9]+\]\+", f"{header} {value}")
+            adduct = re.search(_HRMS_ADDUCT_PATTERN, f"{header} {value}")
             if adduct:
                 result.setdefault("hrms_adduct", adduct.group(0))
         elif key in {"mp", "meltingpoint"}:
@@ -462,13 +464,13 @@ def _first_number(value: str) -> str:
 
 def _adduct_from_headers(headers: list[str]) -> str | None:
     joined = " ".join(headers)
-    match = re.search(r"\[M[+-][A-Za-z0-9]+\]\+", joined)
+    match = re.search(_HRMS_ADDUCT_PATTERN, joined)
     return match.group(0) if match else None
 
 
 def _hrms_label_from_header(header: str) -> str:
     cleaned = re.sub(r"\s+", " ", header).strip()
-    cleaned = re.sub(r":?\s*\[M[+-][A-Za-z0-9]+\]\+\s*$", "", cleaned).strip()
+    cleaned = re.sub(rf":?\s*{_HRMS_ADDUCT_PATTERN}\s*$", "", cleaned).strip()
     cleaned = cleaned.rstrip(":")
     return "HRMS (ESI/Q-TOF) m/z" if cleaned.lower() == "hrms" else cleaned or "HRMS (ESI/Q-TOF) m/z"
 

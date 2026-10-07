@@ -109,7 +109,7 @@ Copy-Item -LiteralPath (Join-Path $root "README.md") -Destination (Join-Path $pa
 Copy-Item -LiteralPath (Join-Path $root "README_RU.md") -Destination (Join-Path $payloadDir "README_RU.md")
 Copy-Item -LiteralPath (Join-Path $root "README_EN.md") -Destination (Join-Path $payloadDir "README_EN.md")
 Copy-Item -LiteralPath (Join-Path $root "INSTALL_RU.md") -Destination (Join-Path $payloadDir "INSTALL_RU.md")
-Copy-Item -LiteralPath (Join-Path $root "RELEASE_BETA_1_2.md") -Destination (Join-Path $payloadDir "RELEASE_BETA_1_2.md")
+Copy-Item -LiteralPath (Join-Path $root "RELEASE_BETA_1_3.md") -Destination (Join-Path $payloadDir "RELEASE_BETA_1_3.md")
 Copy-Item -LiteralPath (Join-Path $root "examples\example_1") -Destination (Join-Path $payloadExamplesDir "example_1") -Recurse
 Copy-Item -LiteralPath (Join-Path $root "examples\example_2") -Destination (Join-Path $payloadExamplesDir "example_2") -Recurse
 Copy-Item -LiteralPath (Join-Path $root "examples\example_3") -Destination (Join-Path $payloadExamplesDir "example_3") -Recurse
@@ -144,6 +144,11 @@ $trackedInstallerDir = Join-Path $root "installer"
 $trackedInstallerExe = Join-Path $trackedInstallerDir "AutoSupportGeneratorSetup.exe"
 New-Item -ItemType Directory -Force -Path $trackedInstallerDir | Out-Null
 Copy-Item -LiteralPath $setupExe -Destination $trackedInstallerExe -Force
+$setupHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setupExe).Hash.ToLowerInvariant()
+$distHashFile = Join-Path $distDir "AutoSupportGeneratorSetup.exe.sha256"
+$trackedHashFile = Join-Path $trackedInstallerDir "AutoSupportGeneratorSetup.exe.sha256"
+Set-Content -LiteralPath $distHashFile -Value "$setupHash  AutoSupportGeneratorSetup.exe" -Encoding ascii
+Copy-Item -LiteralPath $distHashFile -Destination $trackedHashFile -Force
 
 Write-Host ""
 Write-Host "Build finished:"
@@ -151,3 +156,4 @@ Write-Host "  $appExe"
 Write-Host "  $uninstallExe"
 Write-Host "  $setupExe"
 Write-Host "  $trackedInstallerExe"
+Write-Host "  $trackedHashFile"

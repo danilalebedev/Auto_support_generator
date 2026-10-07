@@ -1,4 +1,4 @@
-# Установка Auto Support Generator beta 1.2
+# Установка Auto Support Generator beta 1.3
 
 ## Что установить заранее
 
@@ -11,7 +11,7 @@
 
 ## Установка без Git и Python
 
-1. На странице GitHub откройте [`installer/AutoSupportGeneratorSetup.exe`](installer/AutoSupportGeneratorSetup.exe) и нажмите **Download raw file**. Клонировать репозиторий не нужно.
+1. На странице GitHub откройте [`installer/AutoSupportGeneratorSetup.exe`](installer/AutoSupportGeneratorSetup.exe) и нажмите **Download raw file**. Рядом находится файл [`AutoSupportGeneratorSetup.exe.sha256`](installer/AutoSupportGeneratorSetup.exe.sha256) для проверки контрольной суммы. Клонировать репозиторий не нужно.
 2. Запустите скачанный файл двойным кликом.
 3. Если Windows SmartScreen показывает предупреждение, проверьте источник файла, нажмите **Подробнее**, затем **Выполнить в любом случае**.
 4. В поле **Installation folder** оставьте предложенный путь или нажмите **Browse...** и выберите другую папку.
@@ -37,32 +37,37 @@
 
 ## Примеры
 
-В установленной папке находятся три полных набора:
+В установленной папке находятся пять полных наборов:
 
 ```text
 examples\example_1
 examples\example_2
 examples\example_3
+examples\example_4
+examples\example_5
 ```
 
-Каждый набор использует те же названия, что и поля GUI:
+Каждый набор содержит редактируемые входы и ожидаемый `Reference_output.docx`, собранный с **Show scope**. Первые три примера показывают базовые серии, `example_4` — несколько методик, 28 соединений и необязательную РСА, `example_5` — реальные HSQC/HMBC. Наборы используют те же названия, что и поля GUI:
 
 - `Compound_table.docx`;
 - `Spectra_source` или `Spectra_source.zip`;
 - `SI_template.docx`;
 - `Reaction_schema.docx`;
-- `Scope.docx`.
+- `Scope.docx`;
+- `All_in_one_input.docx`;
+- `Reference_output.docx`.
 
 Примеры также можно скопировать из раздела **Instructions → Example files**.
 
 ## Первый запуск
 
-1. На странице **Generate** выберите `Compound_table.docx`.
-2. В **Spectra source** выберите zip или папку со спектрами.
-3. Выберите **Output folder**.
-4. При необходимости укажите SI template, отдельные 1H/13C `.mngp`, Reaction schema и Scope.
-5. Проверьте настройки на странице **Processing**.
-6. Нажмите **Generate SI**.
+1. На странице **Generate** выберите режим **Separate files** или **Single all-in-one DOCX**.
+2. Для отдельного режима выберите `Compound_table.docx`; для единого — `All_in_one_input.docx`.
+3. В **Spectra source** выберите zip или папку со спектрами, затем задайте **Output folder**.
+4. При необходимости укажите CIF source, отдельные 1H/13C `.mngp` и включите **Show scope**.
+5. Проверьте настройки на странице **Processing** и нажмите **Generate SI**.
+
+В all-in-one сохраняйте неизменными метки `[AUTO SI: COMPOUND TABLE]`, `[AUTO SI: REACTION SCHEMA]`, `[AUTO SI: SCOPE]`, `[AUTO SI: SI TEMPLATE]`, `[AUTO SI: CRYSTALLOGRAPHY TEMPLATE]` и `[AUTO SI: END]`. Для нескольких серий используйте селекторы `[AUTO SI: REACTION 2a-2f]` перед соответствующими таблицами и `[AUTO SI: METHOD 2a-2f]` перед общими методиками; после методов поставьте `[AUTO SI: COMPOUND TEMPLATE]`.
 
 Подробное описание всех функций находится в `README_RU.md` и внутри страницы **Instructions** приложения.
 

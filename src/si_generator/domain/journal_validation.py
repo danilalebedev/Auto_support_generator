@@ -30,6 +30,48 @@ def _validate_compound(compound: Compound, profile_label: str, validation: dict)
         if not _has_nucleus(compound, str(nucleus)):
             issues.append(_warning(compound, "JOURNAL_NMR_REQUIRED", f"{profile_label} requires {nucleus} NMR data."))
 
+    required_lists = [str(nucleus) for nucleus in validation.get("required_resonance_lists", [])]
+    for nucleus in required_lists:
+        if not _has_resonance_list(compound, nucleus):
+            issues.append(
+                _warning(
+                    compound,
+                    "JOURNAL_NMR_LIST_REQUIRED",
+                    f"{profile_label} requires a {nucleus} NMR resonance list.",
+                )
+            )
+
+    for nucleus in validation.get("required_spectrum_images", []):
+        nucleus = str(nucleus)
+        if not _has_spectrum_artifact(compound, nucleus):
+            issues.append(
+                _warning(
+                    compound,
+                    "JOURNAL_NMR_SPECTRUM_REQUIRED",
+                    f"{profile_label} requires a {nucleus} NMR spectrum image.",
+                )
+            )
+
+    condition_nuclei = required_lists or [str(nucleus) for nucleus in validation.get("required_nuclei", [])]
+    for nucleus in condition_nuclei:
+        conditions = _nmr_conditions(compound, nucleus)
+        if validation.get("require_nmr_solvent") and not _has_nmr_solvent(conditions):
+            issues.append(
+                _warning(
+                    compound,
+                    "JOURNAL_NMR_SOLVENT_REQUIRED",
+                    f"{profile_label} requires the solvent for {nucleus} NMR.",
+                )
+            )
+        if validation.get("require_nmr_frequency") and not re.search(r"\b\d+(?:[.,]\d+)?\s*MHz\b", conditions, re.I):
+            issues.append(
+                _warning(
+                    compound,
+                    "JOURNAL_NMR_FREQUENCY_REQUIRED",
+                    f"{profile_label} requires the spectrometer frequency for {nucleus} NMR.",
+                )
+            )
+
     formula_elements = _formula_elements(compound.formula)
     for element, nuclei in dict(validation.get("required_nuclei_by_element", {}) or {}).items():
         if formula_elements.get(str(element), 0) <= 0:
@@ -78,6 +120,63 @@ def _has_nucleus(compound: Compound, nucleus: str) -> bool:
         if candidate == normalized:
             return True
     return bool(re.search(rf"(?<!\d){re.escape(normalized)}\b", compound.extra_nmr.upper()))
+
+
+def _has_resonance_list(compound: Compound, nucleus: str) -> bool:
+    normalized = _normalize_nucleus(nucleus)
+    if normalized == "1H":
+        return not _is_missing(compound.h1_nmr)
+    if normalized == "13C":
+        return not _is_missing(compound.c13_nmr)
+    spectrum = _nmr_spectrum(compound, normalized)
+    return bool(spectrum and (spectrum.get("signals") or str(spectrum.get("formatted_text") or "").strip()))
+
+
+def _has_spectrum_artifact(compound: Compound, nucleus: str) -> bool:
+    normalized = _normalize_nucleus(nucleus)
+    if normalized == "1H":
+        return bool(compound.h1_image_path.strip() or compound.h1_spectrum_path.strip() or compound.h1_mnova_path.strip())
+    if normalized == "13C":
+        return bool(compound.c13_image_path.strip() or compound.c13_spectrum_path.strip() or compound.c13_mnova_path.strip())
+    spectrum = _nmr_spectrum(compound, normalized)
+    if spectrum and any(str(spectrum.get(key) or "").strip() for key in ("image_path", "source_path", "spectrum_path", "mnova_path")):
+        return True
+    return any(normalized in str(path).upper() for path in compound.spectra_1d_files)
+
+
+def _nmr_conditions(compound: Compound, nucleus: str) -> str:
+    normalized = _normalize_nucleus(nucleus)
+    if normalized == "1H":
+        direct, text = compound.h1_conditions, compound.h1_nmr
+    elif normalized == "13C":
+        direct, text = compound.c13_conditions, compound.c13_nmr
+    else:
+        spectrum = _nmr_spectrum(compound, normalized) or {}
+        direct = str(spectrum.get("conditions") or "")
+        text = str(spectrum.get("formatted_text") or "")
+    if direct.strip():
+        return direct.strip()
+    parenthetical = re.search(r"\(([^)]*\bMHz\b[^)]*)\)", text, re.I)
+    return parenthetical.group(1).strip() if parenthetical else ""
+
+
+def _has_nmr_solvent(conditions: str) -> bool:
+    residual = re.sub(r"\b\d+(?:[.,]\d+)?\s*MHz\b", "", conditions, flags=re.I)
+    residual = re.sub(r"\b\d+(?:[.,]\d+)?\s*(?:K|°C)\b", "", residual, flags=re.I)
+    residual = re.sub(r"\b(?:NMR|1H|13C|19F|31P)\b", "", residual, flags=re.I)
+    return bool(re.search(r"[A-Za-zА-Яа-я]", residual))
+
+
+def _nmr_spectrum(compound: Compound, normalized_nucleus: str) -> dict | None:
+    for key, spectrum in compound.nmr_spectra.items():
+        candidate = _normalize_nucleus(str(spectrum.get("nucleus") or key))
+        if candidate == normalized_nucleus:
+            return dict(spectrum)
+    return None
+
+
+def _normalize_nucleus(nucleus: str) -> str:
+    return nucleus.upper().replace("{1H}", "")
 
 
 def _has_formula_evidence(compound: Compound) -> bool:

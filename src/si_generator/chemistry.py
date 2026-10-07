@@ -22,6 +22,10 @@ MONOISOTOPIC_MASS: dict[str, float] = {
 }
 
 ELECTRON_MASS = 0.000548579909
+_ADDUCT_RE = re.compile(
+    r"^\[M(?:(?P<operation>[+-])(?P<component>\d*[A-Z][A-Za-z0-9]*))?\]"
+    r"(?P<charge_count>\d*)(?P<charge_sign>[+-])$"
+)
 
 
 def parse_formula(formula: str) -> OrderedDict[str, int]:
@@ -48,25 +52,45 @@ def formula_mass(formula: str) -> float:
 
 
 def calc_hrms_mz(formula: str, adduct: str) -> float:
-    match = re.fullmatch(r"\[M([+-])([A-Za-z0-9]+)\]\+", adduct.strip())
-    if not match:
-        raise ValueError(f"Unsupported adduct format: {adduct}. Expected e.g. [M+H]+ or [M+Na]+.")
-
-    sign_text, adduct_formula = match.groups()
-    sign = 1 if sign_text == "+" else -1
-    ion_mass = formula_mass(formula) + sign * formula_mass(adduct_formula) - ELECTRON_MASS
-    return round(ion_mass, 4)
+    operation, component_multiplier, component_formula, charge = _parse_adduct(adduct)
+    ion_mass = formula_mass(formula)
+    if component_formula:
+        direction = 1 if operation == "+" else -1
+        ion_mass += direction * component_multiplier * formula_mass(component_formula)
+    ion_mass -= charge * ELECTRON_MASS
+    return round(ion_mass / abs(charge), 4)
 
 
 def ion_formula(formula: str, adduct: str) -> str:
-    match = re.fullmatch(r"\[M([+-])([A-Za-z0-9]+)\]\+", adduct.strip())
-    if not match:
-        return formula
-
-    sign_text, adduct_formula = match.groups()
+    operation, component_multiplier, component_formula, charge = _parse_adduct(adduct)
     elements = parse_formula(formula)
-    for element, count in parse_formula(adduct_formula).items():
-        elements[element] = elements.get(element, 0) + (count if sign_text == "+" else -count)
-        if elements[element] == 0:
-            del elements[element]
-    return "".join(element + (str(count) if count != 1 else "") for element, count in elements.items()) + "+"
+    if component_formula:
+        direction = 1 if operation == "+" else -1
+        for element, count in parse_formula(component_formula).items():
+            elements[element] = elements.get(element, 0) + direction * component_multiplier * count
+            if elements[element] < 0:
+                raise ValueError(f"Adduct {adduct} removes more {element} atoms than formula {formula} contains.")
+            if elements[element] == 0:
+                del elements[element]
+    charge_suffix = f"{'^' + str(abs(charge)) if abs(charge) != 1 else ''}{'+' if charge > 0 else '-'}"
+    return "".join(element + (str(count) if count != 1 else "") for element, count in elements.items()) + charge_suffix
+
+
+def _parse_adduct(adduct: str) -> tuple[str, int, str, int]:
+    normalized = re.sub(r"\s+", "", adduct)
+    match = _ADDUCT_RE.fullmatch(normalized)
+    if not match:
+        raise ValueError(
+            f"Unsupported adduct format: {adduct}. Expected e.g. [M+H]+, [M-H]-, [M]+, or [M+2H]2+."
+        )
+
+    operation = match.group("operation") or "+"
+    component = match.group("component") or ""
+    component_match = re.fullmatch(r"(?:(\d+))?([A-Z][A-Za-z0-9]*)", component) if component else None
+    component_multiplier = int(component_match.group(1) or 1) if component_match else 1
+    component_formula = component_match.group(2) if component_match else ""
+    charge_magnitude = int(match.group("charge_count") or 1)
+    if charge_magnitude <= 0:
+        raise ValueError(f"Adduct charge must be non-zero: {adduct}")
+    charge = charge_magnitude if match.group("charge_sign") == "+" else -charge_magnitude
+    return operation, component_multiplier, component_formula, charge

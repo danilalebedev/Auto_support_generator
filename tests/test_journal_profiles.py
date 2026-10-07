@@ -52,6 +52,33 @@ class JournalProfileTests(unittest.TestCase):
         self.assertGreaterEqual(len(profiles), 17)
         self.assertEqual([], [problem for profile in profiles for problem in validate_profile_resources(profile)])
 
+    def test_all_publication_templates_render_a_document(self) -> None:
+        compound = Compound(
+            id="cmp_001",
+            number="2a",
+            name="Profile render example",
+            formula="C8H8O",
+            h1_nmr="7.20 (d, J = 8.0 Hz, 2H)",
+            h1_conditions="400 MHz, CDCl3",
+            c13_nmr="145.0, 128.0",
+            c13_conditions="101 MHz, CDCl3",
+            hrms_found="121.0648",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for profile in list_journal_profiles():
+                with self.subTest(profile_id=profile.id):
+                    output = root / f"{profile.id}.docx"
+                    build_document_from_model(
+                        build_si_document_model([compound]),
+                        output,
+                        template_path=profile.template_path,
+                        render_options=profile.data,
+                    )
+                    rendered = Document(output)
+                    text = "\n".join(paragraph.text for paragraph in rendered.paragraphs)
+                    self.assertIn("Profile render example", text)
+
     def test_journal_override_inherits_publisher_defaults(self) -> None:
         profile = get_journal_profile("acs.joc")
         defaults = journal_profile_defaults(profile.id)
@@ -67,6 +94,17 @@ class JournalProfileTests(unittest.TestCase):
         self.assertEqual(block["id"], "nature.commschem")
         self.assertTrue(block["source_urls"])
         self.assertEqual(block["visual_style_status"], "house_default")
+
+    def test_orglett_inherits_all_acs_sources(self) -> None:
+        block = journal_profile_manifest_block("acs.orglett")
+
+        self.assertIn("https://researcher-resources.acs.org/publish/data_guidelines", block["source_urls"])
+        self.assertIn("https://pubsapp.acs.org/paragonplus/submission/acs_nmr_guidelines.pdf", block["source_urls"])
+        self.assertIn(
+            "https://researcher-resources.acs.org/publish/author_guidelines?coden=orlef7",
+            block["source_urls"],
+        )
+        self.assertEqual(block["profile_version"], "2026.10")
 
     def test_settings_node_applies_profile_resources_and_records_overrides(self) -> None:
         request = GenerateSIRequest(
@@ -127,6 +165,53 @@ class JournalProfileTests(unittest.TestCase):
         document = Document(profile.template_path)
         self.assertAlmostEqual(document.sections[0].page_width.cm, 21.0, places=1)
         self.assertAlmostEqual(document.sections[0].page_height.cm, 29.7, places=1)
+
+    def test_acs_warns_separately_for_lists_images_and_conditions(self) -> None:
+        compound = Compound(
+            id="cmp_001",
+            number="2a",
+            name="Incomplete ACS example",
+            formula="C8H8O",
+            h1_nmr="7.20 (d, J = 8.0 Hz, 2H)",
+            c13_nmr="145.0, 128.0",
+            hrms_found="121.0648",
+        )
+
+        issues = validate_compounds_for_journal([compound], "acs.orglett")
+        codes = [issue["code"] for issue in issues]
+
+        self.assertEqual(codes.count("JOURNAL_NMR_SPECTRUM_REQUIRED"), 2)
+        self.assertEqual(codes.count("JOURNAL_NMR_SOLVENT_REQUIRED"), 2)
+        self.assertEqual(codes.count("JOURNAL_NMR_FREQUENCY_REQUIRED"), 2)
+        self.assertNotIn("JOURNAL_NMR_LIST_REQUIRED", codes)
+
+    def test_acs_accepts_complete_nmr_lists_images_and_conditions(self) -> None:
+        compound = Compound(
+            id="cmp_001",
+            number="2a",
+            name="Complete ACS example",
+            formula="C8H8O",
+            h1_nmr="7.20 (d, J = 8.0 Hz, 2H)",
+            h1_conditions="400 MHz, CDCl3",
+            h1_image_path="2a_1H.png",
+            c13_nmr="145.0, 128.0",
+            c13_conditions="101 MHz, CDCl3",
+            c13_image_path="2a_13C.png",
+            hrms_found="121.0648",
+        )
+
+        issues = validate_compounds_for_journal([compound], "acs.orglett")
+        codes = {issue["code"] for issue in issues}
+
+        self.assertFalse(
+            codes
+            & {
+                "JOURNAL_NMR_LIST_REQUIRED",
+                "JOURNAL_NMR_SPECTRUM_REQUIRED",
+                "JOURNAL_NMR_SOLVENT_REQUIRED",
+                "JOURNAL_NMR_FREQUENCY_REQUIRED",
+            }
+        )
 
 
 def _section_orientations(docx_path: Path) -> list[str]:

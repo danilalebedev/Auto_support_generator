@@ -24,6 +24,22 @@ class FormulaHrmsTests(unittest.TestCase):
     def test_ion_formula_adds_adduct(self) -> None:
         self.assertEqual(ion_formula("C2H4O2", "[M+Na]+"), "C2H4O2Na+")
 
+    def test_negative_and_unmodified_ions_include_electron_mass(self) -> None:
+        self.assertEqual(calc_hrms_mz("C2H4O2", "[M-H]-"), 59.0139)
+        self.assertEqual(ion_formula("C2H4O2", "[M-H]-"), "C2H3O2-")
+        self.assertEqual(ion_formula("C2H4O2", "[M]+"), "C2H4O2+")
+
+    def test_multiply_charged_adduct_is_divided_by_charge(self) -> None:
+        self.assertEqual(calc_hrms_mz("C2H4O2", "[M+2H]2+"), 31.0178)
+        self.assertEqual(ion_formula("C2H4O2", "[M+2H]2+"), "C2H6O2^2+")
+
+    def test_adduct_can_contain_spaces(self) -> None:
+        self.assertEqual(calc_hrms_mz("C2H4O2", "[M + Na] +"), calc_hrms_mz("C2H4O2", "[M+Na]+"))
+
+    def test_adduct_cannot_remove_atoms_missing_from_formula(self) -> None:
+        with self.assertRaisesRegex(ValueError, "removes more N atoms"):
+            ion_formula("C2H4O2", "[M-NH4]-")
+
     def test_domain_hrms_result_groups_calculated_values(self) -> None:
         result = calculate_hrms("C11H10BrFO2", "[M+H]+")
 

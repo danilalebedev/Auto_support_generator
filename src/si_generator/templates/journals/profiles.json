@@ -1,6 +1,6 @@
 {
-  "catalog_version": "2026.08",
-  "checked_date": "2026-08-05",
+  "catalog_version": "2026.10",
+  "checked_date": "2026-10-07",
   "profiles": {
     "organic.default": {
       "label": "General Organic SI",
@@ -48,7 +48,11 @@
       },
       "validation": {
         "elemental_analysis_tolerance_percent": 0.4,
-        "nmr_shift_decimals": {"1H": 2, "13C": 1}
+        "nmr_shift_decimals": {"1H": 2, "13C": 1},
+        "required_resonance_lists": ["1H", "13C"],
+        "required_spectrum_images": ["1H", "13C"],
+        "require_nmr_solvent": true,
+        "require_nmr_frequency": true
       },
       "source_urls": [
         "https://researcher-resources.acs.org/publish/data_guidelines",
@@ -72,6 +76,8 @@
       "inherits": "acs.base",
       "label": "ACS - Organic Letters (Org. Lett.)",
       "visible": true,
+      "version": "2026.10",
+      "checked_date": "2026-10-07",
       "document": {"template_docx": "acs.orglett.docx"},
       "validation": {
         "formula_evidence": {"any_of": ["HRMS", "elemental_analysis"], "enforcement": "required_for_new_compounds"},

@@ -19,7 +19,7 @@ Auto Support Generator — проект с открытым исходным к�
 
 ## Установка без Git и Python
 
-1. Откройте файл [`installer/AutoSupportGeneratorSetup.exe`](installer/AutoSupportGeneratorSetup.exe) на GitHub.
+1. Откройте файл [`installer/AutoSupportGeneratorSetup.exe`](installer/AutoSupportGeneratorSetup.exe) на GitHub. Рядом опубликована контрольная сумма [`AutoSupportGeneratorSetup.exe.sha256`](installer/AutoSupportGeneratorSetup.exe.sha256).
 2. Нажмите **Download raw file** и сохраните установщик. Клонировать репозиторий и устанавливать Git не нужно.
 3. Запустите `AutoSupportGeneratorSetup.exe`. Если появился Windows SmartScreen, убедитесь, что файл скачан из этого репозитория, затем нажмите **Подробнее → Выполнить в любом случае**.
 4. В поле **Installation folder** оставьте предложенный путь в `%LOCALAPPDATA%` или нажмите **Browse...** и выберите другую папку.
@@ -264,13 +264,31 @@ si-procedure-import method.docx -o procedure_inputs --variable "bromide 2a" --pr
 
 В обычных готовых `All_in_one_input.docx` собраны Compound table, Reaction schema, Scope и SI template. РСА-пример дополнительно содержит `[AUTO SI: CRYSTALLOGRAPHY TEMPLATE]`; программа извлекает оба шаблона автоматически. Если SI template удалить, применяется шаблон выбранного **Publication preset**; если РСА-шаблон отсутствует, используется отдельное поле либо встроенный ACS-ориентированный вариант. Publication preset, Spectra source, CIF source, Output folder, MestReNova, `.mngp` и Processing остаются настройками приложения и не хранятся в объединенном DOCX.
 
+#### Несколько методик и реакций в одном входе
+
+Внутри секции `[AUTO SI: REACTION SCHEMA]` можно разместить несколько таблиц. Перед каждой таблицей добавьте отдельный абзац-селектор, например `[AUTO SI: REACTION 2a-2f]` или `[AUTO SI: REACTION 3a, 3c, 5]`. Для каждого продукта используется только одна совпавшая таблица. Если таблица одна, селектор необязателен; если появился хотя бы один селектор, он обязателен перед каждой таблицей.
+
+Внутри `[AUTO SI: SI TEMPLATE]` общие методики задаются блоками `[AUTO SI: METHOD <номера>]`. После последней методики поставьте `[AUTO SI: COMPOUND TEMPLATE]`, а ниже оставьте один общий шаблон описания соединения. Например:
+
+```text
+[AUTO SI: METHOD 2a-2f]
+General procedure A ...
+[AUTO SI: METHOD 3a, 3c, 5]
+General procedure B ...
+[AUTO SI: COMPOUND TEMPLATE]
+{Product.name} ({Product.number})
+{Product.preparation}
+```
+
+Поддерживаются списки через запятую, числовые диапазоны `1-5` и буквенные диапазоны с общей цифрой `2a-2f`. Диапазоны не должны пересекаться, идти по убыванию или содержать номера, отсутствующие в Compound table/Scope. Общая таблица Scope по-прежнему содержит по одной строке на продукт; селекторы связывают эту строку с нужной реакционной таблицей и общей методикой без дублирования текста.
+
 ### Реакция и выровненный scope
 
 В **Generate** включите **Show scope**. Нужны `Reaction_schema.docx` и `Scope.docx` либо соответствующие секции all-in-one. В Scope укажите структуры Reagent_i и продукта, совпадающие номера продуктов и измеренные массы для расчёта выхода. Можно использовать уже заданный процент выхода из Compound table.
 
 Над сеткой показана реакция первого соединения серии: постоянные реагенты без эквивалентов над стрелкой, растворитель под ней. Служебная подпись `Representative reaction` не выводится. В **Reaction conditions** добавьте температуру, время и другие условия; неизвестные значения программа не придумывает. Под каждой структурой идёт одна строка вида **2a**, 80%: номер жирный, запятая и выход обычного начертания.
 
-В `scope` сохраняются редактируемые `.cdxml`, PNG и данные для дальнейших изменений. Word содержит нативную PNG-визуализацию ChemDraw перед описаниями соединений. Patch обновляет состав и номера scope без обработки спектров, Add расширяет его или создаёт отдельную схему для новой методики. Требуется установленный ChemDraw; при выключенной галочке блок не создаётся.
+В `scope` сохраняются редактируемые `.cdxml`, `.cdx`, PNG и данные для дальнейших изменений. В Word реакция и scope вставляются как редактируемые ChemDraw OLE-объекты с PNG-превью. Patch обновляет состав и номера scope без обработки спектров, Add расширяет его или создаёт отдельную схему для новой методики. Требуется установленный ChemDraw; при выключенной галочке блок не создаётся.
 
 Каждый нумерованный пример содержит редактируемые входные файлы и `Reference_output.docx`, сгенерированный с включённой опцией **Show scope**. Начните с [example_1](examples/example_1), полный NMR/РСА workflow показан в [example_4](examples/example_4), а обработка реальных HSQC/HMBC показана в [example_5](examples/example_5).
 
@@ -362,7 +380,7 @@ Patch использует уже обработанные PNG и Mnova OLE и �
 | **Nature Portfolio** | Nature Chemistry, Communications Chemistry |
 | **Другие** | Molecules, Beilstein Journal of Organic Chemistry, Chemical Papers, General Organic SI |
 
-Профили построены как общее правило издательства плюс уточнение конкретного журнала. Встроенные DOCX являются воспроизводимыми шаблонами программы на основе действующих author guidelines, а не официальными файлами издательств. Перед подачей сверяйтесь с сайтом журнала. Источники и дата проверки сохраняются в `support_information.manifest.json`; подробная матрица находится в [`docs/journal_si_template_requirements.md`](docs/journal_si_template_requirements.md).
+Профили построены как общее правило издательства плюс уточнение конкретного журнала. Встроенные DOCX являются воспроизводимыми шаблонами программы на основе действующих author guidelines, а не официальными файлами издательств. Перед подачей сверяйтесь с сайтом журнала. Источники и дата проверки сохраняются в `support_information.manifest.json`; см. [матрицу требований](docs/journal_si_template_requirements.md) и [фактический аудит ACS Organic Letters](docs/acs_orglett_compliance_audit.md).
 
 ## SI template и алиасы
 

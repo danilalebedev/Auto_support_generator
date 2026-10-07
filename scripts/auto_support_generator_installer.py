@@ -11,7 +11,7 @@ from tkinter import BooleanVar, StringVar, Tk, filedialog, messagebox, ttk
 
 
 APP_NAME = "Auto Support Generator"
-APP_VERSION = "0.1.2"
+APP_VERSION = "0.1.3"
 APP_PUBLISHER = "Danila Lebedev"
 INSTALL_DIR_NAME = "AutoSupportGenerator"
 APP_EXE_NAME = "AutoSupportGenerator.exe"
@@ -28,9 +28,10 @@ PAYLOAD_FILES = (
     "README_RU.md",
     "README_EN.md",
     "INSTALL_RU.md",
-    "RELEASE_BETA_1_2.md",
+    "RELEASE_BETA_1_3.md",
 )
 PAYLOAD_DIRS = ("examples", "docs")
+REQUIRED_EXAMPLES = tuple(f"example_{index}" for index in range(1, 6))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -330,8 +331,20 @@ def _validate_payload(payload: Path) -> None:
     examples = payload / "examples"
     if not examples.is_dir():
         raise RuntimeError("Installer payload examples folder is missing.")
-    if not any(examples.iterdir()):
-        raise RuntimeError("Installer payload examples folder is empty.")
+    missing_examples = [name for name in REQUIRED_EXAMPLES if not (examples / name).is_dir()]
+    if missing_examples:
+        raise RuntimeError("Installer payload is missing examples: " + ", ".join(missing_examples))
+    incomplete_examples = [
+        name
+        for name in REQUIRED_EXAMPLES
+        if not (examples / name / "All_in_one_input.docx").is_file()
+        or not (examples / name / "Reference_output.docx").is_file()
+    ]
+    if incomplete_examples:
+        raise RuntimeError(
+            "Installer examples are missing All_in_one_input.docx or Reference_output.docx: "
+            + ", ".join(incomplete_examples)
+        )
 
 
 def _validate_install(app_dir: Path) -> None:
@@ -340,6 +353,12 @@ def _validate_install(app_dir: Path) -> None:
         raise RuntimeError(f"{APP_EXE_NAME} was not installed: {exe_path}")
     if not (app_dir / "examples").is_dir():
         raise RuntimeError("Examples were not installed.")
+    for example_name in REQUIRED_EXAMPLES:
+        example_dir = app_dir / "examples" / example_name
+        if not (example_dir / "All_in_one_input.docx").is_file():
+            raise RuntimeError(f"{example_name}/All_in_one_input.docx was not installed.")
+        if not (example_dir / "Reference_output.docx").is_file():
+            raise RuntimeError(f"{example_name}/Reference_output.docx was not installed.")
     if not (app_dir / UNINSTALL_EXE_NAME).is_file():
         raise RuntimeError("The uninstaller was not installed.")
     _read_install_manifest(app_dir)

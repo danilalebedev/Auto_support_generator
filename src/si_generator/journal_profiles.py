@@ -179,7 +179,9 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
     for key, value in override.items():
         if key == "inherits":
             continue
-        if isinstance(value, dict) and isinstance(result.get(key), dict):
+        if key == "source_urls" and isinstance(value, list) and isinstance(result.get(key), list):
+            result[key] = list(dict.fromkeys([*result[key], *deepcopy(value)]))
+        elif isinstance(value, dict) and isinstance(result.get(key), dict):
             result[key] = _deep_merge(result[key], value)
         else:
             result[key] = deepcopy(value)

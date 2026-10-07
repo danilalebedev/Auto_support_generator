@@ -8,7 +8,7 @@ An optional sidecar JSON supplies crystal-growth/refinement text, CCDC, an exter
 
 Raw Bruker HSQC, HMBC, COSY, NOESY, TOCSY and ROESY experiments are detected from acquisition metadata. Version A uses separately processed 1H/13C external projections, independent 8% trace sizes, contour scaling 4.0 and isotope-labelled `1H / ppm` and `13C / ppm` axes; the 13C projection uses Bernstein baseline correction of order 3.
 
-**Multiple series** assembles a folder of series, each with its own Compound_table, optional SI_template and Reaction_schema/Scope. Processing settings are shared; compound numbers must be unique. See the [field reference and requirements](docs/crystallography.md) and [complete runnable example](examples/example_4). Existing installer binaries have not been rebuilt for these source changes.
+**Multiple series** assembles a folder of series, each with its own Compound_table, optional SI_template and Reaction_schema/Scope. Processing settings are shared; compound numbers must be unique. See the [field reference and requirements](docs/crystallography.md) and [complete runnable example](examples/example_4). The current beta 1.3 installer and its SHA-256 checksum are in [`installer`](installer).
 
 **English** | [Русский](README_RU.md)
 
@@ -203,6 +203,24 @@ The file is divided by fixed labels:
 
 Standard bundled `All_in_one_input.docx` files contain Compound table, Reaction schema, Scope and SI template. The crystallography example additionally embeds `[AUTO SI: CRYSTALLOGRAPHY TEMPLATE]`; both templates are extracted automatically. If the SI template is absent, the selected publication preset is used. If the X-ray template is absent, the separate field or built-in ACS-oriented template is used. Publication preset, Spectra source, CIF source, Output folder, MestReNova, `.mngp` and Processing remain application settings.
 
+#### Several methods and reactions in one input
+
+The `[AUTO SI: REACTION SCHEMA]` section may contain several tables. Put a selector paragraph such as `[AUTO SI: REACTION 2a-2f]` or `[AUTO SI: REACTION 3a, 3c, 5]` immediately before each table. A product must match exactly one table. The selector is optional for a single table; once any selector is used, every reaction table needs one.
+
+Inside `[AUTO SI: SI TEMPLATE]`, add shared procedure blocks as `[AUTO SI: METHOD <numbers>]`. Put `[AUTO SI: COMPOUND TEMPLATE]` after the last method and keep one reusable compound-characterization template below it. For example:
+
+```text
+[AUTO SI: METHOD 2a-2f]
+General procedure A ...
+[AUTO SI: METHOD 3a, 3c, 5]
+General procedure B ...
+[AUTO SI: COMPOUND TEMPLATE]
+{Product.name} ({Product.number})
+{Product.preparation}
+```
+
+Selectors accept comma-separated labels, numeric ranges such as `1-5`, and letter ranges with a shared numeric prefix such as `2a-2f`. They must not overlap, descend, or refer to products missing from the compound table/Scope. Scope remains one row per product; selectors connect each row to the correct reaction table and shared method without duplicating the procedure for every compound.
+
 ### Reaction and aligned compound scope
 
 Enable **Generate → Show scope** and provide `Reaction_schema.docx` and `Scope.docx`, or their all-in-one sections. Scope contains editable reagent/product structures, matching product numbers and measured masses; yields can also come from percentage yields in the compound table.
@@ -299,7 +317,7 @@ On Generate, choose a **Publication preset** and click **Apply**, then adjust in
 | **Nature Portfolio** | Nature Chemistry, Communications Chemistry |
 | **Other** | Molecules, Beilstein Journal of Organic Chemistry, Chemical Papers, General Organic SI |
 
-Profiles use a publisher base plus journal-specific overrides. Bundled DOCX files are reproducible application templates derived from current author guidance, not official publisher templates. Always check the target journal before submission. Source URLs and review dates are written to `support_information.manifest.json`; see [`docs/journal_si_template_requirements.md`](docs/journal_si_template_requirements.md) for the requirements matrix.
+Profiles use a publisher base plus journal-specific overrides. Bundled DOCX files are reproducible application templates derived from current author guidance, not official publisher templates. Always check the target journal before submission. Source URLs and review dates are written to `support_information.manifest.json`; see the [requirements matrix](docs/journal_si_template_requirements.md) and the [evidence-based ACS Organic Letters audit](docs/acs_orglett_compliance_audit.md).
 
 ## SI template aliases
 
